@@ -4,15 +4,17 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Check, Flag, Sparkles, Star } from "lucide-react";
 import { defaultScoreProfile } from "@/data/student";
 import { generateStudyPlan } from "@/lib/plan";
-import { readScoreProfile } from "@/lib/storage";
-import type { ScoreProfile } from "@/types";
+import { readScoreAnalysis, readScoreProfile } from "@/lib/storage";
+import type { ScoreProfile, ScoreReportAnalysis } from "@/types";
 import { Badge, LinkButton, ModuleGlyph, ProgressBar, Shell } from "@/components/ui";
 
 export default function PlanPage() {
   const [profile, setProfile] = useState<ScoreProfile>(defaultScoreProfile);
+  const [analysis, setAnalysis] = useState<ScoreReportAnalysis | null>(null);
 
   useEffect(() => {
     setProfile(readScoreProfile());
+    setAnalysis(readScoreAnalysis());
   }, []);
 
   const plan = generateStudyPlan(profile);
@@ -25,6 +27,24 @@ export default function PlanPage() {
           <h1 className="page-title mt-4">{profile.studentName}, here is your roadmap to {profile.targetScore}.</h1>
           <p className="page-sub">{plan.encouragement}</p>
         </section>
+
+        {analysis ? (
+          <section className="card card-pad-lg border-violet/30 bg-surface">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <Badge tone="violet">Based on score report analysis</Badge>
+              <Badge tone={analysis.extractionConfidence === "High" ? "green" : analysis.extractionConfidence === "Medium" ? "amber" : "rose"}>
+                {analysis.extractionConfidence} extraction confidence
+              </Badge>
+            </div>
+            <h2 className="display text-2xl">What Ascend found</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {analysis.findings.map((finding) => (
+                <div key={finding} className="rounded-lg bg-surface2 p-3 text-sm leading-6 text-ink2">{finding}</div>
+              ))}
+            </div>
+            <p className="mt-4 text-sm leading-6 text-muted">{analysis.sectionAdvice}</p>
+          </section>
+        ) : null}
 
         <section className="card card-pad-lg bg-ink text-bg">
           <div className="grid gap-6 md:grid-cols-[160px_1fr_160px] md:items-center">
@@ -117,6 +137,17 @@ export default function PlanPage() {
             <LinkButton href="/summary" variant="ghost">Share summary</LinkButton>
           </div>
         </section>
+
+        {analysis ? (
+          <section className="card card-pad-lg">
+            <h2 className="display text-2xl">Next actions from your report</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {analysis.nextActions.map((action) => (
+                <div key={action} className="rounded-lg border border-border bg-surface2 p-4 text-sm font-semibold leading-6">{action}</div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </Shell>
   );

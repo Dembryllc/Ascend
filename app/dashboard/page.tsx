@@ -1,11 +1,23 @@
-import { ArrowRight, FileUp, Sparkles, Target } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { ArrowRight, FileUp, Sparkles, Target, UserRound } from "lucide-react";
 import { modules } from "@/data/modules";
 import { defaultScoreProfile } from "@/data/student";
 import { generateStudyPlan, MATH_BENCHMARK, RW_BENCHMARK } from "@/lib/plan";
+import { readAccount, readScoreProfile } from "@/lib/storage";
+import type { Account, ScoreProfile } from "@/types";
 import { Badge, HeroBand, LinkButton, ModuleCard, ProgressBar, Shell } from "@/components/ui";
 
 export default function DashboardPage() {
-  const profile = defaultScoreProfile;
+  const [profile, setProfile] = useState<ScoreProfile>(defaultScoreProfile);
+  const [account, setAccount] = useState<Account | null>(null);
+
+  useEffect(() => {
+    setProfile(readScoreProfile());
+    setAccount(readAccount());
+  }, []);
+
   const plan = generateStudyPlan(profile);
   const progressToTarget = ((profile.totalScore - 400) / (profile.targetScore - 400)) * 100;
 
@@ -16,12 +28,14 @@ export default function DashboardPage() {
           <div className="flex flex-wrap gap-2">
             <Badge tone="green">12-day streak</Badge>
             <Badge tone="violet">Test date {new Date(profile.testDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</Badge>
+            {account ? <Badge>{account.role}</Badge> : null}
           </div>
           <h1 className="display mt-5 max-w-3xl text-4xl leading-tight md:text-6xl">Hi {profile.studentName}. You&apos;ve got this.</h1>
           <p className="mt-3 max-w-xl text-bg/75">Start with {plan.recommendedModules[0].name}. It is the clearest path toward your target right now.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <LinkButton href={`/modules/${plan.recommendedModules[0].id}`} variant="soft" iconRight={ArrowRight}>Continue studying</LinkButton>
             <LinkButton href="/upload" variant="ghost" iconRight={FileUp}>Upload score report</LinkButton>
+            {!account ? <LinkButton href="/account" variant="ghost" iconRight={UserRound}>Create account</LinkButton> : null}
           </div>
         </HeroBand>
 

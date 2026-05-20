@@ -1,4 +1,4 @@
-import { ArrowRight, FileUp, Play, Sparkles } from "lucide-react";
+import { ArrowRight, FileUp, Play, Sparkles, UserRound } from "lucide-react";
 import { modules } from "@/data/modules";
 import { defaultScoreProfile } from "@/data/student";
 import { generateStudyPlan } from "@/lib/plan";
@@ -17,7 +17,8 @@ export default function HomePage() {
             Study the exact SAT domains, upload or enter a score report, and get a weekly plan that feels doable.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <LinkButton href="/dashboard" variant="soft" iconRight={ArrowRight}>Open dashboard</LinkButton>
+            <LinkButton href="/account" variant="soft" iconRight={UserRound}>Create account</LinkButton>
+            <LinkButton href="/dashboard" variant="ghost" iconRight={ArrowRight}>Open dashboard</LinkButton>
             <LinkButton href="/upload" variant="ghost" iconRight={FileUp}>Add score report</LinkButton>
           </div>
         </HeroBand>

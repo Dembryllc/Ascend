@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { ArrowRight, BookOpen, Check, CircleHelp, FileUp, Flag, Home, LineChart, Lock, Play, Settings, Shield, Sparkles, Target, Trash2, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Check, CircleHelp, FileUp, Flag, Home, LineChart, Lock, Play, Settings, Shield, Sparkles, Target, Trash2, UserRound, Users } from "lucide-react";
 import type { Module } from "@/types";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -24,6 +24,7 @@ export const icons = {
   lock: Lock,
   trash: Trash2,
   settings: Settings,
+  account: UserRound,
   help: CircleHelp,
   arrowRight: ArrowRight
 };
@@ -107,6 +108,7 @@ export function ModuleCard({ module, compact = false }: { module: Module; compac
 export function Shell({ children }: { children: React.ReactNode }) {
   const nav = [
     ["Dashboard", "/dashboard", icons.home],
+    ["Account", "/account", icons.account],
     ["Modules", "/modules", icons.book],
     ["Practice", "/practice", icons.play],
     ["Score report", "/upload", icons.upload],

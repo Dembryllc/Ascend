@@ -2,6 +2,7 @@ export type Section = "rw" | "math";
 export type Impact = "Low" | "Medium" | "High";
 export type DomainBand = 1 | 2 | 3 | 4;
 export type Confidence = 1 | 2 | 3 | 4 | 5;
+export type UserRole = "student" | "parent" | "teacher";
 
 export type Module = {
   id: string;
@@ -49,6 +50,26 @@ export type ScoreProfile = {
   weeklyStudyGoal: number;
   domainBands: Record<string, DomainBand>;
   domainConfidence: Record<string, Confidence>;
+};
+
+export type Account = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt: string;
+  goal: "already-tested" | "study-first" | "both";
+};
+
+export type ScoreReportAnalysis = {
+  fileName?: string;
+  extractedTextPreview?: string;
+  extractionConfidence: "High" | "Medium" | "Low";
+  findings: string[];
+  missingFields: string[];
+  priorityDomainIds: string[];
+  sectionAdvice: string;
+  nextActions: string[];
 };
 
 export type StudySession = {
