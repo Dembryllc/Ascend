@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { ArrowRight, BookOpen, Check, CircleHelp, FileUp, Flag, Home, LineChart, Lock, Play, Settings, Shield, Sparkles, Target, Trash2, UserRound, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Check, CircleHelp, ClipboardList, FileUp, Flag, Home, LineChart, Lock, Play, Settings, Shield, Sparkles, Target, Trash2, UserRound, Users } from "lucide-react";
 import type { Module } from "@/types";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -20,6 +20,7 @@ export const icons = {
   target: Target,
   users: Users,
   play: Play,
+  tests: ClipboardList,
   shield: Shield,
   lock: Lock,
   trash: Trash2,
@@ -111,6 +112,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ["Account", "/account", icons.account],
     ["Modules", "/modules", icons.book],
     ["Practice", "/practice", icons.play],
+    ["Practice tests", "/tests", icons.tests],
     ["Score report", "/upload", icons.upload],
     ["Study plan", "/plan", icons.spark],
     ["Parent view", "/summary", icons.users],

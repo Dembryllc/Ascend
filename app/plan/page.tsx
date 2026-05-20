@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, Flag, Sparkles, Star } from "lucide-react";
 import { defaultScoreProfile } from "@/data/student";
+import { officialDomainDetails } from "@/data/sat-reference";
 import { generateStudyPlan } from "@/lib/plan";
 import { readScoreAnalysis, readScoreProfile } from "@/lib/storage";
 import type { ScoreProfile, ScoreReportAnalysis } from "@/types";
@@ -78,7 +79,7 @@ export default function PlanPage() {
                   <ModuleGlyph module={module} />
                   <div className="flex-1">
                     <div className="font-bold">{module.name}</div>
-                    <div className="text-xs text-muted">{module.impact} impact · confidence {profile.domainConfidence[module.id]}/5</div>
+                    <div className="text-xs text-muted">{module.impact} impact · confidence {profile.domainConfidence[module.id]}/5 · {officialDomainDetails[module.id].coverage}</div>
                   </div>
                   <ArrowRight size={16} />
                 </a>
@@ -132,6 +133,9 @@ export default function PlanPage() {
           <Badge tone="violet" icon={Sparkles}>Target score strategy</Badge>
           <h2 className="display mt-4 text-2xl text-violetDeep">Why this plan works</h2>
           <p className="mt-3 max-w-3xl leading-7 text-violetDeep">{plan.targetScoreStrategy} Lower-confidence domains get extra practice, and each week stays between 3 and 5 sessions so it feels repeatable.</p>
+          <div className="mt-4 rounded-lg bg-white/40 p-4 text-sm leading-6 text-violetDeep">
+            Next skill to unlock in {plan.recommendedModules[0].name}: {officialDomainDetails[plan.recommendedModules[0].id].nextBandSkill}
+          </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <LinkButton href={`/modules/${plan.recommendedModules[0].id}`} variant="accent" iconRight={ArrowRight}>Start first module</LinkButton>
             <LinkButton href="/summary" variant="ghost">Share summary</LinkButton>

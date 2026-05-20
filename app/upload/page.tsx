@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, FileText, FileUp, Lock, Shield } from "lucide-react";
 import { modules } from "@/data/modules";
+import { officialDomainDetails, officialScoreReportNotes } from "@/data/sat-reference";
 import { defaultScoreProfile } from "@/data/student";
 import { analyzeScoreText, buildAnalysis, extractPdfText } from "@/lib/score-report";
 import { readScoreAnalysis, readScoreProfile, saveScoreAnalysis, saveScoreProfile } from "@/lib/storage";
@@ -96,6 +97,10 @@ export default function UploadPage() {
 
           <form onSubmit={submit} className="card card-pad-lg space-y-5">
             <h2 className="display text-2xl">Manual score entry</h2>
+            <div className="rounded-lg bg-violetSoft p-4 text-sm leading-6 text-violetDeep">
+              <div className="mb-2 font-bold">How Ascend reads official score reports</div>
+              {officialScoreReportNotes.slice(0, 4).join(" ")}
+            </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label><span className="label">Student name</span><input className="input mt-2" value={profile.studentName} onChange={(event) => setProfile({ ...profile, studentName: event.target.value })} /></label>
               <label><span className="label">Test date</span><input className="input mt-2" type="date" value={profile.testDate} onChange={(event) => setProfile({ ...profile, testDate: event.target.value })} /></label>
@@ -113,6 +118,7 @@ export default function UploadPage() {
                 {modules.map((module) => (
                   <label key={module.id} className="rounded-lg border border-border bg-surface2 p-3">
                     <span className="text-sm font-semibold">{module.name}</span>
+                    <span className="mt-1 block text-xs leading-5 text-muted">{officialDomainDetails[module.id].coverage}</span>
                     <select className="input mt-2" value={profile.domainBands[module.id]} onChange={(event) => updateBand(module.id, event.target.value)}>
                       <option value={1}>1 · Needs work</option>
                       <option value={2}>2 · Developing</option>
@@ -157,6 +163,13 @@ function AnalysisPanel({ analysis }: { analysis: ScoreReportAnalysis }) {
         </div>
       </div>
       <p className="mt-4 text-sm leading-6 text-muted">{analysis.sectionAdvice}</p>
+      <div className="mt-4 grid gap-2">
+        {priorityModules.slice(0, 3).map((module) => module ? (
+          <div key={module.id} className="rounded-lg bg-surface2 p-3 text-xs leading-5 text-muted">
+            <strong className="text-ink">{module.name}:</strong> {officialDomainDetails[module.id].scoreReportMeaning} Next skill: {officialDomainDetails[module.id].nextBandSkill}
+          </div>
+        ) : null)}
+      </div>
       {analysis.missingFields.length ? (
         <p className="mt-3 text-xs font-semibold text-amber">Please confirm manually: {analysis.missingFields.join(", ")}.</p>
       ) : null}

@@ -1,4 +1,5 @@
 import { modules } from "@/data/modules";
+import { officialDomainDetails, officialScoreReportNotes } from "@/data/sat-reference";
 import { defaultScoreProfile } from "@/data/student";
 import { generateStudyPlan, MATH_BENCHMARK, rankedModules, RW_BENCHMARK } from "@/lib/plan";
 import type { Confidence, DomainBand, ScoreProfile, ScoreReportAnalysis } from "@/types";
@@ -71,12 +72,13 @@ export function buildAnalysis(profile: ScoreProfile, extractedTextPreview = "", 
       `Current total: ${profile.totalScore}. Target: ${profile.targetScore}. Gap: ${Math.max(0, profile.targetScore - profile.totalScore)} points.`,
       `Reading and Writing: ${profile.rwScore} (${profile.rwScore >= RW_BENCHMARK ? "above" : "below"} benchmark ${RW_BENCHMARK}).`,
       `Math: ${profile.mathScore} (${profile.mathScore >= MATH_BENCHMARK ? "above" : "below"} benchmark ${MATH_BENCHMARK}).`,
-      `Top recommended module: ${plan.recommendedModules[0].name}.`
+      `Top recommended module: ${plan.recommendedModules[0].name}. ${officialDomainDetails[plan.recommendedModules[0].id].nextBandSkill}`
     ],
     nextActions: [
       `Start ${plan.recommendedModules[0].name} today.`,
       `Do ${plan.weeklySchedule.length} focused sessions this week.`,
-      "After each practice set, rate confidence so the plan can shift toward low-confidence domains."
+      "After each practice set, rate confidence so the plan can shift toward low-confidence domains.",
+      officialScoreReportNotes[4]
     ]
   };
 }
