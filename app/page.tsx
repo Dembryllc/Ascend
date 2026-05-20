@@ -17,8 +17,8 @@ export default function HomePage() {
             Study the exact SAT domains, upload or enter a score report, and get a weekly plan that feels doable.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <LinkButton href="/account" variant="soft" iconRight={UserRound}>Create account</LinkButton>
-            <LinkButton href="/dashboard" variant="ghost" iconRight={ArrowRight}>Open dashboard</LinkButton>
+            <LinkButton href="/login" variant="soft" iconRight={UserRound}>Log in and start</LinkButton>
+            <LinkButton href="/study" variant="ghost" iconRight={Play}>Start studying now</LinkButton>
             <LinkButton href="/upload" variant="ghost" iconRight={FileUp}>Add score report</LinkButton>
           </div>
         </HeroBand>
@@ -44,7 +44,7 @@ export default function HomePage() {
         <section>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="display text-3xl">Start with these</h2>
-            <LinkButton href="/practice" variant="ghost" iconRight={Play}>Practice</LinkButton>
+            <LinkButton href="/study" variant="ghost" iconRight={Play}>Start studying</LinkButton>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {plan.priorityAreas.map((module) => <ModuleCard key={module.id} module={module} />)}

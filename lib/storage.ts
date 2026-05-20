@@ -1,12 +1,13 @@
 "use client";
 
 import { defaultProgress, defaultScoreProfile } from "@/data/student";
-import type { Account, ProgressState, ScoreProfile, ScoreReportAnalysis } from "@/types";
+import type { Account, ProgressState, ScoreProfile, ScoreReportAnalysis, StudyAttempt } from "@/types";
 
 const scoreKey = "ascend-score-profile";
 const progressKey = "ascend-progress-state";
 const accountKey = "ascend-account";
 const analysisKey = "ascend-score-analysis";
+const attemptsKey = "ascend-study-attempts";
 
 export function readScoreProfile(): ScoreProfile {
   if (typeof window === "undefined") return defaultScoreProfile;
@@ -26,6 +27,10 @@ export function readAccount(): Account | null {
 
 export function saveAccount(account: Account) {
   window.localStorage.setItem(accountKey, JSON.stringify(account));
+}
+
+export function isLoggedIn() {
+  return Boolean(readAccount());
 }
 
 export function signOut() {
@@ -52,8 +57,20 @@ export function saveScoreAnalysis(analysis: ScoreReportAnalysis) {
   window.localStorage.setItem(analysisKey, JSON.stringify(analysis));
 }
 
+export function readStudyAttempts(): StudyAttempt[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(attemptsKey);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export function saveStudyAttempt(attempt: StudyAttempt) {
+  const attempts = readStudyAttempts();
+  window.localStorage.setItem(attemptsKey, JSON.stringify([attempt, ...attempts].slice(0, 200)));
+}
+
 export function deleteAscendData() {
   window.localStorage.removeItem(scoreKey);
   window.localStorage.removeItem(progressKey);
   window.localStorage.removeItem(analysisKey);
+  window.localStorage.removeItem(attemptsKey);
 }

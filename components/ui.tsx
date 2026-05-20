@@ -109,9 +109,10 @@ export function ModuleCard({ module, compact = false }: { module: Module; compac
 export function Shell({ children }: { children: React.ReactNode }) {
   const nav = [
     ["Dashboard", "/dashboard", icons.home],
+    ["Start studying", "/study", icons.play],
     ["Account", "/account", icons.account],
     ["Modules", "/modules", icons.book],
-    ["Practice", "/practice", icons.play],
+    ["Question bank", "/practice", icons.play],
     ["Practice tests", "/tests", icons.tests],
     ["Score report", "/upload", icons.upload],
     ["Study plan", "/plan", icons.spark],

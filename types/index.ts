@@ -98,3 +98,12 @@ export type ProgressState = {
   timeSpentMinutes: Record<string, number>;
   scoreHistory: Array<{ date: string; total: number; rw: number; math: number }>;
 };
+
+export type StudyAttempt = {
+  questionId: string;
+  moduleId: string;
+  pickedAnswer: string;
+  correct: boolean;
+  confidence: Confidence;
+  answeredAt: string;
+};

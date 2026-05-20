@@ -34,8 +34,9 @@ export default function DashboardPage() {
           <p className="mt-3 max-w-xl text-bg/75">Start with {plan.recommendedModules[0].name}. It is the clearest path toward your target right now.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <LinkButton href={`/modules/${plan.recommendedModules[0].id}`} variant="soft" iconRight={ArrowRight}>Continue studying</LinkButton>
+            <LinkButton href="/study" variant="soft" iconRight={Sparkles}>Start study block</LinkButton>
             <LinkButton href="/upload" variant="ghost" iconRight={FileUp}>Upload score report</LinkButton>
-            {!account ? <LinkButton href="/account" variant="ghost" iconRight={UserRound}>Create account</LinkButton> : null}
+            {!account ? <LinkButton href="/login" variant="ghost" iconRight={UserRound}>Log in</LinkButton> : null}
           </div>
         </HeroBand>
 

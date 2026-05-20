@@ -65,7 +65,7 @@ export default function AccountPage() {
           <Badge tone="violet" icon={UserRound}>{account ? "Account settings" : "Create account"}</Badge>
           <div>
             <h1 className="page-title mt-4">{account ? "Your Ascend account" : "Let’s set up Ascend for you."}</h1>
-            <p className="page-sub">This MVP stores your account locally in this browser. It gives the app a real student profile, goal, and starting path without adding production auth yet.</p>
+            <p className="page-sub">Edit your local Ascend profile. Use Login when you want the front-door student flow.</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -123,7 +123,8 @@ export default function AccountPage() {
               <li>Parent/teacher view reflects the same student profile.</li>
             </ul>
           </div>
-          <LinkButton href="/upload" variant="ghost" iconRight={ArrowRight}>Go to score upload</LinkButton>
+          <LinkButton href="/study" variant="accent" iconRight={ArrowRight}>Start studying</LinkButton>
+          <LinkButton href="/login" variant="ghost" iconRight={ArrowRight}>Go to login</LinkButton>
         </aside>
       </div>
     </Shell>
