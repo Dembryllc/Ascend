@@ -34,8 +34,25 @@ export default function StudentHome() {
 
   if (loading) return (
     <AppShell>
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="mb-6">
+        <div className="h-9 w-64 bg-[#E5E7EB] rounded-xl animate-pulse mb-2" />
+        <div className="h-5 w-40 bg-[#E5E7EB] rounded-xl animate-pulse" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="h-20 bg-[#E5E7EB] rounded-2xl animate-pulse" />
+        <div className="h-20 bg-[#E5E7EB] rounded-2xl animate-pulse" />
+      </div>
+      <div className="h-6 w-32 bg-[#E5E7EB] rounded-xl animate-pulse mb-4" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-[#F3F4F6] overflow-hidden">
+            <div className="h-40 bg-[#E5E7EB] animate-pulse" />
+            <div className="p-3 space-y-2">
+              <div className="h-4 bg-[#E5E7EB] rounded animate-pulse" />
+              <div className="h-3 w-2/3 bg-[#E5E7EB] rounded animate-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
     </AppShell>
   )
