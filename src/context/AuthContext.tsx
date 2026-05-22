@@ -11,7 +11,7 @@ interface AuthContextValue {
     error: string | null
 }
 
-const AuthContext = createContext<AuthContextValue>({ user: null, profile: null, loading: true, error: null })
+const AuthContext = createContext<AuthContextValue>( user: null, profile: null, loading: true, error: null })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return unsub
   }, [])
 
-  return <AuthContext.Provider value={{ user, profile, loading, error }}>{children}</AuthContext.Provider>AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, profile, loading, error }}>{children}</AuthContext.Provider>
     }
 
 export function useAuth() {
