@@ -28,7 +28,7 @@ export default function AppShell({ children, title }: Props) {
             <div className="bg-[#4A90D9] text-white p-1.5 rounded-lg">
               <BookOpen size={20} />
             </div>
-            <span className="text-lg font-bold text-[#1A1D23]">PagePal</span>
+            <span className="text-lg font-bold text-[#1A1D23]">Ascend Annotate</span>
           </Link>
 
           {title && <h1 className="text-base font-semibold text-[#1A1D23] hidden sm:block">{title}</h1>}

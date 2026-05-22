@@ -39,7 +39,7 @@ export default function LoginPage() {
           <div className="bg-[#4A90D9] text-white p-2 rounded-xl">
             <BookOpen size={28} />
           </div>
-          <span className="text-2xl font-bold text-[#1A1D23]">PagePal</span>
+          <span className="text-2xl font-bold text-[#1A1D23]">Ascend Annotate</span>
         </div>
 
         <h1 className="text-xl font-bold text-center mb-1 text-[#1A1D23]">Welcome back!</h1>
@@ -92,7 +92,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-sm text-[#4B5563] mt-6">
-          New to PagePal?{' '}
+          New to Ascend Annotate?{' '}
           <Link to="/register" className="text-[#4A90D9] font-semibold hover:underline">
             Create an account
           </Link>
