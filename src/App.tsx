@@ -16,6 +16,7 @@ import AnnotationsViewerPage from '@/pages/teacher/AnnotationsViewerPage'
 import StudentHome from '@/pages/student/StudentHome'
 import ReadingPage from '@/pages/student/ReadingPage'
 import MyAnnotationsPage from '@/pages/student/MyAnnotationsPage'
+import StudentUploadPage from '@/pages/student/StudentUploadPage'
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/student" element={<ProtectedRoute requiredRole="student"><StudentHome /></ProtectedRoute>} />
           <Route path="/student/read/:bookId" element={<ProtectedRoute requiredRole="student"><ReadingPage /></ProtectedRoute>} />
           <Route path="/student/annotations" element={<ProtectedRoute requiredRole="student"><MyAnnotationsPage /></ProtectedRoute>} />
+          <Route path="/student/upload" element={<ProtectedRoute requiredRole="student"><StudentUploadPage /></ProtectedRoute>} />
 
           {/* Default */}
           <Route path="/" element={<Navigate to="/login" replace />} />
