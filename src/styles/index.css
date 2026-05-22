@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-blue: #4A90D9;
+  --color-brand-green: #5BB974;
+  --color-brand-yellow: #F5C842;
+  --color-brand-purple: #9B7FD4;
+  --color-brand-red: #E05C5C;
+  --color-surface: #F8F9FC;
+  --color-surface-card: #FFFFFF;
+  --color-text-primary: #1A1D23;
+  --color-text-secondary: #4B5563;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --radius-card: 1rem;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* High contrast focus ring for accessibility */
+:focus-visible {
+  outline: 3px solid var(--color-brand-blue);
+  outline-offset: 2px;
+}
