@@ -4,22 +4,34 @@ import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
 import { getBooksByStudent, deleteStudentBook } from '@/firebase/books'
 import type { Book } from '@/types'
-import { BookOpen, MessageSquare, Plus, Trash2 } from 'lucide-react'
+import { BookOpen, MessageSquare, Plus, Trash2, AlertCircle } from 'lucide-react'
 
 export default function StudentHome() {
-  const { profile } = useAuth()
+  const { profile, loading: authLoading } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Book | null>(null)
 
   useEffect(() => {
-    if (!profile) return
-    getBooksByStudent(profile.uid).then((b) => {
-      setBooks(b)
+    if (authLoading) return
+    if (!profile) {
       setLoading(false)
-    })
-  }, [profile])
+      return
+    }
+    setLoading(true)
+    getBooksByStudent(profile.uid)
+      .then((b) => {
+        setBooks(b)
+        setLoading(false)
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to load books:', err)
+        setError(err instanceof Error ? err.message : 'Could not load your books. Please try refreshing.')
+        setLoading(false)
+      })
+  }, [profile, authLoading])
 
   async function handleDelete(book: Book) {
     setDeleting(book.id)
@@ -53,6 +65,23 @@ export default function StudentHome() {
             </div>
           </div>
         ))}
+      </div>
+    </AppShell>
+  )
+
+  if (error) return (
+    <AppShell>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <AlertCircle size={44} className="text-red-400 mb-4" />
+        <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Couldn't load your books</h3>
+        <p className="text-[#4B5563] max-w-sm mb-2">{error}</p>
+        <p className="text-xs text-[#9CA3AF] mb-6">Check the browser console for details.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     </AppShell>
   )
