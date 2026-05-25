@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useAuth } from '@/context/AuthContext'
 import { getBook, getBookPdfBlob } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
@@ -10,10 +11,7 @@ import type { Book, Annotation, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { ChevronLeft, ChevronRight, Volume2, ArrowLeft } from 'lucide-react'
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 export default function ReadingPage() {
   const { bookId } = useParams<{ bookId: string }>()

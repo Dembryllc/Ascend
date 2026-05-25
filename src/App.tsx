@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/context/AuthContext'
 import ProtectedRoute from '@/components/shared/ProtectedRoute'
@@ -13,22 +12,11 @@ import UploadBookPage from '@/pages/teacher/UploadBookPage'
 import ClassroomPage from '@/pages/teacher/ClassroomPage'
 import AnnotationsViewerPage from '@/pages/teacher/AnnotationsViewerPage'
 
-// Student — home and upload are lightweight, load eagerly
+// Student
 import StudentHome from '@/pages/student/StudentHome'
 import StudentUploadPage from '@/pages/student/StudentUploadPage'
 import MyAnnotationsPage from '@/pages/student/MyAnnotationsPage'
-
-// ReadingPage carries the entire PDF.js bundle — lazy load so it only
-// downloads when a student actually opens a book, not on the home page.
-const ReadingPage = lazy(() => import('@/pages/student/ReadingPage'))
-
-function PageSpinner() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
-      <div className="w-10 h-10 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-}
+import ReadingPage from '@/pages/student/ReadingPage'
 
 export default function App() {
   return (
@@ -49,9 +37,7 @@ export default function App() {
           <Route path="/student" element={<ProtectedRoute requiredRole="student"><StudentHome /></ProtectedRoute>} />
           <Route path="/student/read/:bookId" element={
             <ProtectedRoute requiredRole="student">
-              <Suspense fallback={<PageSpinner />}>
-                <ReadingPage />
-              </Suspense>
+              <ReadingPage />
             </ProtectedRoute>
           } />
           <Route path="/student/annotations" element={<ProtectedRoute requiredRole="student"><MyAnnotationsPage /></ProtectedRoute>} />
