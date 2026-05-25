@@ -1,5 +1,6 @@
 import {
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -48,6 +49,10 @@ export async function loginUser(email: string, password: string): Promise<User> 
 
 export async function logoutUser(): Promise<void> {
   await signOut(auth)
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email)
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
