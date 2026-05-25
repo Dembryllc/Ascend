@@ -11,7 +11,7 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore'
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBlob } from 'firebase/storage'
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage'
 import { db, storage } from './config'
 import type { Book } from '@/types'
 
@@ -83,8 +83,11 @@ export async function getBook(bookId: string): Promise<Book | null> {
 }
 
 export async function getBookPdfBlob(storageUrl: string): Promise<Blob> {
-  const fileRef = ref(storage, storageUrl)
-  return getBlob(fileRef)
+  const response = await fetch(storageUrl)
+  if (!response.ok) {
+    throw new Error(`PDF download failed: ${response.status}`)
+  }
+  return response.blob()
 }
 
 export async function assignBookToStudent(bookId: string, studentId: string): Promise<void> {
