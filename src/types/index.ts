@@ -39,6 +39,7 @@ export interface Annotation {
   pageNumber: number
   reactionType: ReactionType
   noteText: string
+  selectedText?: string
   timestamp: Date
 }
 

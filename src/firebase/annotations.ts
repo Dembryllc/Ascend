@@ -20,6 +20,7 @@ function toAnnotation(id: string, data: Record<string, unknown>): Annotation {
     pageNumber:   data.pageNumber   as number,
     reactionType: data.reactionType as ReactionType,
     noteText:     data.noteText     as string,
+    selectedText: typeof data.selectedText === 'string' ? data.selectedText : '',
     timestamp:    (data.timestamp as { toDate(): Date })?.toDate() ?? new Date(),
   }
 }
@@ -30,6 +31,7 @@ export async function saveAnnotation(
   pageNumber: number,
   reactionType: ReactionType,
   noteText: string,
+  selectedText = '',
 ): Promise<Annotation> {
   const ref = await addDoc(collection(db, 'annotations'), {
     studentId,
@@ -37,21 +39,30 @@ export async function saveAnnotation(
     pageNumber,
     reactionType,
     noteText,
+    selectedText,
     timestamp: serverTimestamp(),
   })
-  return { id: ref.id, studentId, bookId, pageNumber, reactionType, noteText, timestamp: new Date() }
+  return { id: ref.id, studentId, bookId, pageNumber, reactionType, noteText, selectedText, timestamp: new Date() }
 }
 
 export async function updateAnnotation(
   annotationId: string,
   reactionType: ReactionType,
   noteText: string,
+  selectedText?: string,
 ): Promise<void> {
-  await updateDoc(doc(db, 'annotations', annotationId), {
+  const payload: {
+    reactionType: ReactionType
+    noteText: string
+    selectedText?: string
+    timestamp: ReturnType<typeof serverTimestamp>
+  } = {
     reactionType,
     noteText,
     timestamp: serverTimestamp(),
-  })
+  }
+  if (selectedText !== undefined) payload.selectedText = selectedText
+  await updateDoc(doc(db, 'annotations', annotationId), payload)
 }
 
 export async function deleteAnnotation(annotationId: string): Promise<void> {

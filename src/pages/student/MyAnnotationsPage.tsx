@@ -117,6 +117,11 @@ export default function MyAnnotationsPage() {
                     <p className="text-xs text-[#4A90D9] font-semibold mb-1">
                       {bookTitle(ann.bookId)} • Page {ann.pageNumber}
                     </p>
+                    {ann.selectedText && (
+                      <p className="text-sm text-[#1A1D23] bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2 mb-2">
+                        “{ann.selectedText}”
+                      </p>
+                    )}
                     {ann.noteText && <p className="text-base text-[#1A1D23]">{ann.noteText}</p>}
                     <div className="flex gap-3 mt-2">
                       <button onClick={() => startEdit(ann)} className="text-xs text-[#4A90D9] hover:underline">Edit</button>
@@ -150,6 +155,11 @@ export default function MyAnnotationsPage() {
                 </button>
               ))}
             </div>
+            {editing.selectedText && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-300 rounded-r-xl px-4 py-3 text-sm text-[#1A1D23] mb-4">
+                “{editing.selectedText}”
+              </div>
+            )}
             <textarea
               value={editNote}
               onChange={(e) => setEditNote(e.target.value)}

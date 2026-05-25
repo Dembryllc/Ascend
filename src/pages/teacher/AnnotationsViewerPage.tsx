@@ -125,6 +125,11 @@ export default function AnnotationsViewerPage() {
                         {ann.timestamp.toLocaleDateString()} {ann.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
+                    {ann.selectedText && (
+                      <p className="text-sm text-[#1A1D23] bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2 mt-2">
+                        “{ann.selectedText}”
+                      </p>
+                    )}
                     {ann.noteText && (
                       <p className="text-[#4B5563] mt-1.5 text-base">{ann.noteText}</p>
                     )}

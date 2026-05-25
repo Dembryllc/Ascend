@@ -24,6 +24,7 @@ export default function ReadingPage() {
   const [pageAnnotations, setPageAnnotations] = useState<Annotation[]>([])
   const [annotationPanel, setAnnotationPanel] = useState<{ open: boolean; editing?: Annotation }>({ open: false })
   const [selectedReaction, setSelectedReaction] = useState<ReactionType>('think')
+  const [selectedText, setSelectedText] = useState('')
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
   const [containerWidth, setContainerWidth] = useState(700)
@@ -81,13 +82,29 @@ export default function ReadingPage() {
     setReaderError(`PDF.js error: ${err.message}`)
   }
 
-  function openAnnotationPanel(editing?: Annotation) {
+  function getSelectedPdfText() {
+    const selection = window.getSelection()
+    const text = selection?.toString().replace(/\s+/g, ' ').trim() ?? ''
+    if (!selection || !text) return ''
+
+    const container = document.getElementById('pdf-container')
+    if (!container || selection.rangeCount === 0) return text
+
+    const range = selection.getRangeAt(0)
+    const startIsInReader = container.contains(range.startContainer)
+    const endIsInReader = container.contains(range.endContainer)
+    return startIsInReader && endIsInReader ? text : ''
+  }
+
+  function openAnnotationPanel(reactionType?: ReactionType, editing?: Annotation) {
     if (editing) {
       setSelectedReaction(editing.reactionType)
+      setSelectedText(editing.selectedText ?? '')
       setNoteText(editing.noteText)
       setAnnotationPanel({ open: true, editing })
     } else {
-      setSelectedReaction('think')
+      setSelectedReaction(reactionType ?? 'think')
+      setSelectedText(getSelectedPdfText())
       setNoteText('')
       setAnnotationPanel({ open: true })
     }
@@ -102,16 +119,16 @@ export default function ReadingPage() {
     setSaving(true)
     try {
       if (annotationPanel.editing) {
-        await updateAnnotation(annotationPanel.editing.id, selectedReaction, noteText)
+        await updateAnnotation(annotationPanel.editing.id, selectedReaction, noteText, selectedText)
         setAnnotations((prev) =>
           prev.map((a) =>
             a.id === annotationPanel.editing!.id
-              ? { ...a, reactionType: selectedReaction, noteText, timestamp: new Date() }
+              ? { ...a, reactionType: selectedReaction, noteText, selectedText, timestamp: new Date() }
               : a
           )
         )
       } else {
-        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText)
+        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText, selectedText)
         setAnnotations((prev) => [...prev, ann])
       }
       closePanel()
@@ -243,7 +260,8 @@ export default function ReadingPage() {
             {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
               <button
                 key={type}
-                onClick={() => openAnnotationPanel()}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => openAnnotationPanel(type)}
                 aria-label={r.label}
                 className="flex flex-col items-center gap-1 p-2 rounded-xl border-2 border-transparent hover:border-[#4A90D9] hover:bg-blue-50 transition-all"
               >
@@ -265,10 +283,15 @@ export default function ReadingPage() {
                       <span className="text-xl">{r.emoji}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-[#4B5563]">{r.label}</p>
-                        {ann.noteText && <p className="text-sm text-[#1A1D23] mt-0.5">{ann.noteText}</p>}
+                        {ann.selectedText && (
+                          <p className="text-sm text-[#1A1D23] mt-1 bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2">
+                            “{ann.selectedText}”
+                          </p>
+                        )}
+                        {ann.noteText && <p className="text-sm text-[#1A1D23] mt-1">{ann.noteText}</p>}
                       </div>
                       <button
-                        onClick={() => openAnnotationPanel(ann)}
+                        onClick={() => openAnnotationPanel(undefined, ann)}
                         className="text-xs text-[#4A90D9] hover:underline shrink-0"
                       >
                         Edit
@@ -311,6 +334,21 @@ export default function ReadingPage() {
                   <span className="text-xs text-[#4B5563] text-center leading-tight">{r.label}</span>
                 </button>
               ))}
+            </div>
+
+            <div className="mb-5">
+              <label className="block text-sm font-semibold text-[#1A1D23] mb-1">
+                Highlighted text
+              </label>
+              {selectedText ? (
+                <div className="bg-yellow-50 border-l-4 border-yellow-300 rounded-r-xl px-4 py-3 text-sm text-[#1A1D23] max-h-32 overflow-y-auto">
+                  “{selectedText}”
+                </div>
+              ) : (
+                <div className="bg-[#F8F9FC] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#6B7280]">
+                  Select text on the page before choosing a reaction to attach a passage.
+                </div>
+              )}
             </div>
 
             {/* Note text */}
