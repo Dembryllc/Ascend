@@ -12,6 +12,7 @@ export default function TeacherDashboard() {
   const [books, setBooks] = useState<Book[]>([])
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -22,6 +23,10 @@ export default function TeacherDashboard() {
       setBooks(b)
       setClassroom(c)
       setLoading(false)
+    }).catch((err: unknown) => {
+      console.error('Failed to load teacher dashboard:', err)
+      setError(err instanceof Error ? err.message : 'Could not load your dashboard. Please refresh.')
+      setLoading(false)
     })
   }, [profile])
 
@@ -30,6 +35,12 @@ export default function TeacherDashboard() {
       <div className="flex justify-center py-16">
         <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
       </div>
+    </AppShell>
+  )
+
+  if (error) return (
+    <AppShell title="Dashboard">
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm">{error}</div>
     </AppShell>
   )
 

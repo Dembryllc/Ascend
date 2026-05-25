@@ -82,11 +82,11 @@ export async function getAnnotationsByStudentAndBook(
   const q = query(
     collection(db, 'annotations'),
     where('studentId', '==', studentId),
+    where('bookId', '==', bookId),
   )
   const snap = await getDocs(q)
   return snap.docs
     .map((d) => toAnnotation(d.id, d.data()))
-    .filter((ann) => ann.bookId === bookId)
     .sort((a, b) => a.pageNumber - b.pageNumber)
 }
 

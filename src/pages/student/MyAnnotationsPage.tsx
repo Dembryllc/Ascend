@@ -16,6 +16,8 @@ export default function MyAnnotationsPage() {
   const [editing, setEditing] = useState<Annotation | null>(null)
   const [editNote, setEditNote] = useState('')
   const [editReaction, setEditReaction] = useState<ReactionType>('think')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -42,18 +44,30 @@ export default function MyAnnotationsPage() {
   }
 
   async function saveEdit() {
-    if (!editing) return
-    await updateAnnotation(editing.id, editReaction, editNote)
-    setAnnotations((prev) =>
-      prev.map((a) => a.id === editing.id ? { ...a, reactionType: editReaction, noteText: editNote } : a)
-    )
-    setEditing(null)
+    if (!editing || saving) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await updateAnnotation(editing.id, editReaction, editNote)
+      setAnnotations((prev) =>
+        prev.map((a) => a.id === editing.id ? { ...a, reactionType: editReaction, noteText: editNote } : a)
+      )
+      setEditing(null)
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(id: string) {
-    await deleteAnnotation(id)
-    setAnnotations((prev) => prev.filter((a) => a.id !== id))
-    if (editing?.id === id) setEditing(null)
+    try {
+      await deleteAnnotation(id)
+      setAnnotations((prev) => prev.filter((a) => a.id !== id))
+      if (editing?.id === id) setEditing(null)
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Could not delete. Please try again.')
+    }
   }
 
   function bookTitle(bookId: string) {
@@ -175,9 +189,10 @@ export default function MyAnnotationsPage() {
               maxLength={500}
               className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none mb-4"
             />
+            {saveError && <p className="text-sm text-red-600 mb-3">{saveError}</p>}
             <div className="flex gap-3">
-              <button onClick={() => setEditing(null)} className="flex-1 border border-[#D1D5DB] rounded-xl py-3 font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors">Cancel</button>
-              <button onClick={saveEdit} className="flex-1 bg-[#4A90D9] text-white rounded-xl py-3 font-bold hover:bg-[#357ABD] transition-colors">Save</button>
+              <button onClick={() => { setEditing(null); setSaveError('') }} className="flex-1 border border-[#D1D5DB] rounded-xl py-3 font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors">Cancel</button>
+              <button onClick={saveEdit} disabled={saving} className="flex-1 bg-[#4A90D9] text-white rounded-xl py-3 font-bold hover:bg-[#357ABD] disabled:opacity-60 transition-colors">{saving ? 'Saving…' : 'Save'}</button>
             </div>
           </div>
         </div>

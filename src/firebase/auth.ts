@@ -24,20 +24,27 @@ export async function registerUser(
 
   let classroomId: string | null = null
 
-  if (role === 'student' && classroomJoinCode) {
-    classroomId = await resolveJoinCode(classroomJoinCode)
-    if (!classroomId) throw new Error('Invalid class join code. Please check with your teacher.')
-    await addStudentToClassroom(user.uid, classroomId)
-  }
+  try {
+    if (role === 'student' && classroomJoinCode) {
+      classroomId = await resolveJoinCode(classroomJoinCode)
+      if (!classroomId) throw new Error('Invalid class join code. Please check with your teacher.')
+      await addStudentToClassroom(user.uid, classroomId)
+    }
 
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    email,
-    displayName,
-    role,
-    classroomId,
-    createdAt: serverTimestamp(),
-  })
+    await setDoc(doc(db, 'users', user.uid), {
+      uid: user.uid,
+      email,
+      displayName,
+      role,
+      classroomId,
+      createdAt: serverTimestamp(),
+    })
+  } catch (err) {
+    // Firestore setup failed — delete the Auth account so the user can retry
+    // without ending up with an orphaned account and no profile document.
+    await user.delete().catch(() => {/* deletion best-effort */})
+    throw err
+  }
 
   return user
 }

@@ -16,6 +16,7 @@ export default function ProgressDashboardPage() {
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -49,9 +50,12 @@ export default function ProgressDashboardPage() {
       setLoading(false)
     }
 
-    load().catch((err) => {
+    load().catch((err: unknown) => {
       console.error('Failed to load teacher progress:', err)
-      if (!cancelled) setLoading(false)
+      if (!cancelled) {
+        setError(err instanceof Error ? err.message : 'Could not load progress data. Please refresh.')
+        setLoading(false)
+      }
     })
 
     return () => {
@@ -91,6 +95,12 @@ export default function ProgressDashboardPage() {
       <div className="flex justify-center py-16">
         <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
       </div>
+    </AppShell>
+  )
+
+  if (error) return (
+    <AppShell title="Progress">
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm">{error}</div>
     </AppShell>
   )
 
