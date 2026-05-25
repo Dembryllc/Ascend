@@ -4,7 +4,7 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { useAuth } from '@/context/AuthContext'
-import { getBook } from '@/firebase/books'
+import { getBook, getBookPdfBlob } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
 import type { Book, Annotation, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
@@ -31,6 +31,8 @@ export default function ReadingPage() {
   const [saving, setSaving] = useState(false)
   const [containerWidth, setContainerWidth] = useState(700)
   const [loadingBook, setLoadingBook] = useState(true)
+  const [loadingPdf, setLoadingPdf] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState('')
   const [readerError, setReaderError] = useState('')
 
   useEffect(() => {
@@ -62,6 +64,36 @@ export default function ReadingPage() {
   useEffect(() => {
     setPageAnnotations(annotations.filter((a) => a.pageNumber === currentPage))
   }, [annotations, currentPage])
+
+  useEffect(() => {
+    if (!book?.storageUrl) return
+    let active = true
+    let objectUrl = ''
+
+    setLoadingPdf(true)
+    setPdfUrl('')
+    setReaderError('')
+
+    getBookPdfBlob(book.storageUrl)
+      .then((blob) => {
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
+        setPdfUrl(objectUrl)
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to load PDF from storage:', err)
+        if (!active) return
+        setReaderError('The PDF uploaded, but the reader could not download it from storage. Check Firebase Storage rules and try opening it again.')
+      })
+      .finally(() => {
+        if (active) setLoadingPdf(false)
+      })
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [book?.storageUrl])
 
   // Responsive PDF width
   useEffect(() => {
@@ -165,6 +197,7 @@ export default function ReadingPage() {
 
   const hasAnnotationOnPage = pageAnnotations.length > 0
   const annotatedPages = new Set(annotations.map((a) => a.pageNumber))
+  const isPdfPreparing = loadingPdf || !pdfUrl
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
@@ -189,24 +222,33 @@ export default function ReadingPage() {
       <div id="pdf-container" className="flex-1 flex flex-col items-center px-4 py-4 max-w-4xl mx-auto w-full">
         {/* PDF */}
         <div className="flex-1 w-full flex justify-center">
-          <Document
-            file={book.storageUrl}
-            onLoadSuccess={onDocumentLoaded}
-            onLoadError={onDocumentLoadError}
-            error={
-              <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
-                This PDF could not be rendered. Try re-uploading it or using a different PDF.
+          {isPdfPreparing ? (
+            <div className="flex justify-center py-20">
+              <div className="text-center">
+                <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm font-semibold text-[#4B5563]">Preparing PDF…</p>
               </div>
-            }
-            loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
-          >
-            <Page
-              pageNumber={currentPage}
-              width={containerWidth}
-              renderTextLayer
-              renderAnnotationLayer={false}
-            />
-          </Document>
+            </div>
+          ) : (
+            <Document
+              file={pdfUrl}
+              onLoadSuccess={onDocumentLoaded}
+              onLoadError={onDocumentLoadError}
+              error={
+                <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
+                  This PDF could not be rendered. Try re-uploading it or using a different PDF.
+                </div>
+              }
+              loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
+            >
+              <Page
+                pageNumber={currentPage}
+                width={containerWidth}
+                renderTextLayer
+                renderAnnotationLayer={false}
+              />
+            </Document>
+          )}
         </div>
 
         {/* Page navigation */}

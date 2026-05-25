@@ -11,7 +11,7 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore'
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage'
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBlob } from 'firebase/storage'
 import { db, storage } from './config'
 import type { Book } from '@/types'
 
@@ -80,6 +80,10 @@ export async function getBook(bookId: string): Promise<Book | null> {
   if (!snap.exists()) return null
   const data = snap.data()
   return { id: snap.id, ...data, createdAt: data.createdAt?.toDate() ?? new Date() } as Book
+}
+
+export async function getBookPdfBlob(storageUrl: string): Promise<Blob> {
+  return getBlob(ref(storage, storageUrl))
 }
 
 export async function assignBookToStudent(bookId: string, studentId: string): Promise<void> {
