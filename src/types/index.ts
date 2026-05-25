@@ -23,6 +23,8 @@ export interface Book {
   title: string
   author: string
   readingLevel?: string
+  assignmentPrompt?: string
+  successCriteria?: string
   storageUrl: string
   uploadedBy: string
   assignedStudentIds: string[]
@@ -36,10 +38,12 @@ export interface Annotation {
   id: string
   studentId: string
   bookId: string
+  classroomId?: string | null
   pageNumber: number
   reactionType: ReactionType
   noteText: string
   selectedText?: string
+  annotationKind?: 'annotation' | 'reflection'
   timestamp: Date
 }
 

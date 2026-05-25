@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -8,9 +8,11 @@ import { getBook } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
 import type { Book, Annotation, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
-import { ChevronLeft, ChevronRight, Volume2, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, MessageSquare, Target } from 'lucide-react'
 
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs'
+
+const HIGHLIGHT_STOP_WORDS = new Set(['and', 'are', 'for', 'not', 'that', 'the', 'this', 'was', 'with'])
 
 type PdfDocument = {
   numPages: number
@@ -28,7 +30,6 @@ export default function ReadingPage() {
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
-  const [pageAnnotations, setPageAnnotations] = useState<Annotation[]>([])
   const [annotationPanel, setAnnotationPanel] = useState<{ open: boolean; editing?: Annotation }>({ open: false })
   const [selectedReaction, setSelectedReaction] = useState<ReactionType>('think')
   const [selectedText, setSelectedText] = useState('')
@@ -39,16 +40,11 @@ export default function ReadingPage() {
   const [readerError, setReaderError] = useState('')
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
   const [readAloudStatus, setReadAloudStatus] = useState('')
+  const [reflectionText, setReflectionText] = useState('')
 
   useEffect(() => {
-    if (!bookId) {
-      setReaderError('Missing book id.')
-      setLoadingBook(false)
-      return
-    }
+    if (!bookId) return
     if (!profile) return
-    setLoadingBook(true)
-    setReaderError('')
     Promise.all([
       getBook(bookId),
       getAnnotationsByStudentAndBook(profile.uid, bookId),
@@ -66,14 +62,46 @@ export default function ReadingPage() {
     })
   }, [bookId, profile])
 
+  const pageAnnotations = useMemo(
+    () => annotations.filter((a) => a.pageNumber === currentPage),
+    [annotations, currentPage],
+  )
+
   useEffect(() => {
-    setPageAnnotations(annotations.filter((a) => a.pageNumber === currentPage))
-  }, [annotations, currentPage])
+    const timer = window.setTimeout(() => {
+      const spans = Array.from(document.querySelectorAll<HTMLElement>('.react-pdf__Page__textContent span'))
+      spans.forEach((span) => {
+        span.style.backgroundColor = ''
+        span.style.borderRadius = ''
+        span.style.boxShadow = ''
+      })
+
+      const quotes = pageAnnotations
+        .filter((ann) => ann.annotationKind !== 'reflection')
+        .map((ann) => ann.selectedText?.replace(/\s+/g, ' ').trim().toLowerCase())
+        .filter((quote): quote is string => Boolean(quote && quote.length > 0))
+
+      if (quotes.length === 0) return
+
+      spans.forEach((span) => {
+        const spanText = span.textContent?.replace(/\s+/g, ' ').trim().toLowerCase()
+        if (!spanText || spanText.length < 4 || HIGHLIGHT_STOP_WORDS.has(spanText)) return
+        const shouldHighlight = quotes.some((quote) => quote.includes(spanText) || spanText.includes(quote))
+        if (shouldHighlight) {
+          span.style.backgroundColor = 'rgba(250, 204, 21, 0.42)'
+          span.style.borderRadius = '3px'
+          span.style.boxShadow = '0 0 0 2px rgba(250, 204, 21, 0.2)'
+        }
+      })
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [pageAnnotations, currentPage])
 
   // Responsive PDF width
   useEffect(() => {
     function measure() {
-      const el = document.getElementById('pdf-container')
+      const el = document.getElementById('pdf-main-column')
       if (el) setContainerWidth(Math.min(el.clientWidth - 32, 900))
     }
     measure()
@@ -139,7 +167,7 @@ export default function ReadingPage() {
           )
         )
       } else {
-        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText, selectedText)
+        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText, selectedText, 'annotation', profile.classroomId)
         setAnnotations((prev) => [...prev, ann])
       }
       closePanel()
@@ -152,6 +180,27 @@ export default function ReadingPage() {
     await deleteAnnotation(annotationId)
     setAnnotations((prev) => prev.filter((a) => a.id !== annotationId))
     closePanel()
+  }
+
+  async function handleReflectionSave() {
+    if (!profile || !bookId || !reflectionText.trim()) return
+    setSaving(true)
+    try {
+      const ann = await saveAnnotation(
+        profile.uid,
+        bookId,
+        currentPage,
+        'important',
+        reflectionText.trim(),
+        '',
+        'reflection',
+        profile.classroomId,
+      )
+      setAnnotations((prev) => [...prev, ann])
+      setReflectionText('')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const speakPage = useCallback(async () => {
@@ -187,6 +236,21 @@ export default function ReadingPage() {
     window.speechSynthesis.speak(utt)
   }, [currentPage, pdfDocument])
 
+  if (!bookId) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
+      <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
+        <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
+        <p className="text-[#4B5563] text-sm mb-6">Missing book id.</p>
+        <button
+          onClick={() => navigate('/student')}
+          className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Back to Bookshelf
+        </button>
+      </div>
+    </div>
+  )
+
   if (loadingBook) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
       <div className="text-center">
@@ -214,6 +278,11 @@ export default function ReadingPage() {
 
   const hasAnnotationOnPage = pageAnnotations.length > 0
   const annotatedPages = new Set(annotations.map((a) => a.pageNumber))
+  const reflectionCount = annotations.filter((a) => a.annotationKind === 'reflection').length
+  const quoteCount = annotations.filter((a) => a.selectedText && a.annotationKind !== 'reflection').length
+  const taskCount = Math.max(4, quoteCount + reflectionCount)
+  const completedTaskCount = Math.min(taskCount, quoteCount + reflectionCount)
+  const completionPct = Math.round((completedTaskCount / taskCount) * 100)
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
@@ -235,31 +304,52 @@ export default function ReadingPage() {
         </div>
       </header>
 
-      <div id="pdf-container" className="flex-1 flex flex-col items-center px-4 py-4 max-w-4xl mx-auto w-full">
-        {/* PDF */}
-        <div className="flex-1 w-full flex justify-center">
-          <Document
-              file={book.storageUrl}
-              onLoadSuccess={onDocumentLoaded}
-              onLoadError={onDocumentLoadError}
-              error={
-                <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
-                  This PDF could not be rendered. Try re-uploading it or using a different PDF.
+      <div id="pdf-container" className="flex-1 px-3 sm:px-4 py-4 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+          <main id="pdf-main-column" className="min-w-0">
+            {(book.assignmentPrompt || book.successCriteria) && (
+              <section className="w-full mb-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-50 text-[#4A90D9] p-2 rounded-xl shrink-0">
+                    <Target size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-[#1A1D23] text-sm">Today&apos;s reading task</p>
+                    {book.assignmentPrompt && <p className="text-sm text-[#4B5563] mt-1">{book.assignmentPrompt}</p>}
+                    {book.successCriteria && <p className="text-xs font-semibold text-[#5BB974] mt-2">{book.successCriteria}</p>}
+                    <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#4A90D9] rounded-full" style={{ width: `${completionPct}%` }} />
+                    </div>
+                    <p className="text-xs text-[#6B7280] mt-1">{completedTaskCount} of {taskCount} reading actions complete</p>
+                  </div>
                 </div>
-              }
-              loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
-            >
-              <Page
-                pageNumber={currentPage}
-                width={containerWidth}
-                renderTextLayer
-                renderAnnotationLayer={false}
-              />
-            </Document>
-        </div>
+              </section>
+            )}
 
-        {/* Page navigation */}
-        <div className="w-full mt-4 flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm border border-[#F3F4F6]">
+            {/* PDF */}
+            <div className="flex-1 w-full flex justify-center">
+              <Document
+                  file={book.storageUrl}
+                  onLoadSuccess={onDocumentLoaded}
+                  onLoadError={onDocumentLoadError}
+                  error={
+                    <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
+                      This PDF could not be rendered. Try re-uploading it or using a different PDF.
+                    </div>
+                  }
+                  loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
+                >
+                  <Page
+                    pageNumber={currentPage}
+                    width={containerWidth}
+                    renderTextLayer
+                    renderAnnotationLayer={false}
+                  />
+                </Document>
+            </div>
+
+            {/* Page navigation */}
+            <div className="w-full mt-4 flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm border border-[#F3F4F6]">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
@@ -285,13 +375,13 @@ export default function ReadingPage() {
           >
             Next <ChevronRight size={20} />
           </button>
-        </div>
-        {readAloudStatus && (
-          <p className="w-full mt-2 text-center text-xs font-semibold text-[#4B5563]">{readAloudStatus}</p>
-        )}
+            </div>
+            {readAloudStatus && (
+              <p className="w-full mt-2 text-center text-xs font-semibold text-[#4B5563]">{readAloudStatus}</p>
+            )}
 
-        {/* Annotation toolbar */}
-        <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+            {/* Annotation toolbar */}
+            <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
           <p className="text-sm font-bold text-[#1A1D23] mb-3">How does this page make you feel?</p>
           <div className="grid grid-cols-5 gap-2">
             {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
@@ -339,6 +429,76 @@ export default function ReadingPage() {
               </div>
             </div>
           )}
+            </div>
+          </main>
+
+          <aside className="lg:sticky lg:top-20 space-y-4">
+            <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare size={18} className="text-[#9B7FD4]" />
+                <h3 className="font-bold text-[#1A1D23]">Annotation sidebar</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <MiniStat label="Notes" value={annotations.filter((ann) => ann.annotationKind !== 'reflection').length} />
+                <MiniStat label="Quotes" value={quoteCount} />
+                <MiniStat label="Pages" value={annotatedPages.size} />
+              </div>
+              {annotations.length === 0 ? (
+                <p className="text-sm text-[#6B7280]">Select a passage, choose an emoji, and save your first note.</p>
+              ) : (
+                <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
+                  {annotations
+                    .slice()
+                    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+                    .map((ann) => {
+                      const r = REACTIONS[ann.reactionType]
+                      return (
+                        <button
+                          key={ann.id}
+                          onClick={() => setCurrentPage(Math.max(1, ann.pageNumber))}
+                          className="w-full text-left bg-[#F8F9FC] hover:bg-blue-50 border border-[#EEF0F4] rounded-xl p-3 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-[#1A1D23]">{r.emoji} Page {ann.pageNumber}</span>
+                            <span className="text-[11px] text-[#9CA3AF]">{r.label}</span>
+                          </div>
+                          {ann.annotationKind === 'reflection' && (
+                            <p className="text-xs font-semibold text-[#5BB974] mt-1">Reflection</p>
+                          )}
+                          {ann.selectedText && ann.annotationKind !== 'reflection' && (
+                            <p className="text-xs text-[#4B5563] mt-1 line-clamp-2">“{ann.selectedText}”</p>
+                          )}
+                          {ann.noteText && <p className="text-xs text-[#1A1D23] mt-1 line-clamp-2">{ann.noteText}</p>}
+                        </button>
+                      )
+                    })}
+                </div>
+              )}
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle size={18} className="text-[#5BB974]" />
+                <h3 className="font-bold text-[#1A1D23]">After reading</h3>
+              </div>
+              <p className="text-sm text-[#4B5563] mb-3">Write one short reflection when you finish a chunk of reading.</p>
+              <textarea
+                value={reflectionText}
+                onChange={(e) => setReflectionText(e.target.value)}
+                rows={4}
+                maxLength={600}
+                placeholder="What changed in your thinking? What should your teacher notice?"
+                className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none"
+              />
+              <button
+                onClick={handleReflectionSave}
+                disabled={!reflectionText.trim() || saving}
+                className="mt-3 w-full bg-[#5BB974] hover:bg-[#4AA863] disabled:opacity-50 text-white rounded-xl py-2.5 font-bold transition-colors"
+              >
+                Save Reflection
+              </button>
+            </section>
+          </aside>
         </div>
       </div>
 
@@ -426,6 +586,15 @@ export default function ReadingPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="bg-[#F8F9FC] border border-[#EEF0F4] rounded-xl px-3 py-2 text-center">
+      <div className="text-lg font-bold text-[#1A1D23]">{value}</div>
+      <div className="text-[11px] font-semibold text-[#6B7280]">{label}</div>
     </div>
   )
 }

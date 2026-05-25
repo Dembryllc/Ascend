@@ -117,7 +117,10 @@ export default function MyAnnotationsPage() {
                     <p className="text-xs text-[#4A90D9] font-semibold mb-1">
                       {bookTitle(ann.bookId)} • Page {ann.pageNumber}
                     </p>
-                    {ann.selectedText && (
+                    {ann.annotationKind === 'reflection' && (
+                      <p className="text-xs font-semibold text-[#5BB974] mb-2">Reflection</p>
+                    )}
+                    {ann.selectedText && ann.annotationKind !== 'reflection' && (
                       <p className="text-sm text-[#1A1D23] bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2 mb-2">
                         “{ann.selectedText}”
                       </p>
@@ -155,7 +158,12 @@ export default function MyAnnotationsPage() {
                 </button>
               ))}
             </div>
-            {editing.selectedText && (
+            {editing.annotationKind === 'reflection' && (
+              <div className="bg-green-50 border border-green-100 text-[#1A1D23] rounded-xl px-4 py-3 text-sm font-semibold mb-4">
+                Reflection
+              </div>
+            )}
+            {editing.selectedText && editing.annotationKind !== 'reflection' && (
               <div className="bg-yellow-50 border-l-4 border-yellow-300 rounded-r-xl px-4 py-3 text-sm text-[#1A1D23] mb-4">
                 “{editing.selectedText}”
               </div>

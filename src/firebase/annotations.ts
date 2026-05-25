@@ -17,10 +17,12 @@ function toAnnotation(id: string, data: Record<string, unknown>): Annotation {
     id,
     studentId:    data.studentId    as string,
     bookId:       data.bookId       as string,
+    classroomId:  typeof data.classroomId === 'string' ? data.classroomId : null,
     pageNumber:   data.pageNumber   as number,
     reactionType: data.reactionType as ReactionType,
-    noteText:     data.noteText     as string,
+    noteText:     typeof data.noteText === 'string' ? data.noteText : '',
     selectedText: typeof data.selectedText === 'string' ? data.selectedText : '',
+    annotationKind: data.annotationKind === 'reflection' ? 'reflection' : 'annotation',
     timestamp:    (data.timestamp as { toDate(): Date })?.toDate() ?? new Date(),
   }
 }
@@ -32,17 +34,21 @@ export async function saveAnnotation(
   reactionType: ReactionType,
   noteText: string,
   selectedText = '',
+  annotationKind: Annotation['annotationKind'] = 'annotation',
+  classroomId: string | null = null,
 ): Promise<Annotation> {
   const ref = await addDoc(collection(db, 'annotations'), {
     studentId,
     bookId,
+    classroomId,
     pageNumber,
     reactionType,
     noteText,
     selectedText,
+    annotationKind,
     timestamp: serverTimestamp(),
   })
-  return { id: ref.id, studentId, bookId, pageNumber, reactionType, noteText, selectedText, timestamp: new Date() }
+  return { id: ref.id, studentId, bookId, classroomId, pageNumber, reactionType, noteText, selectedText, annotationKind, timestamp: new Date() }
 }
 
 export async function updateAnnotation(
@@ -105,7 +111,7 @@ export async function getAnnotationsByClassAndBook(
     where('bookId', '==', bookId),
   )
   const snap = await getDocs(q)
-  const allowedStudentIds = new Set(studentIds.slice(0, 30))
+  const allowedStudentIds = new Set(studentIds)
   return snap.docs
     .map((d) => toAnnotation(d.id, d.data()))
     .filter((ann) => allowedStudentIds.has(ann.studentId))

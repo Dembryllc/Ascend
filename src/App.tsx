@@ -11,6 +11,7 @@ import TeacherDashboard from '@/pages/teacher/TeacherDashboard'
 import UploadBookPage from '@/pages/teacher/UploadBookPage'
 import ClassroomPage from '@/pages/teacher/ClassroomPage'
 import AnnotationsViewerPage from '@/pages/teacher/AnnotationsViewerPage'
+import ProgressDashboardPage from '@/pages/teacher/ProgressDashboardPage'
 
 // Student
 import StudentHome from '@/pages/student/StudentHome'
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/teacher/upload" element={<ProtectedRoute requiredRole="teacher"><UploadBookPage /></ProtectedRoute>} />
           <Route path="/teacher/classroom" element={<ProtectedRoute requiredRole="teacher"><ClassroomPage /></ProtectedRoute>} />
           <Route path="/teacher/annotations" element={<ProtectedRoute requiredRole="teacher"><AnnotationsViewerPage /></ProtectedRoute>} />
+          <Route path="/teacher/progress" element={<ProtectedRoute requiredRole="teacher"><ProgressDashboardPage /></ProtectedRoute>} />
 
           {/* Student */}
           <Route path="/student" element={<ProtectedRoute requiredRole="student"><StudentHome /></ProtectedRoute>} />

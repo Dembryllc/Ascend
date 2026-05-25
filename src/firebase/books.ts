@@ -20,9 +20,13 @@ export async function uploadBook(
   title: string,
   author: string,
   readingLevel: string,
+  assignmentPrompt: string,
+  successCriteria: string,
   teacherId: string,
   onProgress?: (pct: number) => void,
 ): Promise<Book> {
+  const cleanAssignmentPrompt = assignmentPrompt.trim()
+  const cleanSuccessCriteria = successCriteria.trim()
   const storageRef = ref(storage, `books/${Date.now()}_${file.name}`)
   const task = uploadBytesResumable(storageRef, file)
 
@@ -39,6 +43,8 @@ export async function uploadBook(
     title,
     author,
     readingLevel: readingLevel || null,
+    assignmentPrompt: cleanAssignmentPrompt || null,
+    successCriteria: cleanSuccessCriteria || null,
     storageUrl,
     uploadedBy: teacherId,
     assignedStudentIds: [],
@@ -50,6 +56,8 @@ export async function uploadBook(
     title,
     author,
     readingLevel,
+    assignmentPrompt: cleanAssignmentPrompt,
+    successCriteria: cleanSuccessCriteria,
     storageUrl,
     uploadedBy: teacherId,
     assignedStudentIds: [],

@@ -58,7 +58,7 @@ export function exportAnnotationsPDF(
       `Date: ${ann.timestamp.toLocaleDateString()} ${ann.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
       9, false, '#6B7280',
     )
-    if (ann.selectedText) {
+    if (ann.selectedText && ann.annotationKind !== 'reflection') {
       y += 2
       addText(`Highlighted: “${ann.selectedText}”`, 10, false, '#4B5563')
     }

@@ -167,11 +167,14 @@ export default function ClassroomPage() {
               <p className="text-sm text-[#4B5563] mb-4">Assign a book to every student at once.</p>
               <div className="space-y-2">
                 {books.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
-                    <span className="text-sm font-medium text-[#1A1D23]">{b.title}</span>
+                  <div key={b.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-[#F3F4F6] last:border-0">
+                    <div>
+                      <span className="text-sm font-medium text-[#1A1D23]">{b.title}</span>
+                      {b.assignmentPrompt && <p className="text-xs text-[#6B7280] mt-1">{b.assignmentPrompt}</p>}
+                    </div>
                     <button
                       onClick={() => handleAssignAll(b.id)}
-                      className="text-xs bg-[#5BB974] text-white px-3 py-1.5 rounded-lg hover:bg-[#4AA863] transition-colors font-semibold"
+                      className="text-xs bg-[#5BB974] text-white px-3 py-1.5 rounded-lg hover:bg-[#4AA863] transition-colors font-semibold self-start sm:self-auto"
                     >
                       Assign All
                     </button>

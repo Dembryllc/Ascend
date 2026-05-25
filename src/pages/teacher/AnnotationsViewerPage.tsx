@@ -8,7 +8,8 @@ import { getUserProfile } from '@/firebase/auth'
 import type { Annotation, Book, UserProfile } from '@/types'
 import { REACTIONS } from '@/types'
 import { exportAnnotationsPDF } from '@/utils/exportPDF'
-import { FileDown } from 'lucide-react'
+import { buildAnnotationSummary } from '@/utils/teacherSummary'
+import { BarChart3, FileDown, Lightbulb } from 'lucide-react'
 
 export default function AnnotationsViewerPage() {
   const { profile } = useAuth()
@@ -45,6 +46,7 @@ export default function AnnotationsViewerPage() {
 
   const selectedStudentProfile = students.find((s) => s.uid === selectedStudent)
   const selectedBookData = books.find((b) => b.id === selectedBook)
+  const summary = buildAnnotationSummary(annotations)
 
   function handleExport() {
     if (!selectedStudentProfile || !selectedBookData) return
@@ -111,7 +113,32 @@ export default function AnnotationsViewerPage() {
 
       {/* Annotations list */}
       {annotations.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <section className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 size={20} className="text-[#4A90D9]" />
+              <h3 className="font-bold text-lg text-[#1A1D23]">Pattern Summary</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <SummaryStat label="Annotations" value={summary.total} />
+              <SummaryStat label="Quoted passages" value={summary.quoteCount} />
+              <SummaryStat label="Questions" value={summary.questionCount} />
+              <SummaryStat label="Dominant reaction" value={summary.dominantReaction} isText />
+            </div>
+            {summary.topPages.length > 0 && (
+              <p className="text-sm text-[#4B5563] mb-2">
+                Most active pages: {summary.topPages.map((p) => `page ${p.pageNumber} (${p.count})`).join(', ')}
+              </p>
+            )}
+            {summary.topKeywords.length > 0 && (
+              <p className="text-sm text-[#4B5563] mb-3">Common note words: {summary.topKeywords.join(', ')}</p>
+            )}
+            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+              <Lightbulb size={18} className="text-[#4A90D9] shrink-0 mt-0.5" />
+              <p className="text-sm font-semibold text-[#1A1D23]">{summary.suggestedPrompt}</p>
+            </div>
+          </section>
+
           {annotations.map((ann) => {
             const r = REACTIONS[ann.reactionType]
             return (
@@ -125,7 +152,10 @@ export default function AnnotationsViewerPage() {
                         {ann.timestamp.toLocaleDateString()} {ann.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    {ann.selectedText && (
+                    {ann.annotationKind === 'reflection' && (
+                      <p className="text-xs font-semibold text-[#5BB974] mt-2">Reflection</p>
+                    )}
+                    {ann.selectedText && ann.annotationKind !== 'reflection' && (
                       <p className="text-sm text-[#1A1D23] bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2 mt-2">
                         “{ann.selectedText}”
                       </p>
@@ -145,5 +175,14 @@ export default function AnnotationsViewerPage() {
         </div>
       ) : null}
     </AppShell>
+  )
+}
+
+function SummaryStat({ label, value, isText }: { label: string; value: number | string; isText?: boolean }) {
+  return (
+    <div className="bg-[#F8F9FC] border border-[#EEF0F4] rounded-xl p-3">
+      <div className={`font-bold text-[#1A1D23] ${isText ? 'text-sm' : 'text-2xl'}`}>{value}</div>
+      <div className="text-xs text-[#6B7280] mt-0.5">{label}</div>
+    </div>
   )
 }
