@@ -122,11 +122,9 @@ export default function LoginPage() {
           {message && (
             <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm" role="status">
               {message}
-              {resetMode && (
-                <p className="mt-2 text-xs text-green-800">
-                  The reset link is sent by Firebase Authentication, not directly by Ascend.
-                </p>
-              )}
+              <p className="mt-2 text-xs text-green-800">
+                The reset link is sent by Firebase Authentication, not directly by Ascend.
+              </p>
             </div>
           )}
 

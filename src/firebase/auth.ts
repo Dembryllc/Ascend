@@ -52,10 +52,26 @@ export async function logoutUser(): Promise<void> {
 }
 
 export async function sendPasswordReset(email: string, redirectUrl?: string): Promise<void> {
-  await sendPasswordResetEmail(auth, email.trim().toLowerCase(), redirectUrl ? {
-    url: redirectUrl,
-    handleCodeInApp: false,
-  } : undefined)
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!redirectUrl) {
+    await sendPasswordResetEmail(auth, normalizedEmail)
+    return
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, normalizedEmail, {
+      url: redirectUrl,
+      handleCodeInApp: false,
+    })
+  } catch (err: unknown) {
+    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : ''
+    if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+      await sendPasswordResetEmail(auth, normalizedEmail)
+      return
+    }
+    throw err
+  }
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
