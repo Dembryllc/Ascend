@@ -7,7 +7,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './config'
@@ -66,21 +65,23 @@ export async function getAnnotationsByStudentAndBook(
   const q = query(
     collection(db, 'annotations'),
     where('studentId', '==', studentId),
-    where('bookId', '==', bookId),
-    orderBy('pageNumber'),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => toAnnotation(d.id, d.data()))
+  return snap.docs
+    .map((d) => toAnnotation(d.id, d.data()))
+    .filter((ann) => ann.bookId === bookId)
+    .sort((a, b) => a.pageNumber - b.pageNumber)
 }
 
 export async function getAnnotationsByStudent(studentId: string): Promise<Annotation[]> {
   const q = query(
     collection(db, 'annotations'),
     where('studentId', '==', studentId),
-    orderBy('timestamp', 'desc'),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => toAnnotation(d.id, d.data()))
+  return snap.docs
+    .map((d) => toAnnotation(d.id, d.data()))
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
 }
 
 export async function getAnnotationsByClassAndBook(
@@ -91,9 +92,11 @@ export async function getAnnotationsByClassAndBook(
   const q = query(
     collection(db, 'annotations'),
     where('bookId', '==', bookId),
-    where('studentId', 'in', studentIds.slice(0, 30)),
-    orderBy('pageNumber'),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => toAnnotation(d.id, d.data()))
+  const allowedStudentIds = new Set(studentIds.slice(0, 30))
+  return snap.docs
+    .map((d) => toAnnotation(d.id, d.data()))
+    .filter((ann) => allowedStudentIds.has(ann.studentId))
+    .sort((a, b) => a.pageNumber - b.pageNumber)
 }
