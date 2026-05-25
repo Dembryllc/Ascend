@@ -51,8 +51,11 @@ export async function logoutUser(): Promise<void> {
   await signOut(auth)
 }
 
-export async function sendPasswordReset(email: string): Promise<void> {
-  await sendPasswordResetEmail(auth, email)
+export async function sendPasswordReset(email: string, redirectUrl?: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email.trim().toLowerCase(), redirectUrl ? {
+    url: redirectUrl,
+    handleCodeInApp: false,
+  } : undefined)
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {

@@ -4,6 +4,18 @@ import { loginUser, sendPasswordReset } from '@/firebase/auth'
 import { useAuth } from '@/context/AuthContext'
 import { BookOpen } from 'lucide-react'
 
+function authErrorMessage(err: unknown): string {
+  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : ''
+  if (code === 'auth/invalid-email') return 'Enter a valid email address.'
+  if (code === 'auth/user-not-found') return 'No Ascend account exists for that email address.'
+  if (code === 'auth/missing-email') return 'Enter your email address first.'
+  if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+    return 'Password reset is blocked because this site domain is not authorized in Firebase Authentication settings.'
+  }
+  if (code === 'auth/too-many-requests') return 'Too many reset attempts. Wait a few minutes and try again.'
+  return 'Could not send a reset email. Check the address and try again.'
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
@@ -41,15 +53,13 @@ export default function LoginPage() {
     setMessage('')
     setLoading(true)
     try {
-      await sendPasswordReset(email)
-      setMessage('Password reset email sent. Check your inbox for the link from Firebase.')
-      setResetMode(false)
+      const normalizedEmail = email.trim().toLowerCase()
+      const redirectUrl = `${window.location.origin}/login`
+      await sendPasswordReset(normalizedEmail, redirectUrl)
+      setEmail(normalizedEmail)
+      setMessage(`Password reset email sent to ${normalizedEmail}. Check spam or promotions if it does not appear in a minute.`)
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('auth/invalid-email')) {
-        setError('Enter a valid email address.')
-      } else {
-        setError('Could not send a reset email. Check the address and try again.')
-      }
+      setError(authErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -112,6 +122,11 @@ export default function LoginPage() {
           {message && (
             <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm" role="status">
               {message}
+              {resetMode && (
+                <p className="mt-2 text-xs text-green-800">
+                  The reset link is sent by Firebase Authentication, not directly by Ascend.
+                </p>
+              )}
             </div>
           )}
 
