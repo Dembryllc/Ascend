@@ -4,8 +4,9 @@ import AppShell from '@/components/layout/AppShell'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook } from '@/firebase/annotations'
+import { getReadingProgress } from '@/firebase/readingProgress'
 import { getUserProfile } from '@/firebase/auth'
-import type { Annotation, Book, UserProfile } from '@/types'
+import type { Annotation, Book, ReadingProgress, UserProfile } from '@/types'
 import { REACTIONS } from '@/types'
 import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
@@ -18,6 +19,7 @@ export default function AnnotationsViewerPage() {
   const [selectedStudent, setSelectedStudent] = useState('')
   const [selectedBook, setSelectedBook] = useState('')
   const [annotations, setAnnotations] = useState<Annotation[]>([])
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
 
@@ -39,8 +41,12 @@ export default function AnnotationsViewerPage() {
   async function fetchAnnotations() {
     if (!selectedStudent || !selectedBook) return
     setFetching(true)
-    const ann = await getAnnotationsByStudentAndBook(selectedStudent, selectedBook)
+    const [ann, progress] = await Promise.all([
+      getAnnotationsByStudentAndBook(selectedStudent, selectedBook),
+      getReadingProgress(selectedStudent, selectedBook),
+    ])
     setAnnotations(ann)
+    setReadingProgress(progress)
     setFetching(false)
   }
 
@@ -72,7 +78,11 @@ export default function AnnotationsViewerPage() {
             <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Student</label>
             <select
               value={selectedStudent}
-              onChange={(e) => setSelectedStudent(e.target.value)}
+              onChange={(e) => {
+                setSelectedStudent(e.target.value)
+                setAnnotations([])
+                setReadingProgress(null)
+              }}
               className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
             >
               <option value="">Select a student…</option>
@@ -83,7 +93,11 @@ export default function AnnotationsViewerPage() {
             <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Book</label>
             <select
               value={selectedBook}
-              onChange={(e) => setSelectedBook(e.target.value)}
+              onChange={(e) => {
+                setSelectedBook(e.target.value)
+                setAnnotations([])
+                setReadingProgress(null)
+              }}
               className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
             >
               <option value="">Select a book…</option>
@@ -112,8 +126,24 @@ export default function AnnotationsViewerPage() {
       </div>
 
       {/* Annotations list */}
-      {annotations.length > 0 ? (
+      {(annotations.length > 0 || readingProgress) ? (
         <div className="space-y-4">
+          {readingProgress && (
+            <section className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 size={20} className="text-[#5BB974]" />
+                <h3 className="font-bold text-lg text-[#1A1D23]">Reading Progress</h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <SummaryStat label="Completion" value={`${readingProgress.completionPercent}%`} isText />
+                <SummaryStat label="Last page" value={readingProgress.lastReadPage} />
+                <SummaryStat label="Highest page" value={readingProgress.highestPageRead} />
+                <SummaryStat label="Minutes read" value={Math.round(readingProgress.totalSecondsRead / 60)} />
+              </div>
+            </section>
+          )}
+
+          {annotations.length > 0 && (
           <section className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 size={20} className="text-[#4A90D9]" />
@@ -138,6 +168,7 @@ export default function AnnotationsViewerPage() {
               <p className="text-sm font-semibold text-[#1A1D23]">{summary.suggestedPrompt}</p>
             </div>
           </section>
+          )}
 
           {annotations.map((ann) => {
             const r = REACTIONS[ann.reactionType]

@@ -1,4 +1,4 @@
-import type { Annotation, Book, ReactionType } from '@/types'
+import type { Annotation, Book, ReadingProgress, ReactionType } from '@/types'
 
 const WEEKLY_PAGE_GOAL = 5
 
@@ -32,6 +32,9 @@ export interface StudentProgressSummary {
   annotationsCount: number
   pagesAnnotated: number
   pagesAnnotatedThisWeek: number
+  minutesRead: number
+  completedBooks: number
+  booksInProgress: number
   weeklyPageGoal: number
   weeklyGoalPercent: number
   streakDays: number
@@ -47,10 +50,13 @@ export interface StudentProgressSummary {
 export function buildStudentProgressSummary(
   books: Book[],
   annotations: Annotation[],
+  readingProgress: ReadingProgress[] = [],
 ): StudentProgressSummary {
   const sortedAnnotations = [...annotations].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+  const sortedProgress = [...readingProgress].sort((a, b) => b.lastReadAt.getTime() - a.lastReadAt.getTime())
   const pages = new Set(sortedAnnotations.map((a) => `${a.bookId}:${a.pageNumber}`))
   const annotatedBooks = new Set(sortedAnnotations.map(getAnnotationBookId))
+  const activeProgress = sortedProgress.filter((progress) => books.some((book) => book.id === progress.bookId))
   const weekStart = startOfWeek()
   const pagesThisWeek = new Set(
     sortedAnnotations
@@ -84,16 +90,27 @@ export function buildStudentProgressSummary(
   }
 
   const mostRecentAnnotation = sortedAnnotations[0]
-  const unannotatedBook = books.find((book) => !annotatedBooks.has(book.id)) ?? null
+  const mostRecentProgress = activeProgress[0]
+  const completedBookIds = new Set(activeProgress.filter((progress) => progress.completed).map((progress) => progress.bookId))
+  const inProgressBookIds = new Set(activeProgress.filter((progress) => !progress.completed && progress.completionPercent > 0).map((progress) => progress.bookId))
+  const unstartedBook = books.find((book) => !annotatedBooks.has(book.id) && !inProgressBookIds.has(book.id) && !completedBookIds.has(book.id)) ?? null
   const lastAnnotatedBook = mostRecentAnnotation
     ? books.find((book) => book.id === mostRecentAnnotation.bookId) ?? null
     : null
-  const nextBook = unannotatedBook ?? lastAnnotatedBook ?? books[0] ?? null
+  const lastReadBook = mostRecentProgress
+    ? books.find((book) => book.id === mostRecentProgress.bookId) ?? null
+    : null
+  const nextBook = lastReadBook && !mostRecentProgress?.completed
+    ? lastReadBook
+    : unstartedBook ?? lastAnnotatedBook ?? books.find((book) => !completedBookIds.has(book.id)) ?? books[0] ?? null
 
   let nextActionLabel = 'Add a book'
   let nextActionDetail = 'Build your shelf, then start annotating as you read.'
 
-  if (nextBook && unannotatedBook) {
+  if (nextBook && mostRecentProgress && nextBook.id === mostRecentProgress.bookId && !mostRecentProgress.completed) {
+    nextActionLabel = 'Keep reading'
+    nextActionDetail = `Pick up ${nextBook.title} on page ${mostRecentProgress.lastReadPage}.`
+  } else if (nextBook && unstartedBook) {
     nextActionLabel = 'Start annotating'
     nextActionDetail = `${nextBook.title} is ready for your first note.`
   } else if (nextBook && mostRecentAnnotation) {
@@ -109,6 +126,9 @@ export function buildStudentProgressSummary(
     annotationsCount: sortedAnnotations.length,
     pagesAnnotated: pages.size,
     pagesAnnotatedThisWeek: pagesThisWeek.size,
+    minutesRead: Math.round(activeProgress.reduce((sum, progress) => sum + progress.totalSecondsRead, 0) / 60),
+    completedBooks: completedBookIds.size,
+    booksInProgress: inProgressBookIds.size,
     weeklyPageGoal: WEEKLY_PAGE_GOAL,
     weeklyGoalPercent: Math.min(100, Math.round((pagesThisWeek.size / WEEKLY_PAGE_GOAL) * 100)),
     streakDays,

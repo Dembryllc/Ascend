@@ -47,6 +47,21 @@ export interface Annotation {
   timestamp: Date
 }
 
+export interface ReadingProgress {
+  id: string
+  studentId: string
+  bookId: string
+  classroomId?: string | null
+  lastReadPage: number
+  highestPageRead: number
+  totalPages: number
+  completionPercent: number
+  totalSecondsRead: number
+  completed: boolean
+  lastReadAt: Date
+  createdAt: Date
+}
+
 export const REACTIONS: Record<ReactionType, { emoji: string; label: string; color: string }> = {
   surprise:  { emoji: '😲', label: 'Surprise',        color: '#F59E0B' },
   think:     { emoji: '🤔', label: 'Makes Me Think',  color: '#6366F1' },

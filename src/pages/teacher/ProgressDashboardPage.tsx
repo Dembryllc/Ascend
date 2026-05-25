@@ -6,14 +6,15 @@ import { getAnnotationsByClassAndBook } from '@/firebase/annotations'
 import { getUserProfile } from '@/firebase/auth'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
-import type { Annotation, Book, UserProfile } from '@/types'
-import { BarChart3, BookOpen, MessageSquare, Users } from 'lucide-react'
+import { getReadingProgressByClassroom } from '@/firebase/readingProgress'
+import type { Annotation, ReadingProgress, UserProfile } from '@/types'
+import { CheckCircle, Clock, MessageSquare, Users } from 'lucide-react'
 
 export default function ProgressDashboardPage() {
   const { profile } = useAuth()
   const [students, setStudents] = useState<UserProfile[]>([])
-  const [books, setBooks] = useState<Book[]>([])
   const [annotations, setAnnotations] = useState<Annotation[]>([])
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,23 +28,24 @@ export default function ProgressDashboardPage() {
       ])
       if (!classroom) {
         if (!cancelled) {
-          setBooks(teacherBooks)
           setStudents([])
           setAnnotations([])
+          setReadingProgress([])
           setLoading(false)
         }
         return
       }
 
-      const [studentProfiles, bookAnnotations] = await Promise.all([
+      const [studentProfiles, bookAnnotations, progressRows] = await Promise.all([
         Promise.all(classroom.studentIds.map((id) => getUserProfile(id))),
         Promise.all(teacherBooks.map((book) => getAnnotationsByClassAndBook(classroom.studentIds, book.id))),
+        getReadingProgressByClassroom(classroom.id),
       ])
 
       if (cancelled) return
-      setBooks(teacherBooks)
       setStudents(studentProfiles.filter(Boolean) as UserProfile[])
       setAnnotations(bookAnnotations.flat())
+      setReadingProgress(progressRows.filter((row) => classroom.studentIds.includes(row.studentId)))
       setLoading(false)
     }
 
@@ -60,17 +62,29 @@ export default function ProgressDashboardPage() {
   const rows = useMemo(() => {
     return students.map((student) => {
       const studentAnnotations = annotations.filter((ann) => ann.studentId === student.uid)
+      const studentProgress = readingProgress.filter((progress) => progress.studentId === student.uid)
       const annotatedBooks = new Set(studentAnnotations.map((ann) => ann.bookId))
+      const activeBooks = new Set(studentProgress.map((progress) => progress.bookId))
       const latest = studentAnnotations.slice().sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]
+      const latestProgress = studentProgress.slice().sort((a, b) => b.lastReadAt.getTime() - a.lastReadAt.getTime())[0]
       return {
         student,
         annotations: studentAnnotations.length,
         quotes: studentAnnotations.filter((ann) => ann.selectedText && ann.annotationKind !== 'reflection').length,
-        booksStarted: annotatedBooks.size,
+        booksStarted: new Set([...annotatedBooks, ...activeBooks]).size,
+        minutesRead: Math.round(studentProgress.reduce((sum, progress) => sum + progress.totalSecondsRead, 0) / 60),
+        completedBooks: studentProgress.filter((progress) => progress.completed).length,
+        averageCompletion: studentProgress.length > 0
+          ? Math.round(studentProgress.reduce((sum, progress) => sum + progress.completionPercent, 0) / studentProgress.length)
+          : 0,
         latest,
+        latestProgress,
       }
     })
-  }, [annotations, students])
+  }, [annotations, readingProgress, students])
+
+  const totalMinutes = Math.round(readingProgress.reduce((sum, progress) => sum + progress.totalSecondsRead, 0) / 60)
+  const completedBooks = readingProgress.filter((progress) => progress.completed).length
 
   if (loading) return (
     <AppShell title="Progress">
@@ -84,14 +98,14 @@ export default function ProgressDashboardPage() {
     <AppShell title="Progress">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-[#1A1D23]">Class Progress</h2>
-        <p className="text-[#4B5563] mt-1">A quick scan of reading activity from annotations and highlighted passages.</p>
+        <p className="text-[#4B5563] mt-1">A quick scan of pages read, time spent, completion, and annotation activity.</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <Stat icon={<Users size={20} />} label="Students" value={students.length} />
-        <Stat icon={<BookOpen size={20} />} label="Teacher books" value={books.length} />
+        <Stat icon={<Clock size={20} />} label="Minutes read" value={totalMinutes} />
+        <Stat icon={<CheckCircle size={20} />} label="Books completed" value={completedBooks} />
         <Stat icon={<MessageSquare size={20} />} label="Annotations" value={annotations.length} />
-        <Stat icon={<BarChart3 size={20} />} label="Quoted passages" value={annotations.filter((ann) => ann.selectedText && ann.annotationKind !== 'reflection').length} />
       </div>
 
       {rows.length === 0 ? (
@@ -103,25 +117,31 @@ export default function ProgressDashboardPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] gap-3 px-5 py-3 bg-[#F8F9FC] text-xs font-bold uppercase tracking-wide text-[#6B7280]">
+          <div className="hidden md:grid grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_0.9fr_1.2fr] gap-3 px-5 py-3 bg-[#F8F9FC] text-xs font-bold uppercase tracking-wide text-[#6B7280]">
             <span>Student</span>
             <span>Books started</span>
+            <span>Completion</span>
+            <span>Minutes</span>
             <span>Notes</span>
-            <span>Quotes</span>
             <span>Last activity</span>
           </div>
           <div className="divide-y divide-[#F3F4F6]">
             {rows.map((row) => (
-              <div key={row.student.uid} className="grid grid-cols-2 md:grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] gap-3 px-5 py-4 items-center">
+              <div key={row.student.uid} className="grid grid-cols-2 md:grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_0.9fr_1.2fr] gap-3 px-5 py-4 items-center">
                 <div className="col-span-2 md:col-span-1">
                   <p className="font-bold text-[#1A1D23]">{row.student.displayName}</p>
                   <p className="text-xs text-[#6B7280]">{row.student.email}</p>
                 </div>
                 <Metric label="Books" value={row.booksStarted} />
+                <Metric label="Done" value={`${row.averageCompletion}%`} />
+                <Metric label="Minutes" value={row.minutesRead} />
                 <Metric label="Notes" value={row.annotations} />
-                <Metric label="Quotes" value={row.quotes} />
                 <div className="col-span-2 md:col-span-1 text-sm text-[#4B5563]">
-                  {row.latest ? row.latest.timestamp.toLocaleDateString() : 'No notes yet'}
+                  {row.latestProgress
+                    ? `${row.latestProgress.lastReadAt.toLocaleDateString()} · page ${row.latestProgress.lastReadPage}`
+                    : row.latest
+                      ? row.latest.timestamp.toLocaleDateString()
+                      : 'No activity yet'}
                 </div>
               </div>
             ))}
@@ -142,7 +162,7 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div>
       <p className="md:hidden text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF]">{label}</p>

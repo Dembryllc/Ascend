@@ -14,6 +14,42 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/classrooms/$(classroomId))
         && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
     }
+    function canReadBook(bookId, uid) {
+      return exists(/databases/$(database)/documents/books/$(bookId))
+        && (
+          uid in get(/databases/$(database)/documents/books/$(bookId)).data.assignedStudentIds
+          || get(/databases/$(database)/documents/books/$(bookId)).data.uploadedBy == uid
+        );
+    }
+    function validProgressData(data) {
+      return data.keys().hasOnly([
+          'studentId',
+          'bookId',
+          'classroomId',
+          'lastReadPage',
+          'highestPageRead',
+          'totalPages',
+          'completionPercent',
+          'totalSecondsRead',
+          'completed',
+          'lastReadAt',
+          'createdAt'
+        ])
+        && data.studentId is string
+        && data.bookId is string
+        && data.lastReadPage is int
+        && data.highestPageRead is int
+        && data.totalPages is int
+        && data.completionPercent is int
+        && data.totalSecondsRead is int
+        && data.completed is bool
+        && data.lastReadPage >= 1
+        && data.highestPageRead >= 1
+        && data.totalPages >= 0
+        && data.completionPercent >= 0
+        && data.completionPercent <= 100
+        && data.totalSecondsRead >= 0;
+    }
 
     // ── users ─────────────────────────────────────────────────────────────
     // Users read their own profile, or any authenticated user can read
@@ -87,6 +123,34 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.studentId == request.auth.uid;
       allow update: if isSignedIn() && isOwner(resource.data.studentId);
+      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+    }
+
+    // ── reading progress ─────────────────────────────────────────────────
+    // Students update their own reading progress. Teachers can read progress
+    // only for students in a classroom they own.
+    match /readingProgress/{progressId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || (
+          resource.data.keys().hasAll(['classroomId'])
+          && resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        )
+      );
+      allow create: if isSignedIn()
+                    && validProgressData(request.resource.data)
+                    && request.resource.data.studentId == request.auth.uid
+                    && canReadBook(request.resource.data.bookId, request.auth.uid);
+      allow update: if isSignedIn()
+                    && isOwner(resource.data.studentId)
+                    && validProgressData(request.resource.data)
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.bookId == resource.data.bookId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.totalSecondsRead >= resource.data.totalSecondsRead
+                    && request.resource.data.highestPageRead >= resource.data.highestPageRead
+                    && request.resource.data.completionPercent >= resource.data.completionPercent;
       allow delete: if isSignedIn() && isOwner(resource.data.studentId);
     }
   }

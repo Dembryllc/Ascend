@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -6,9 +6,10 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import { useAuth } from '@/context/AuthContext'
 import { getBook } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
-import type { Book, Annotation, ReactionType } from '@/types'
+import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
+import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
-import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, MessageSquare, Target } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target } from 'lucide-react'
 
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs'
 
@@ -41,6 +42,9 @@ export default function ReadingPage() {
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
   const [readAloudStatus, setReadAloudStatus] = useState('')
   const [reflectionText, setReflectionText] = useState('')
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
+  const [markingComplete, setMarkingComplete] = useState(false)
+  const lastProgressTickRef = useRef(0)
 
   useEffect(() => {
     if (!bookId) return
@@ -48,12 +52,15 @@ export default function ReadingPage() {
     Promise.all([
       getBook(bookId),
       getAnnotationsByStudentAndBook(profile.uid, bookId),
-    ]).then(([b, ann]) => {
+      getReadingProgress(profile.uid, bookId),
+    ]).then(([b, ann, progress]) => {
       if (!b) {
         setReaderError('This book could not be found. It may have been deleted or not assigned to you.')
       }
       setBook(b)
       setAnnotations(ann)
+      setReadingProgress(progress)
+      if (progress?.lastReadPage) setCurrentPage(Math.max(1, progress.lastReadPage))
       setLoadingBook(false)
     }).catch((err: unknown) => {
       console.error('Failed to open book:', err)
@@ -114,6 +121,65 @@ export default function ReadingPage() {
     setPdfDocument(loadedPdf)
     setNumPages(loadedPdf.numPages)
     setReaderError('')
+  }
+
+  const persistProgress = useCallback(async (secondsRead = 0, completed = false) => {
+    if (!profile || !bookId || numPages === 0) return
+    const progress = await recordReadingProgress({
+      studentId: profile.uid,
+      bookId,
+      classroomId: profile.classroomId,
+      pageNumber: currentPage,
+      totalPages: numPages,
+      secondsRead,
+      completed,
+    })
+    setReadingProgress(progress)
+  }, [bookId, currentPage, numPages, profile])
+
+  useEffect(() => {
+    if (numPages === 0) return
+    const timer = window.setTimeout(() => {
+      void persistProgress(0)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [currentPage, numPages, persistProgress])
+
+  useEffect(() => {
+    if (numPages === 0) return
+    lastProgressTickRef.current = Date.now()
+    const interval = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      const secondsRead = Math.max(5, Math.round((now - lastProgressTickRef.current) / 1000))
+      lastProgressTickRef.current = now
+      void persistProgress(secondsRead)
+    }, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [numPages, persistProgress])
+
+  useEffect(() => {
+    if (numPages === 0) return
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return
+      const now = Date.now()
+      const secondsRead = Math.round((now - lastProgressTickRef.current) / 1000)
+      lastProgressTickRef.current = now
+      if (secondsRead > 3) void persistProgress(secondsRead)
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [numPages, persistProgress])
+
+  async function handleMarkComplete() {
+    setMarkingComplete(true)
+    try {
+      await persistProgress(0, true)
+    } finally {
+      setMarkingComplete(false)
+    }
   }
 
   function onDocumentLoadError(err: Error) {
@@ -283,6 +349,8 @@ export default function ReadingPage() {
   const taskCount = Math.max(4, quoteCount + reflectionCount)
   const completedTaskCount = Math.min(taskCount, quoteCount + reflectionCount)
   const completionPct = Math.round((completedTaskCount / taskCount) * 100)
+  const readingCompletionPct = readingProgress?.completionPercent ?? (numPages > 0 ? Math.round((currentPage / numPages) * 100) : 0)
+  const minutesRead = Math.max(0, Math.round((readingProgress?.totalSecondsRead ?? 0) / 60))
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
@@ -325,6 +393,34 @@ export default function ReadingPage() {
                 </div>
               </section>
             )}
+
+            <section className="w-full mb-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-[#1A1D23] text-sm">Reading progress</p>
+                  <p className="text-xs text-[#4B5563] mt-1">
+                    Page {currentPage} of {numPages || '...'} · {minutesRead} minute{minutesRead === 1 ? '' : 's'} tracked
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {readingProgress?.completed && (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-[#5BB974] bg-green-50 px-3 py-2 rounded-xl">
+                      <CheckCircle size={14} /> Complete
+                    </span>
+                  )}
+                  <button
+                    onClick={handleMarkComplete}
+                    disabled={markingComplete || readingProgress?.completed}
+                    className="text-xs font-bold bg-[#1A1D23] text-white px-3 py-2 rounded-xl hover:bg-[#2A2F3A] disabled:opacity-50 transition-colors"
+                  >
+                    {readingProgress?.completed ? 'Completed' : markingComplete ? 'Saving...' : 'Mark Complete'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
+                <div className="h-full bg-[#5BB974] rounded-full" style={{ width: `${readingCompletionPct}%` }} />
+              </div>
+            </section>
 
             {/* PDF */}
             <div className="flex-1 w-full flex justify-center">
@@ -477,6 +573,10 @@ export default function ReadingPage() {
             </section>
 
             <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex items-center gap-2 mb-3 text-sm text-[#4B5563]">
+                <Clock size={16} className="text-[#4A90D9]" />
+                <span>{minutesRead} minute{minutesRead === 1 ? '' : 's'} tracked in this book</span>
+              </div>
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle size={18} className="text-[#5BB974]" />
                 <h3 className="font-bold text-[#1A1D23]">After reading</h3>

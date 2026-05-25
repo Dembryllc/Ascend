@@ -5,7 +5,8 @@ import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
 import { getBooksByStudent, deleteStudentBook } from '@/firebase/books'
 import { getAnnotationsByStudent } from '@/firebase/annotations'
-import type { Annotation, Book, ReactionType } from '@/types'
+import { getReadingProgressByStudent } from '@/firebase/readingProgress'
+import type { Annotation, Book, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
 import {
@@ -25,6 +26,7 @@ export default function StudentHome() {
   const { profile, loading: authLoading, error: authError } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [annotations, setAnnotations] = useState<Annotation[]>([])
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
   const [loadedStudentId, setLoadedStudentId] = useState('')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -37,11 +39,13 @@ export default function StudentHome() {
     Promise.all([
       getBooksByStudent(profile.uid),
       getAnnotationsByStudent(profile.uid),
+      getReadingProgressByStudent(profile.uid),
     ])
-      .then(([b, ann]) => {
+      .then(([b, ann, progressRows]) => {
         if (cancelled) return
         setBooks(b)
         setAnnotations(ann)
+        setReadingProgress(progressRows)
         setError('')
         setLoadedStudentId(profile.uid)
       })
@@ -124,8 +128,9 @@ export default function StudentHome() {
 
   const myBooks = books.filter((b) => b.uploadedBy === profile?.uid)
   const assignedBooks = books.filter((b) => b.uploadedBy !== profile?.uid)
-  const progress = buildStudentProgressSummary(books, annotations)
+  const progress = buildStudentProgressSummary(books, annotations, readingProgress)
   const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
+  const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
 
   return (
     <AppShell>
@@ -195,9 +200,9 @@ export default function StudentHome() {
           />
           <ProgressCard
             icon={<Flame size={20} />}
-            label="Streak"
-            value={`${progress.streakDays}`}
-            detail={progress.streakDays === 1 ? 'day with notes' : 'days with notes'}
+            label="Minutes read"
+            value={`${progress.minutesRead}`}
+            detail={`${progress.completedBooks} completed, ${progress.booksInProgress} in progress`}
           />
           <ProgressCard
             icon={<Target size={20} />}
@@ -238,7 +243,7 @@ export default function StudentHome() {
               <h3 className="text-lg font-bold text-[#1A1D23] mb-4">Assigned by Teacher</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {assignedBooks.map((book) => (
-                  <BookCard key={book.id} book={book} />
+                  <BookCard key={book.id} book={book} progress={progressByBookId.get(book.id)} />
                 ))}
               </div>
             </section>
@@ -253,6 +258,7 @@ export default function StudentHome() {
                   <BookCard
                     key={book.id}
                     book={book}
+                    progress={progressByBookId.get(book.id)}
                     onDelete={() => setConfirmDelete(book)}
                     deleting={deleting === book.id}
                   />
@@ -455,10 +461,12 @@ function RecentActivityCard({
 
 function BookCard({
   book,
+  progress,
   onDelete,
   deleting,
 }: {
   book: Book
+  progress?: ReadingProgress
   onDelete?: () => void
   deleting?: boolean
 }) {
@@ -478,6 +486,17 @@ function BookCard({
           )}
           {book.assignmentPrompt && (
             <p className="text-xs text-[#4B5563] mt-2 line-clamp-2">{book.assignmentPrompt}</p>
+          )}
+          {progress && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-[#6B7280] mb-1">
+                <span>{progress.completed ? 'Complete' : `Page ${progress.lastReadPage}`}</span>
+                <span>{progress.completionPercent}%</span>
+              </div>
+              <div className="h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
+                <div className="h-full bg-[#5BB974] rounded-full" style={{ width: `${progress.completionPercent}%` }} />
+              </div>
+            </div>
           )}
         </div>
       </Link>
