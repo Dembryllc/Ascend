@@ -12,6 +12,13 @@ import { ChevronLeft, ChevronRight, Volume2, ArrowLeft } from 'lucide-react'
 
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs'
 
+type PdfDocument = {
+  numPages: number
+  getPage(pageNumber: number): Promise<{
+    getTextContent(): Promise<{ items: unknown[] }>
+  }>
+}
+
 export default function ReadingPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const navigate = useNavigate()
@@ -30,6 +37,8 @@ export default function ReadingPage() {
   const [containerWidth, setContainerWidth] = useState(700)
   const [loadingBook, setLoadingBook] = useState(true)
   const [readerError, setReaderError] = useState('')
+  const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
+  const [readAloudStatus, setReadAloudStatus] = useState('')
 
   useEffect(() => {
     if (!bookId) {
@@ -72,8 +81,10 @@ export default function ReadingPage() {
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  function onDocumentLoaded({ numPages }: { numPages: number }) {
-    setNumPages(numPages)
+  function onDocumentLoaded(pdf: unknown) {
+    const loadedPdf = pdf as PdfDocument
+    setPdfDocument(loadedPdf)
+    setNumPages(loadedPdf.numPages)
     setReaderError('')
   }
 
@@ -143,15 +154,38 @@ export default function ReadingPage() {
     closePanel()
   }
 
-  const speakPage = useCallback(() => {
-    if (!window.speechSynthesis) return
+  const speakPage = useCallback(async () => {
+    if (!window.speechSynthesis) {
+      setReadAloudStatus('Read aloud is not available in this browser.')
+      return
+    }
+    if (!pdfDocument) {
+      setReadAloudStatus('The page is still loading. Try again in a moment.')
+      return
+    }
+
     window.speechSynthesis.cancel()
-    const textLayer = document.querySelector('.react-pdf__Page__textContent')
-    const text = textLayer?.textContent ?? `Page ${currentPage}`
+    setReadAloudStatus('Reading page aloud…')
+
+    const page = await pdfDocument.getPage(currentPage)
+    const content = await page.getTextContent()
+    const text = content.items
+      .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (!text) {
+      setReadAloudStatus('No readable text was found on this page.')
+      return
+    }
+
     const utt = new SpeechSynthesisUtterance(text)
     utt.rate = 0.9
+    utt.onend = () => setReadAloudStatus('')
+    utt.onerror = () => setReadAloudStatus('Read aloud stopped before finishing.')
     window.speechSynthesis.speak(utt)
-  }, [currentPage])
+  }, [currentPage, pdfDocument])
 
   if (loadingBook) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
@@ -252,6 +286,9 @@ export default function ReadingPage() {
             Next <ChevronRight size={20} />
           </button>
         </div>
+        {readAloudStatus && (
+          <p className="w-full mt-2 text-center text-xs font-semibold text-[#4B5563]">{readAloudStatus}</p>
+        )}
 
         {/* Annotation toolbar */}
         <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
