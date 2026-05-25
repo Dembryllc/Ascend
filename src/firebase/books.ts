@@ -11,7 +11,7 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore'
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage'
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBlob } from 'firebase/storage'
 import { db, storage } from './config'
 import type { Book } from '@/types'
 
@@ -83,18 +83,8 @@ export async function getBook(bookId: string): Promise<Book | null> {
 }
 
 export async function getBookPdfBlob(storageUrl: string): Promise<Blob> {
-  const controller = new AbortController()
-  const timeoutId = window.setTimeout(() => controller.abort(), 20_000)
-
-  try {
-    const response = await fetch(storageUrl, { signal: controller.signal })
-    if (!response.ok) {
-      throw new Error(`PDF download failed with status ${response.status}`)
-    }
-    return response.blob()
-  } finally {
-    window.clearTimeout(timeoutId)
-  }
+  const fileRef = ref(storage, storageUrl)
+  return getBlob(fileRef)
 }
 
 export async function assignBookToStudent(bookId: string, studentId: string): Promise<void> {
