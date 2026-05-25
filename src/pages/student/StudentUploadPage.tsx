@@ -28,17 +28,22 @@ export default function StudentUploadPage() {
     }
     setError('')
     setFile(f)
+    if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
+    if (!author) setAuthor('Unknown author')
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || !profile) return
+    if (!file || !profile) {
+      setError('Please sign in and choose a PDF before uploading.')
+      return
+    }
     setError('')
     setUploading(true)
     try {
-      await uploadStudentBook(file, title, author, readingLevel, profile.uid, setProgress)
+      const book = await uploadStudentBook(file, title || file.name.replace(/\.pdf$/i, ''), author || 'Unknown author', readingLevel, profile.uid, setProgress)
       setDone(true)
-      setTimeout(() => navigate('/student'), 1500)
+      setTimeout(() => navigate(`/student/read/${book.id}`), 900)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
@@ -92,7 +97,7 @@ export default function StudentUploadPage() {
           </div>
 
           <Field label="Book Title *" value={title} onChange={setTitle} placeholder="e.g. Charlotte's Web" required />
-          <Field label="Author *" value={author} onChange={setAuthor} placeholder="e.g. E.B. White" required />
+          <Field label="Author" value={author} onChange={setAuthor} placeholder="e.g. E.B. White" />
           <Field label="Reading Level / Tag" value={readingLevel} onChange={setReadingLevel} placeholder="e.g. Grade 3, Chapter Book" />
 
           {uploading && (
@@ -115,7 +120,7 @@ export default function StudentUploadPage() {
 
           <button
             type="submit"
-            disabled={!file || !title || !author || uploading}
+            disabled={!file || uploading}
             className="w-full bg-[#4A90D9] hover:bg-[#357ABD] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-base transition-colors"
           >
             {uploading ? 'Uploading…' : 'Add to My Bookshelf'}

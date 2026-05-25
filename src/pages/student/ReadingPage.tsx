@@ -10,8 +10,10 @@ import type { Book, Annotation, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { ChevronLeft, ChevronRight, Volume2, ArrowLeft } from 'lucide-react'
 
-// Use CDN worker to avoid bundling issues
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString()
 
 export default function ReadingPage() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -28,15 +30,32 @@ export default function ReadingPage() {
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
   const [containerWidth, setContainerWidth] = useState(700)
+  const [loadingBook, setLoadingBook] = useState(true)
+  const [readerError, setReaderError] = useState('')
 
   useEffect(() => {
-    if (!bookId || !profile) return
+    if (!bookId) {
+      setReaderError('Missing book id.')
+      setLoadingBook(false)
+      return
+    }
+    if (!profile) return
+    setLoadingBook(true)
+    setReaderError('')
     Promise.all([
       getBook(bookId),
       getAnnotationsByStudentAndBook(profile.uid, bookId),
     ]).then(([b, ann]) => {
+      if (!b) {
+        setReaderError('This book could not be found. It may have been deleted or not assigned to you.')
+      }
       setBook(b)
       setAnnotations(ann)
+      setLoadingBook(false)
+    }).catch((err: unknown) => {
+      console.error('Failed to open book:', err)
+      setReaderError(err instanceof Error ? err.message : 'Could not open this book. Please try again.')
+      setLoadingBook(false)
     })
   }, [bookId, profile])
 
@@ -57,6 +76,12 @@ export default function ReadingPage() {
 
   function onDocumentLoaded({ numPages }: { numPages: number }) {
     setNumPages(numPages)
+    setReaderError('')
+  }
+
+  function onDocumentLoadError(err: Error) {
+    console.error('Failed to render PDF:', err)
+    setReaderError('The PDF uploaded, but the reader could not open it. This can happen if the file is scanned, blocked by storage permissions, or not a valid PDF.')
   }
 
   function openAnnotationPanel(editing?: Annotation) {
@@ -114,9 +139,27 @@ export default function ReadingPage() {
     window.speechSynthesis.speak(utt)
   }, [currentPage])
 
-  if (!book) return (
+  if (loadingBook) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
-      <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="text-center">
+        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-sm font-semibold text-[#4B5563]">Opening book…</p>
+      </div>
+    </div>
+  )
+
+  if (readerError || !book) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
+      <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
+        <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
+        <p className="text-[#4B5563] text-sm mb-6">{readerError || 'The book was not found.'}</p>
+        <button
+          onClick={() => navigate('/student')}
+          className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Back to Bookshelf
+        </button>
+      </div>
     </div>
   )
 
@@ -149,6 +192,12 @@ export default function ReadingPage() {
           <Document
             file={book.storageUrl}
             onLoadSuccess={onDocumentLoaded}
+            onLoadError={onDocumentLoadError}
+            error={
+              <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
+                This PDF could not be rendered. Try re-uploading it or using a different PDF.
+              </div>
+            }
             loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
           >
             <Page
