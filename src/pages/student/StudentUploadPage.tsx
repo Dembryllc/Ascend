@@ -26,6 +26,10 @@ export default function StudentUploadPage() {
       setError('Please select a PDF file.')
       return
     }
+    if (f.size > 50 * 1024 * 1024) {
+      setError('File is too large. Maximum size is 50 MB.')
+      return
+    }
     setError('')
     setFile(f)
     if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
@@ -89,7 +93,7 @@ export default function StudentUploadPage() {
                 <>
                   <Upload size={28} className="mx-auto text-[#9CA3AF] mb-2" />
                   <p className="text-sm text-[#4B5563]">Click to select a PDF</p>
-                  <p className="text-xs text-[#9CA3AF] mt-1">PDF files only</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">PDF files only · max 50 MB</p>
                 </>
               )}
             </button>

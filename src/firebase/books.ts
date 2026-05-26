@@ -39,17 +39,23 @@ export async function uploadBook(
     )
   })
 
-  const docRef = await addDoc(collection(db, 'books'), {
-    title,
-    author,
-    readingLevel: readingLevel || null,
-    assignmentPrompt: cleanAssignmentPrompt || null,
-    successCriteria: cleanSuccessCriteria || null,
-    storageUrl,
-    uploadedBy: teacherId,
-    assignedStudentIds: [],
-    createdAt: serverTimestamp(),
-  })
+  let docRef
+  try {
+    docRef = await addDoc(collection(db, 'books'), {
+      title,
+      author,
+      readingLevel: readingLevel || null,
+      assignmentPrompt: cleanAssignmentPrompt || null,
+      successCriteria: cleanSuccessCriteria || null,
+      storageUrl,
+      uploadedBy: teacherId,
+      assignedStudentIds: [],
+      createdAt: serverTimestamp(),
+    })
+  } catch (err) {
+    await deleteObject(storageRef).catch(() => undefined)
+    throw err
+  }
 
   return {
     id: docRef.id,
@@ -126,16 +132,22 @@ export async function uploadStudentBook(
     )
   })
 
-  const docRef = await addDoc(collection(db, 'books'), {
-    title,
-    author,
-    readingLevel: readingLevel || null,
-    storageUrl,
-    uploadedBy: studentId,
-    uploadedByStudent: true,
-    assignedStudentIds: [studentId],
-    createdAt: serverTimestamp(),
-  })
+  let docRef
+  try {
+    docRef = await addDoc(collection(db, 'books'), {
+      title,
+      author,
+      readingLevel: readingLevel || null,
+      storageUrl,
+      uploadedBy: studentId,
+      uploadedByStudent: true,
+      assignedStudentIds: [studentId],
+      createdAt: serverTimestamp(),
+    })
+  } catch (err) {
+    await deleteObject(storageRef).catch(() => undefined)
+    throw err
+  }
 
   return {
     id: docRef.id,

@@ -36,11 +36,11 @@ export default function RegisterPage() {
           <div className="bg-[#4A90D9] text-white p-2 rounded-xl">
             <BookOpen size={28} />
           </div>
-          <span className="text-2xl font-bold text-[#1A1D23]">Ascend Annotate</span>
+          <span className="text-2xl font-bold text-[#1A1D23]">Easy Annotate</span>
         </div>
 
         <h1 className="text-xl font-bold text-center mb-1 text-[#1A1D23]">Create your account</h1>
-        <p className="text-center text-[#4B5563] mb-6 text-sm">Join Ascend Annotate to start reading and annotating</p>
+        <p className="text-center text-[#4B5563] mb-6 text-sm">Join Easy Annotate to start reading and annotating</p>
 
         {/* Role toggle */}
         <div className="flex rounded-xl overflow-hidden border border-[#E5E7EB] mb-6">

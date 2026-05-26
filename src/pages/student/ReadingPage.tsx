@@ -11,7 +11,10 @@ import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target } from 'lucide-react'
 
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs'
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url,
+).toString()
 
 const HIGHLIGHT_STOP_WORDS = new Set(['and', 'are', 'for', 'not', 'that', 'the', 'this', 'was', 'with'])
 

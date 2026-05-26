@@ -34,7 +34,7 @@ export function exportAnnotationsPDF(
   }
 
   // Header
-  addText('Ascend Annotate — Annotation Report', 20, true, '#4A90D9')
+  addText('Easy Annotate — Annotation Report', 20, true, '#4A90D9')
   y += 4
   addText(`Student: ${studentName}`, 13, true)
   addText(`Book: ${bookTitle}`, 13)

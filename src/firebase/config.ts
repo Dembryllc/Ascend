@@ -14,6 +14,14 @@ const firebaseConfig = {
   appId:             import.meta.env.VITE_FIREBASE_APP_ID             || 'YOUR_APP_ID',
 }
 
+if (firebaseConfig.apiKey.startsWith('YOUR_')) {
+  console.error(
+    '[Easy Annotate] Firebase is using placeholder config values. ' +
+    'Create a .env file with your VITE_FIREBASE_* variables. ' +
+    'See README for setup instructions.',
+  )
+}
+
 const app = initializeApp(firebaseConfig)
 
 export const auth    = getAuth(app)

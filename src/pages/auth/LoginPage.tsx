@@ -40,8 +40,21 @@ export default function LoginPage() {
     try {
       await loginUser(email, password)
       // AuthContext will update; redirect happens via ProtectedRoute
-    } catch {
-      setError('Invalid email or password. Please try again.')
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code
+      if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+        setError('Incorrect email or password. Please try again.')
+      } else if (code === 'auth/invalid-email') {
+        setError('That doesn\'t look like a valid email address.')
+      } else if (code === 'auth/user-disabled') {
+        setError('This account has been disabled. Contact your teacher.')
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please wait a few minutes and try again.')
+      } else if (code === 'auth/invalid-api-key' || code === 'auth/app-not-authorized') {
+        setError('App configuration error. Please contact support.')
+      } else {
+        setError('Sign-in failed. Please check your connection and try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -72,7 +85,7 @@ export default function LoginPage() {
           <div className="bg-[#4A90D9] text-white p-2 rounded-xl">
             <BookOpen size={28} />
           </div>
-          <span className="text-2xl font-bold text-[#1A1D23]">Ascend Annotate</span>
+          <span className="text-2xl font-bold text-[#1A1D23]">Easy Annotate</span>
         </div>
 
         <h1 className="text-xl font-bold text-center mb-1 text-[#1A1D23]">
@@ -150,7 +163,7 @@ export default function LoginPage() {
         </button>
 
         <p className="text-center text-sm text-[#4B5563] mt-6">
-          New to Ascend Annotate?{' '}
+          New to Easy Annotate?{' '}
           <Link to="/register" className="text-[#4A90D9] font-semibold hover:underline">
             Create an account
           </Link>
