@@ -131,7 +131,8 @@ service cloud.firestore {
     // only for students in a classroom they own.
     match /readingProgress/{progressId} {
       allow read: if isSignedIn() && (
-        isOwner(resource.data.studentId)
+        resource == null
+        || isOwner(resource.data.studentId)
         || (
           resource.data.keys().hasAll(['classroomId'])
           && resource.data.classroomId is string
