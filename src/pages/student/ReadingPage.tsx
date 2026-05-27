@@ -199,6 +199,12 @@ export default function ReadingPage() {
   useEffect(() => {
     setCapturedSelection('')
     setFloatingBar(null)
+    // Stop any in-progress speech when the user turns the page
+    if (window.speechSynthesis?.speaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage])
 
   async function handleMarkComplete() {
@@ -300,6 +306,14 @@ export default function ReadingPage() {
     }
   }
 
+  const [isSpeaking, setIsSpeaking] = useState(false)
+
+  function stopSpeaking() {
+    window.speechSynthesis?.cancel()
+    setIsSpeaking(false)
+    setReadAloudStatus('')
+  }
+
   const speakPage = useCallback(async () => {
     if (!window.speechSynthesis) {
       setReadAloudStatus('Read aloud is not available in this browser.')
@@ -311,7 +325,8 @@ export default function ReadingPage() {
     }
 
     window.speechSynthesis.cancel()
-    setReadAloudStatus('Reading page aloud…')
+    setIsSpeaking(false)
+    setReadAloudStatus('Loading…')
 
     const page = await pdfDocument.getPage(currentPage)
     const content = await page.getTextContent()
@@ -326,11 +341,39 @@ export default function ReadingPage() {
       return
     }
 
-    const utt = new SpeechSynthesisUtterance(text)
-    utt.rate = 0.9
-    utt.onend = () => setReadAloudStatus('')
-    utt.onerror = () => setReadAloudStatus('Read aloud stopped before finishing.')
-    window.speechSynthesis.speak(utt)
+    // Pick the most natural available en-US voice. Browsers label
+    // high-quality voices as "enhanced", "neural", "premium", or "Google".
+    function pickVoice(): SpeechSynthesisVoice | null {
+      const voices = window.speechSynthesis.getVoices()
+      const enUS = voices.filter((v) => v.lang.startsWith('en'))
+      const ranked = [
+        enUS.find((v) => /enhanced|neural|premium/i.test(v.name)),
+        enUS.find((v) => /google/i.test(v.name)),
+        enUS.find((v) => v.lang === 'en-US'),
+        enUS[0] ?? null,
+      ]
+      return ranked.find(Boolean) ?? null
+    }
+
+    const trySpeak = () => {
+      const utt = new SpeechSynthesisUtterance(text)
+      const voice = pickVoice()
+      if (voice) utt.voice = voice
+      utt.rate = 0.88
+      utt.pitch = 1.0
+      utt.volume = 1.0
+      utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
+      utt.onend = () => { setIsSpeaking(false); setReadAloudStatus('') }
+      utt.onerror = () => { setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.') }
+      window.speechSynthesis.speak(utt)
+    }
+
+    // Voices may not be populated yet on first call — wait for voiceschanged
+    if (window.speechSynthesis.getVoices().length > 0) {
+      trySpeak()
+    } else {
+      window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
+    }
   }, [currentPage, pdfDocument])
 
   if (!bookId) return (
@@ -396,10 +439,27 @@ export default function ReadingPage() {
             <p className="font-bold text-[#1A1D23] text-sm truncate">{book.title}</p>
             <p className="text-xs text-[#4B5563]">{book.author}</p>
           </div>
-          <button onClick={speakPage} aria-label="Read page aloud" className="flex items-center gap-1 text-[#4A90D9] hover:text-[#357ABD] transition-colors px-2 py-1 rounded-lg hover:bg-blue-50">
-            <Volume2 size={20} />
-            <span className="text-xs font-medium hidden sm:inline">Read aloud</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {isSpeaking ? (
+              <button
+                onClick={stopSpeaking}
+                aria-label="Stop reading"
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-semibold text-sm"
+              >
+                <span className="text-base leading-none">⏹</span>
+                <span className="hidden sm:inline">Stop</span>
+              </button>
+            ) : (
+              <button
+                onClick={speakPage}
+                aria-label="Read page aloud"
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#4A90D9] hover:bg-blue-50 transition-colors font-semibold text-sm"
+              >
+                <Volume2 size={20} />
+                <span className="hidden sm:inline">Read aloud</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
