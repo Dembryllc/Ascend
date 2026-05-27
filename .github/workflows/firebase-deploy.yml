@@ -16,10 +16,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: Build
         run: npm run build
@@ -34,7 +33,7 @@ jobs:
       - name: Deploy to Firebase Hosting
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}' > /tmp/sa.json
-          npx firebase-tools deploy --only hosting --project ascend-annotate
+          npx firebase-tools@latest deploy --only hosting --project ascend-annotate
           rm -f /tmp/sa.json
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
