@@ -45,6 +45,8 @@ export default function ReadingPage() {
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [markingComplete, setMarkingComplete] = useState(false)
   const lastProgressTickRef = useRef(0)
+  const [capturedSelection, setCapturedSelection] = useState('')
+  const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (!bookId) return
@@ -173,6 +175,32 @@ export default function ReadingPage() {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [numPages, persistProgress])
 
+  // Capture text selection into state the moment it happens so that tapping
+  // the emoji toolbar (which clears the live selection on mobile) still has
+  // the text available. We never clear capturedSelection on empty-selection
+  // events — only when the user acts (closePanel) or turns the page.
+  useEffect(() => {
+    function onSelectionChange() {
+      const sel = window.getSelection()
+      const text = sel?.toString().replace(/\s+/g, ' ').trim() ?? ''
+      if (!text) return
+      const container = document.getElementById('pdf-container')
+      if (!container || !sel || sel.rangeCount === 0) return
+      const range = sel.getRangeAt(0)
+      if (!container.contains(range.startContainer)) return
+      setCapturedSelection(text)
+      const rect = range.getBoundingClientRect()
+      setFloatingBar({ x: rect.left + rect.width / 2, y: rect.top })
+    }
+    document.addEventListener('selectionchange', onSelectionChange)
+    return () => document.removeEventListener('selectionchange', onSelectionChange)
+  }, [])
+
+  useEffect(() => {
+    setCapturedSelection('')
+    setFloatingBar(null)
+  }, [currentPage])
+
   async function handleMarkComplete() {
     setMarkingComplete(true)
     try {
@@ -188,20 +216,21 @@ export default function ReadingPage() {
   }
 
   function getSelectedPdfText() {
+    // Prefer the state-captured selection — it survives the tap that clears
+    // the live browser selection on mobile.
+    if (capturedSelection) return capturedSelection
     const selection = window.getSelection()
     const text = selection?.toString().replace(/\s+/g, ' ').trim() ?? ''
     if (!selection || !text) return ''
-
     const container = document.getElementById('pdf-container')
     if (!container || selection.rangeCount === 0) return text
-
     const range = selection.getRangeAt(0)
     const startIsInReader = container.contains(range.startContainer)
     const endIsInReader = container.contains(range.endContainer)
     return startIsInReader && endIsInReader ? text : ''
   }
 
-  function openAnnotationPanel(reactionType?: ReactionType, editing?: Annotation) {
+  function openAnnotationPanel(reactionType?: ReactionType, editing?: Annotation, textOverride?: string) {
     if (editing) {
       setSelectedReaction(editing.reactionType)
       setSelectedText(editing.selectedText ?? '')
@@ -209,7 +238,7 @@ export default function ReadingPage() {
       setAnnotationPanel({ open: true, editing })
     } else {
       setSelectedReaction(reactionType ?? 'think')
-      setSelectedText(getSelectedPdfText())
+      setSelectedText(textOverride !== undefined ? textOverride : getSelectedPdfText())
       setNoteText('')
       setAnnotationPanel({ open: true })
     }
@@ -217,6 +246,8 @@ export default function ReadingPage() {
 
   function closePanel() {
     setAnnotationPanel({ open: false })
+    setCapturedSelection('')
+    setFloatingBar(null)
   }
 
   async function handleSave() {
@@ -601,6 +632,44 @@ export default function ReadingPage() {
           </aside>
         </div>
       </div>
+
+      {/* Floating emoji picker — appears above selected text on mobile and desktop */}
+      {floatingBar && !annotationPanel.open && (
+        <div
+          className="fixed z-[45] bg-white rounded-2xl shadow-xl border border-[#E5E7EB] px-2 py-1.5 flex items-center gap-0.5"
+          style={{
+            left: Math.max(8, Math.min(floatingBar.x - 148, window.innerWidth - 304)),
+            top: Math.max(56, floatingBar.y - 64),
+          }}
+        >
+          <span className="text-xs text-[#6B7280] font-medium px-1.5 shrink-0 select-none">React:</span>
+          {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
+            <button
+              key={type}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const text = capturedSelection
+                setCapturedSelection('')
+                setFloatingBar(null)
+                openAnnotationPanel(type, undefined, text)
+              }}
+              title={r.label}
+              aria-label={r.label}
+              className="w-11 h-11 flex items-center justify-center rounded-xl text-2xl hover:bg-[#F3F4F6] active:scale-95 transition-all"
+            >
+              {r.emoji}
+            </button>
+          ))}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setCapturedSelection(''); setFloatingBar(null); window.getSelection()?.removeAllRanges() }}
+            aria-label="Dismiss"
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#9CA3AF] hover:bg-[#F3F4F6] transition-colors ml-0.5 text-base"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Annotation panel modal */}
       {annotationPanel.open && (
