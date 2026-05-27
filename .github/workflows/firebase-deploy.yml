@@ -4,36 +4,28 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Verify Node and npm
-        run: |
-          echo "Node: $(node --version)"
-          echo "npm:  $(npm --version)"
+          node-version: '22'
 
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-          echo "✓ Install complete"
+        run: npm ci --legacy-peer-deps
 
       - name: Build
-        run: |
-          npm run build
-          echo "✓ Build complete"
-          echo "dist/ contents:"
-          ls -lh dist/
+        run: npm run build
         env:
           VITE_FIREBASE_API_KEY: AIzaSyD5sUHH11e0Y1KeNpzEX6Ba9XNlhpNFKKk
           VITE_FIREBASE_AUTH_DOMAIN: ascend-annotate.firebaseapp.com
@@ -47,12 +39,8 @@ jobs:
           SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}
         run: |
           echo "$SA_JSON" > /tmp/sa.json
-          echo "✓ Service account written ($(wc -c < /tmp/sa.json) bytes)"
           npm install -g firebase-tools
-          echo "✓ Firebase tools: $(firebase --version)"
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
             --only hosting \
-            --project ascend-annotate \
-            --debug
+            --project ascend-annotate
           rm -f /tmp/sa.json
-          echo "✓ Deploy complete"
