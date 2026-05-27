@@ -32,9 +32,9 @@ jobs:
           VITE_FIREBASE_APP_ID: "1:97329229065:web:7120ef7d461ff67ba6f7d8"
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}
-          channelId: live
-          projectId: ascend-annotate
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}' > /tmp/sa.json
+          npx firebase-tools deploy --only hosting --project ascend-annotate
+          rm -f /tmp/sa.json
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
