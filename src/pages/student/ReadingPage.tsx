@@ -542,7 +542,10 @@ export default function ReadingPage() {
                             “{ann.selectedText}”
                           </p>
                         )}
-                        {ann.noteText && <p className="text-sm text-[#1A1D23] mt-1">{ann.noteText}</p>}
+                        {ann.noteText
+                          ? <p className="text-sm text-[#1A1D23] mt-1">{ann.noteText}</p>
+                          : <p className="text-xs text-[#9CA3AF] italic mt-1">No note yet — tap Edit to add one</p>
+                        }
                       </div>
                       <button
                         onClick={() => openAnnotationPanel(undefined, ann)}
@@ -582,7 +585,10 @@ export default function ReadingPage() {
                       return (
                         <button
                           key={ann.id}
-                          onClick={() => setCurrentPage(Math.max(1, ann.pageNumber))}
+                          onClick={() => {
+                            setCurrentPage(Math.max(1, ann.pageNumber))
+                            openAnnotationPanel(undefined, ann)
+                          }}
                           className="w-full text-left bg-[#F8F9FC] hover:bg-blue-50 border border-[#EEF0F4] rounded-xl p-3 transition-colors"
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -595,7 +601,10 @@ export default function ReadingPage() {
                           {ann.selectedText && ann.annotationKind !== 'reflection' && (
                             <p className="text-xs text-[#4B5563] mt-1 line-clamp-2">“{ann.selectedText}”</p>
                           )}
-                          {ann.noteText && <p className="text-xs text-[#1A1D23] mt-1 line-clamp-2">{ann.noteText}</p>}
+                          {ann.noteText
+                          ? <p className="text-xs text-[#1A1D23] mt-1 line-clamp-2">{ann.noteText}</p>
+                          : <p className="text-xs text-[#9CA3AF] italic mt-1">Tap to add a note</p>
+                        }
                         </button>
                       )
                     })}
