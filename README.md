@@ -18,7 +18,7 @@ A web-based PDF annotation app for students with special needs. Students read PD
 | PDF rendering | react-pdf v10 + pdfjs-dist v5 |
 | PDF export | jsPDF v4 |
 | Routing | React Router v7 |
-| Hosting | Netlify (static SPA) |
+| Hosting | Firebase Hosting (auto-deploy via GitHub Actions) |
 
 ---
 
@@ -31,6 +31,8 @@ git clone https://github.com/Dembryllc/Ascend.git
 cd Ascend
 npm install --legacy-peer-deps
 ```
+
+> Requires **Node.js 22+**. Vite 8 and TypeScript 6 do not support Node 20.
 
 ### 2. Create `.env`
 
@@ -45,7 +47,7 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
 
-Get these values from **Firebase Console → Project settings → Your apps → SDK setup**.
+Get these from **Firebase Console → Project settings → Your apps → SDK setup**.
 
 ### 3. Run
 
@@ -53,7 +55,7 @@ Get these values from **Firebase Console → Project settings → Your apps → 
 npm run dev
 ```
 
-The app runs at `http://localhost:5173`.
+App runs at `http://localhost:5173`.
 
 ---
 
@@ -88,11 +90,14 @@ src/
 │       ├── TeacherDashboard.tsx  # Book library + classroom overview
 │       ├── UploadBookPage.tsx    # Teacher book upload
 │       ├── ClassroomPage.tsx     # Manage students + assign books
-│       └── AnnotationsViewerPage.tsx # View + export student annotations
+│       ├── AnnotationsViewerPage.tsx  # View + export student annotations
+│       └── ProgressDashboardPage.tsx  # Reading time + completion dashboard
 ├── types/
 │   └── index.ts                  # Shared TypeScript types
 └── utils/
-    └── exportPDF.ts              # jsPDF annotation export
+    ├── exportPDF.ts              # jsPDF annotation export
+    ├── studentProgress.ts        # Progress aggregation helpers
+    └── teacherSummary.ts         # Teacher-side summary helpers
 ```
 
 ---
@@ -106,11 +111,11 @@ src/
 
 ### Firestore Rules
 
-Paste the contents of `firestore.rules` into **Firebase Console → Firestore → Rules**.
+Paste `firestore.rules` into **Firebase Console → Firestore → Rules**.
 
 ### Firestore Composite Indexes
 
-Paste the contents of `firestore.indexes.json` into **Firebase Console → Firestore → Indexes → Import**, or create the three indexes manually:
+The app requires three composite indexes on the `annotations` collection. Create them via **Firebase Console → Firestore → Indexes**, or deploy with `firebase deploy --only firestore:indexes`.
 
 | Collection | Fields | Order |
 |---|---|---|
@@ -118,36 +123,64 @@ Paste the contents of `firestore.indexes.json` into **Firebase Console → Fires
 | `annotations` | `studentId` → `timestamp` | ASC / DESC |
 | `annotations` | `bookId` → `studentId` → `pageNumber` | ASC / ASC / ASC |
 
-Without these indexes, annotation queries will fail silently.
+Without these, annotation queries fail silently.
 
 ### Storage Rules
 
-Paste the contents of `storage.rules` into **Firebase Console → Storage → Rules**.
+Paste `storage.rules` into **Firebase Console → Storage → Rules**.
 
 ---
 
-## Netlify Deployment
+## Deployment
 
-The site deploys automatically when commits are pushed to `main`.
+### GitHub Actions (auto-deploy)
 
-### Required environment variables
+Every push to `main` triggers `.github/workflows/firebase-deploy.yml`, which:
+1. Installs dependencies with Node 22
+2. Builds the app with the Firebase env vars baked in
+3. Deploys to Firebase Hosting using a service account
 
-Set all six `VITE_FIREBASE_*` variables in **Netlify → Site configuration → Environment variables**. Without them the build succeeds but Firebase calls will fail at runtime.
+**Required GitHub secret:** `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` — a Firebase service account JSON with Hosting deploy permissions. Add it under **GitHub repo → Settings → Secrets and variables → Actions**.
 
-### SPA redirect
+The live deploy URL is `ascend-annotate.web.app`. The custom domain `easy-annotate.com` points there via Firebase Hosting.
 
-`netlify.toml` includes the required redirect rule so React Router handles all navigation:
+### Manual build
 
-```toml
-[[redirects]]
-  from = "/*"
-  to   = "/index.html"
-  status = 200
+```bash
+npm run build   # outputs to dist/
 ```
 
-### PDF.js worker
+Type errors fail the build (`tsc -b` runs before Vite).
 
-The Vite build copies `pdfjs-dist/build/pdf.worker.mjs` to `dist/pdf.worker.mjs` via a plugin in `vite.config.ts`. This gives the worker a stable, unhashed URL (`/pdf.worker.mjs`) that is not affected by the SPA redirect and works correctly on iOS Safari.
+---
+
+## PDF.js Worker
+
+The Vite build copies the PDF.js worker to `dist/pdf.worker.mjs` via a plugin in `vite.config.ts`. This gives it a stable, unhashed URL (`/pdf.worker.mjs`) that works correctly across environments and on iOS Safari.
+
+`pdfjs-dist` is a transitive dependency of `react-pdf` and is resolved from `node_modules/react-pdf/node_modules/pdfjs-dist/`. The plugin tries the root `node_modules` path first and falls back to the nested path automatically.
+
+---
+
+## Annotation Flow (Student)
+
+1. Student opens a book and reads page-by-page.
+2. **To annotate selected text:** tap and hold on any text in the PDF — a floating emoji bar appears directly above the selection. Tap an emoji to open the annotation panel with the passage pre-filled. Works on mobile and desktop.
+3. **To annotate the whole page:** tap any emoji in the "How does this page make you feel?" toolbar below the PDF.
+4. In the annotation panel: confirm the emoji reaction, optionally type a note (up to 500 characters), and tap Save.
+5. **To add or edit a note later:** tap any annotation in the sidebar — it navigates to that page and opens the edit panel.
+6. All annotations are visible across sessions and reviewable by the teacher.
+
+---
+
+## Speech / Read Aloud
+
+The **Read Aloud** button in the header reads the current page using the Web Speech API:
+
+- Automatically picks the most natural available en-US voice (prefers enhanced/neural/premium voices, then Google, then any en-US).
+- While reading, the button switches to a **Stop** button that halts playback immediately.
+- Speech stops automatically when the student turns the page.
+- Not available in browsers that do not support `window.speechSynthesis`.
 
 ---
 
@@ -155,15 +188,11 @@ The Vite build copies `pdfjs-dist/build/pdf.worker.mjs` to `dist/pdf.worker.mjs`
 
 | Role | Can do |
 |---|---|
-| **Student** | Register (class code optional), read assigned books, upload personal PDFs, annotate pages with emoji reactions + notes, view/export own annotations |
-| **Teacher** | Upload books with assignment prompts, create classrooms with join codes, assign books to individual students or the whole class, view and export all student annotations |
+| **Student** | Register (class join code optional), read assigned books, upload personal PDFs, annotate with emoji + notes, view and edit all annotations, use read aloud |
+| **Teacher** | Upload books with assignment prompts and success criteria, create classrooms with join codes, assign books to individual students or the whole class, view and export all student annotations, track reading progress |
 
 ---
 
-## Build
+## File Size Limit
 
-```bash
-npm run build   # outputs to dist/
-```
-
-Type errors fail the build (`tsc -b` runs before Vite). The chunk size warning for `index.js` is pre-existing and does not affect functionality.
+PDFs are capped at **50 MB** on upload (both teacher and student upload paths). This is enforced client-side before the Firebase Storage upload begins.
