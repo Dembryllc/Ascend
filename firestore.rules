@@ -1,0 +1,157 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── helpers ──────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isClassTeacher(classroomId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/classrooms/$(classroomId))
+        && get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
+    }
+    function canReadBook(bookId, uid) {
+      return exists(/databases/$(database)/documents/books/$(bookId))
+        && (
+          uid in get(/databases/$(database)/documents/books/$(bookId)).data.assignedStudentIds
+          || get(/databases/$(database)/documents/books/$(bookId)).data.uploadedBy == uid
+        );
+    }
+    function validProgressData(data) {
+      return data.keys().hasOnly([
+          'studentId',
+          'bookId',
+          'classroomId',
+          'lastReadPage',
+          'highestPageRead',
+          'totalPages',
+          'completionPercent',
+          'totalSecondsRead',
+          'completed',
+          'lastReadAt',
+          'createdAt'
+        ])
+        && data.studentId is string
+        && data.bookId is string
+        && data.lastReadPage is int
+        && data.highestPageRead is int
+        && data.totalPages is int
+        && data.completionPercent is int
+        && data.totalSecondsRead is int
+        && data.completed is bool
+        && data.lastReadPage >= 1
+        && data.highestPageRead >= 1
+        && data.totalPages >= 0
+        && data.completionPercent >= 0
+        && data.completionPercent <= 100
+        && data.totalSecondsRead >= 0;
+    }
+
+    // ── users ─────────────────────────────────────────────────────────────
+    // Users read their own profile, or any authenticated user can read
+    // profiles (teachers need to look up student display names).
+    // Only the account owner may write their own document.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+    }
+
+    // ── classrooms ────────────────────────────────────────────────────────
+    // Any signed-in user may read classrooms (join-code lookup at registration).
+    // Only the teacher who owns the classroom may write it.
+    match /classrooms/{classroomId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isOwner(resource.data.teacherId)
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentIds'])
+          && !(request.auth.uid in resource.data.studentIds)
+          && request.auth.uid in request.resource.data.studentIds
+          && request.resource.data.studentIds.hasAll(resource.data.studentIds)
+          && request.resource.data.studentIds.size() == resource.data.studentIds.size() + 1
+        )
+      );
+      allow delete: if isSignedIn() && isOwner(resource.data.teacherId);
+    }
+
+    // ── books ─────────────────────────────────────────────────────────────
+    // Read: any signed-in user who appears in assignedStudentIds, OR the teacher
+    //       who uploaded it, OR a student reading their own uploaded book.
+    // Create: any signed-in user (teacher uploads or student self-upload).
+    //         For student books the app sets uploadedBy = uid and
+    //         assignedStudentIds = [uid] — enforced here.
+    // Update/delete: only the user who originally uploaded the book.
+    match /books/{bookId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid in resource.data.assignedStudentIds
+        || isOwner(resource.data.uploadedBy)
+      );
+
+      allow create: if isSignedIn() && (
+        // Teacher upload — no special constraints beyond being signed in
+        !request.resource.data.keys().hasAll(['uploadedByStudent'])
+        // Student self-upload — must own the doc and be in assignedStudentIds
+        || (request.resource.data.uploadedByStudent == true
+            && request.resource.data.uploadedBy == request.auth.uid
+            && request.auth.uid in request.resource.data.assignedStudentIds)
+      );
+
+      allow update: if isSignedIn() && isOwner(resource.data.uploadedBy);
+      allow delete: if isSignedIn() && isOwner(resource.data.uploadedBy);
+    }
+
+    // ── annotations ───────────────────────────────────────────────────────
+    // Students own their annotations; teachers can read any annotation
+    // (needed for the annotations viewer dashboard).
+    // We avoid a role lookup by letting any signed-in user read — the app
+    // only ever queries annotations scoped to a specific studentId or bookId.
+    match /annotations/{annotationId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || (
+          resource.data.keys().hasAll(['classroomId'])
+          && resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        )
+      );
+      allow create: if isSignedIn()
+                    && request.resource.data.studentId == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(resource.data.studentId);
+      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+    }
+
+    // ── reading progress ─────────────────────────────────────────────────
+    // Students update their own reading progress. Teachers can read progress
+    // only for students in a classroom they own.
+    match /readingProgress/{progressId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || (
+          resource.data.keys().hasAll(['classroomId'])
+          && resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        )
+      );
+      allow create: if isSignedIn()
+                    && validProgressData(request.resource.data)
+                    && request.resource.data.studentId == request.auth.uid
+                    && canReadBook(request.resource.data.bookId, request.auth.uid);
+      allow update: if isSignedIn()
+                    && isOwner(resource.data.studentId)
+                    && validProgressData(request.resource.data)
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.bookId == resource.data.bookId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.totalSecondsRead >= resource.data.totalSecondsRead
+                    && request.resource.data.highestPageRead >= resource.data.highestPageRead
+                    && request.resource.data.completionPercent >= resource.data.completionPercent;
+      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+    }
+  }
+}

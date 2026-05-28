@@ -1,0 +1,46 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: AIzaSyD5sUHH11e0Y1KeNpzEX6Ba9XNlhpNFKKk
+          VITE_FIREBASE_AUTH_DOMAIN: ascend-annotate.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: ascend-annotate
+          VITE_FIREBASE_STORAGE_BUCKET: ascend-annotate.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "97329229065"
+          VITE_FIREBASE_APP_ID: "1:97329229065:web:7120ef7d461ff67ba6f7d8"
+
+      - name: Deploy to Firebase Hosting
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}
+        run: |
+          echo "$SA_JSON" > /tmp/sa.json
+          npm install -g firebase-tools
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
+            --only hosting \
+            --project ascend-annotate
+          rm -f /tmp/sa.json
