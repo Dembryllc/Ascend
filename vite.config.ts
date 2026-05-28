@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
-import { copyFileSync } from 'fs'
+import { copyFileSync, existsSync } from 'fs'
 
 // Copies the PDF.js worker to dist/pdf.worker.mjs with a stable, unhashed URL.
 // Using ?url imports produces a content-hashed URL that can differ between local
@@ -21,7 +21,7 @@ function pdfWorkerPlugin() {
         path.resolve(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.mjs'),
         path.resolve(__dirname, 'node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.mjs'),
       ]
-      const src = candidates.find(p => { try { require('fs').accessSync(p); return true } catch { return false } })
+      const src = candidates.find(existsSync)
       if (!src) throw new Error('pdf.worker.mjs not found in any expected location')
       copyFileSync(src, path.resolve(__dirname, outDir, 'pdf.worker.mjs'))
     },

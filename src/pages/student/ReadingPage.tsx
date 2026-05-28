@@ -47,6 +47,7 @@ export default function ReadingPage() {
   const lastProgressTickRef = useRef(0)
   const [capturedSelection, setCapturedSelection] = useState('')
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   useEffect(() => {
     if (!bookId) return
@@ -305,8 +306,6 @@ export default function ReadingPage() {
       setSaving(false)
     }
   }
-
-  const [isSpeaking, setIsSpeaking] = useState(false)
 
   function stopSpeaking() {
     window.speechSynthesis?.cancel()
