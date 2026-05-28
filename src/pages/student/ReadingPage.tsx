@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -6,12 +6,21 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import { useAuth } from '@/context/AuthContext'
 import { getBook } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
-import type { Book, Annotation, ReactionType } from '@/types'
+import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
+import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
-import { ChevronLeft, ChevronRight, Volume2, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target } from 'lucide-react'
 
-// Use CDN worker to avoid bundling issues
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs'
+
+const HIGHLIGHT_STOP_WORDS = new Set(['and', 'are', 'for', 'not', 'that', 'the', 'this', 'was', 'with'])
+
+type PdfDocument = {
+  numPages: number
+  getPage(pageNumber: number): Promise<{
+    getTextContent(): Promise<{ items: unknown[] }>
+  }>
+}
 
 export default function ReadingPage() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -22,32 +31,88 @@ export default function ReadingPage() {
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
-  const [pageAnnotations, setPageAnnotations] = useState<Annotation[]>([])
   const [annotationPanel, setAnnotationPanel] = useState<{ open: boolean; editing?: Annotation }>({ open: false })
   const [selectedReaction, setSelectedReaction] = useState<ReactionType>('think')
+  const [selectedText, setSelectedText] = useState('')
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [containerWidth, setContainerWidth] = useState(700)
+  const [loadingBook, setLoadingBook] = useState(true)
+  const [readerError, setReaderError] = useState('')
+  const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
+  const [readAloudStatus, setReadAloudStatus] = useState('')
+  const [reflectionText, setReflectionText] = useState('')
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
+  const [markingComplete, setMarkingComplete] = useState(false)
+  const lastProgressTickRef = useRef(0)
+  const [capturedSelection, setCapturedSelection] = useState('')
+  const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   useEffect(() => {
-    if (!bookId || !profile) return
+    if (!bookId) return
+    if (!profile) return
     Promise.all([
       getBook(bookId),
       getAnnotationsByStudentAndBook(profile.uid, bookId),
-    ]).then(([b, ann]) => {
+      getReadingProgress(profile.uid, bookId),
+    ]).then(([b, ann, progress]) => {
+      if (!b) {
+        setReaderError('This book could not be found. It may have been deleted or not assigned to you.')
+      }
       setBook(b)
       setAnnotations(ann)
+      setReadingProgress(progress)
+      if (progress?.lastReadPage) setCurrentPage(Math.max(1, progress.lastReadPage))
+      setLoadingBook(false)
+    }).catch((err: unknown) => {
+      console.error('Failed to open book:', err)
+      setReaderError(err instanceof Error ? err.message : 'Could not open this book. Please try again.')
+      setLoadingBook(false)
     })
   }, [bookId, profile])
 
+  const pageAnnotations = useMemo(
+    () => annotations.filter((a) => a.pageNumber === currentPage),
+    [annotations, currentPage],
+  )
+
   useEffect(() => {
-    setPageAnnotations(annotations.filter((a) => a.pageNumber === currentPage))
-  }, [annotations, currentPage])
+    const timer = window.setTimeout(() => {
+      const spans = Array.from(document.querySelectorAll<HTMLElement>('.react-pdf__Page__textContent span'))
+      spans.forEach((span) => {
+        span.style.backgroundColor = ''
+        span.style.borderRadius = ''
+        span.style.boxShadow = ''
+      })
+
+      const quotes = pageAnnotations
+        .filter((ann) => ann.annotationKind !== 'reflection')
+        .map((ann) => ann.selectedText?.replace(/\s+/g, ' ').trim().toLowerCase())
+        .filter((quote): quote is string => Boolean(quote && quote.length > 0))
+
+      if (quotes.length === 0) return
+
+      spans.forEach((span) => {
+        const spanText = span.textContent?.replace(/\s+/g, ' ').trim().toLowerCase()
+        if (!spanText || spanText.length < 4 || HIGHLIGHT_STOP_WORDS.has(spanText)) return
+        const shouldHighlight = quotes.some((quote) => quote.includes(spanText) || spanText.includes(quote))
+        if (shouldHighlight) {
+          span.style.backgroundColor = 'rgba(250, 204, 21, 0.42)'
+          span.style.borderRadius = '3px'
+          span.style.boxShadow = '0 0 0 2px rgba(250, 204, 21, 0.2)'
+        }
+      })
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [pageAnnotations, currentPage])
 
   // Responsive PDF width
   useEffect(() => {
     function measure() {
-      const el = document.getElementById('pdf-container')
+      const el = document.getElementById('pdf-main-column')
       if (el) setContainerWidth(Math.min(el.clientWidth - 32, 900))
     }
     measure()
@@ -55,17 +120,133 @@ export default function ReadingPage() {
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  function onDocumentLoaded({ numPages }: { numPages: number }) {
-    setNumPages(numPages)
+  function onDocumentLoaded(pdf: unknown) {
+    const loadedPdf = pdf as PdfDocument
+    setPdfDocument(loadedPdf)
+    setNumPages(loadedPdf.numPages)
+    setReaderError('')
   }
 
-  function openAnnotationPanel(editing?: Annotation) {
+  const persistProgress = useCallback(async (secondsRead = 0, completed = false) => {
+    if (!profile || !bookId || numPages === 0) return
+    const progress = await recordReadingProgress({
+      studentId: profile.uid,
+      bookId,
+      classroomId: profile.classroomId,
+      pageNumber: currentPage,
+      totalPages: numPages,
+      secondsRead,
+      completed,
+    })
+    setReadingProgress(progress)
+  }, [bookId, currentPage, numPages, profile])
+
+  useEffect(() => {
+    if (numPages === 0) return
+    const timer = window.setTimeout(() => {
+      void persistProgress(0)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [currentPage, numPages, persistProgress])
+
+  useEffect(() => {
+    if (numPages === 0) return
+    lastProgressTickRef.current = Date.now()
+    const interval = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      const secondsRead = Math.max(5, Math.round((now - lastProgressTickRef.current) / 1000))
+      lastProgressTickRef.current = now
+      void persistProgress(secondsRead)
+    }, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [numPages, persistProgress])
+
+  useEffect(() => {
+    if (numPages === 0) return
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return
+      const now = Date.now()
+      const secondsRead = Math.round((now - lastProgressTickRef.current) / 1000)
+      lastProgressTickRef.current = now
+      if (secondsRead > 3) void persistProgress(secondsRead)
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [numPages, persistProgress])
+
+  // Capture text selection into state the moment it happens so that tapping
+  // the emoji toolbar (which clears the live selection on mobile) still has
+  // the text available. We never clear capturedSelection on empty-selection
+  // events — only when the user acts (closePanel) or turns the page.
+  useEffect(() => {
+    function onSelectionChange() {
+      const sel = window.getSelection()
+      const text = sel?.toString().replace(/\s+/g, ' ').trim() ?? ''
+      if (!text) return
+      const container = document.getElementById('pdf-container')
+      if (!container || !sel || sel.rangeCount === 0) return
+      const range = sel.getRangeAt(0)
+      if (!container.contains(range.startContainer)) return
+      setCapturedSelection(text)
+      const rect = range.getBoundingClientRect()
+      setFloatingBar({ x: rect.left + rect.width / 2, y: rect.top })
+    }
+    document.addEventListener('selectionchange', onSelectionChange)
+    return () => document.removeEventListener('selectionchange', onSelectionChange)
+  }, [])
+
+  useEffect(() => {
+    setCapturedSelection('')
+    setFloatingBar(null)
+    // Stop any in-progress speech when the user turns the page
+    if (window.speechSynthesis?.speaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage])
+
+  async function handleMarkComplete() {
+    setMarkingComplete(true)
+    try {
+      await persistProgress(0, true)
+    } finally {
+      setMarkingComplete(false)
+    }
+  }
+
+  function onDocumentLoadError(err: Error) {
+    console.error('Failed to render PDF:', err)
+    setReaderError(`PDF.js error: ${err.message}`)
+  }
+
+  function getSelectedPdfText() {
+    // Prefer the state-captured selection — it survives the tap that clears
+    // the live browser selection on mobile.
+    if (capturedSelection) return capturedSelection
+    const selection = window.getSelection()
+    const text = selection?.toString().replace(/\s+/g, ' ').trim() ?? ''
+    if (!selection || !text) return ''
+    const container = document.getElementById('pdf-container')
+    if (!container || selection.rangeCount === 0) return text
+    const range = selection.getRangeAt(0)
+    const startIsInReader = container.contains(range.startContainer)
+    const endIsInReader = container.contains(range.endContainer)
+    return startIsInReader && endIsInReader ? text : ''
+  }
+
+  function openAnnotationPanel(reactionType?: ReactionType, editing?: Annotation, textOverride?: string) {
     if (editing) {
       setSelectedReaction(editing.reactionType)
+      setSelectedText(editing.selectedText ?? '')
       setNoteText(editing.noteText)
       setAnnotationPanel({ open: true, editing })
     } else {
-      setSelectedReaction('think')
+      setSelectedReaction(reactionType ?? 'think')
+      setSelectedText(textOverride !== undefined ? textOverride : getSelectedPdfText())
       setNoteText('')
       setAnnotationPanel({ open: true })
     }
@@ -73,26 +254,32 @@ export default function ReadingPage() {
 
   function closePanel() {
     setAnnotationPanel({ open: false })
+    setCapturedSelection('')
+    setFloatingBar(null)
+    setSaveError('')
   }
 
   async function handleSave() {
     if (!profile || !bookId) return
     setSaving(true)
+    setSaveError('')
     try {
       if (annotationPanel.editing) {
-        await updateAnnotation(annotationPanel.editing.id, selectedReaction, noteText)
+        await updateAnnotation(annotationPanel.editing.id, selectedReaction, noteText, selectedText)
         setAnnotations((prev) =>
           prev.map((a) =>
             a.id === annotationPanel.editing!.id
-              ? { ...a, reactionType: selectedReaction, noteText, timestamp: new Date() }
+              ? { ...a, reactionType: selectedReaction, noteText, selectedText, timestamp: new Date() }
               : a
           )
         )
       } else {
-        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText)
+        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText, selectedText, 'annotation', profile.classroomId)
         setAnnotations((prev) => [...prev, ann])
       }
       closePanel()
+    } catch {
+      setSaveError('Could not save. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -104,24 +291,144 @@ export default function ReadingPage() {
     closePanel()
   }
 
-  const speakPage = useCallback(() => {
-    if (!window.speechSynthesis) return
-    window.speechSynthesis.cancel()
-    const textLayer = document.querySelector('.react-pdf__Page__textContent')
-    const text = textLayer?.textContent ?? `Page ${currentPage}`
-    const utt = new SpeechSynthesisUtterance(text)
-    utt.rate = 0.9
-    window.speechSynthesis.speak(utt)
-  }, [currentPage])
+  async function handleReflectionSave() {
+    if (!profile || !bookId || !reflectionText.trim()) return
+    setSaving(true)
+    try {
+      const ann = await saveAnnotation(
+        profile.uid,
+        bookId,
+        currentPage,
+        'important',
+        reflectionText.trim(),
+        '',
+        'reflection',
+        profile.classroomId,
+      )
+      setAnnotations((prev) => [...prev, ann])
+      setReflectionText('')
+    } finally {
+      setSaving(false)
+    }
+  }
 
-  if (!book) return (
+  function stopSpeaking() {
+    window.speechSynthesis?.cancel()
+    setIsSpeaking(false)
+    setReadAloudStatus('')
+  }
+
+  const speakPage = useCallback(async () => {
+    if (!window.speechSynthesis) {
+      setReadAloudStatus('Read aloud is not available in this browser.')
+      return
+    }
+    if (!pdfDocument) {
+      setReadAloudStatus('The page is still loading. Try again in a moment.')
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+    setReadAloudStatus('Loading…')
+
+    const page = await pdfDocument.getPage(currentPage)
+    const content = await page.getTextContent()
+    const text = content.items
+      .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (!text) {
+      setReadAloudStatus('No readable text was found on this page.')
+      return
+    }
+
+    // Pick the most natural available en-US voice. Browsers label
+    // high-quality voices as "enhanced", "neural", "premium", or "Google".
+    function pickVoice(): SpeechSynthesisVoice | null {
+      const voices = window.speechSynthesis.getVoices()
+      const enUS = voices.filter((v) => v.lang.startsWith('en'))
+      const ranked = [
+        enUS.find((v) => /enhanced|neural|premium/i.test(v.name)),
+        enUS.find((v) => /google/i.test(v.name)),
+        enUS.find((v) => v.lang === 'en-US'),
+        enUS[0] ?? null,
+      ]
+      return ranked.find(Boolean) ?? null
+    }
+
+    const trySpeak = () => {
+      const utt = new SpeechSynthesisUtterance(text)
+      const voice = pickVoice()
+      if (voice) utt.voice = voice
+      utt.rate = 0.88
+      utt.pitch = 1.0
+      utt.volume = 1.0
+      utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
+      utt.onend = () => { setIsSpeaking(false); setReadAloudStatus('') }
+      utt.onerror = () => { setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.') }
+      window.speechSynthesis.speak(utt)
+    }
+
+    // Voices may not be populated yet on first call — wait for voiceschanged
+    if (window.speechSynthesis.getVoices().length > 0) {
+      trySpeak()
+    } else {
+      window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
+    }
+  }, [currentPage, pdfDocument])
+
+  if (!bookId) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
+      <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
+        <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
+        <p className="text-[#4B5563] text-sm mb-6">Missing book id.</p>
+        <button
+          onClick={() => navigate('/student')}
+          className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Back to Bookshelf
+        </button>
+      </div>
+    </div>
+  )
+
+  if (loadingBook) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
-      <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="text-center">
+        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-sm font-semibold text-[#4B5563]">Opening book…</p>
+      </div>
+    </div>
+  )
+
+  if (readerError || !book) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
+      <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
+        <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
+        <p className="text-[#4B5563] text-sm mb-6 break-all">{readerError || 'The book was not found.'}</p>
+        {book && <p className="text-xs text-[#9CA3AF] mb-4 break-all">URL: {book.storageUrl?.slice(0, 80)}…</p>}
+        <button
+          onClick={() => navigate('/student')}
+          className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Back to Bookshelf
+        </button>
+      </div>
     </div>
   )
 
   const hasAnnotationOnPage = pageAnnotations.length > 0
   const annotatedPages = new Set(annotations.map((a) => a.pageNumber))
+  const reflectionCount = annotations.filter((a) => a.annotationKind === 'reflection').length
+  const quoteCount = annotations.filter((a) => a.selectedText && a.annotationKind !== 'reflection').length
+  const taskCount = Math.max(4, quoteCount + reflectionCount)
+  const completedTaskCount = Math.min(taskCount, quoteCount + reflectionCount)
+  const completionPct = Math.round((completedTaskCount / taskCount) * 100)
+  const readingCompletionPct = readingProgress?.completionPercent ?? (numPages > 0 ? Math.round((currentPage / numPages) * 100) : 0)
+  const minutesRead = Math.max(0, Math.round((readingProgress?.totalSecondsRead ?? 0) / 60))
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
@@ -136,32 +443,104 @@ export default function ReadingPage() {
             <p className="font-bold text-[#1A1D23] text-sm truncate">{book.title}</p>
             <p className="text-xs text-[#4B5563]">{book.author}</p>
           </div>
-          <button onClick={speakPage} aria-label="Read page aloud" className="flex items-center gap-1 text-[#4A90D9] hover:text-[#357ABD] transition-colors px-2 py-1 rounded-lg hover:bg-blue-50">
-            <Volume2 size={20} />
-            <span className="text-xs font-medium hidden sm:inline">Read aloud</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {isSpeaking ? (
+              <button
+                onClick={stopSpeaking}
+                aria-label="Stop reading"
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-semibold text-sm"
+              >
+                <span className="text-base leading-none">⏹</span>
+                <span className="hidden sm:inline">Stop</span>
+              </button>
+            ) : (
+              <button
+                onClick={speakPage}
+                aria-label="Read page aloud"
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#4A90D9] hover:bg-blue-50 transition-colors font-semibold text-sm"
+              >
+                <Volume2 size={20} />
+                <span className="hidden sm:inline">Read aloud</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
-      <div id="pdf-container" className="flex-1 flex flex-col items-center px-4 py-4 max-w-4xl mx-auto w-full">
-        {/* PDF */}
-        <div className="flex-1 w-full flex justify-center">
-          <Document
-            file={book.storageUrl}
-            onLoadSuccess={onDocumentLoaded}
-            loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
-          >
-            <Page
-              pageNumber={currentPage}
-              width={containerWidth}
-              renderTextLayer
-              renderAnnotationLayer={false}
-            />
-          </Document>
-        </div>
+      <div id="pdf-container" className="flex-1 px-3 sm:px-4 py-4 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+          <main id="pdf-main-column" className="min-w-0">
+            {(book.assignmentPrompt || book.successCriteria) && (
+              <section className="w-full mb-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-50 text-[#4A90D9] p-2 rounded-xl shrink-0">
+                    <Target size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-[#1A1D23] text-sm">Today&apos;s reading task</p>
+                    {book.assignmentPrompt && <p className="text-sm text-[#4B5563] mt-1">{book.assignmentPrompt}</p>}
+                    {book.successCriteria && <p className="text-xs font-semibold text-[#5BB974] mt-2">{book.successCriteria}</p>}
+                    <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#4A90D9] rounded-full" style={{ width: `${completionPct}%` }} />
+                    </div>
+                    <p className="text-xs text-[#6B7280] mt-1">{completedTaskCount} of {taskCount} reading actions complete</p>
+                  </div>
+                </div>
+              </section>
+            )}
 
-        {/* Page navigation */}
-        <div className="w-full mt-4 flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm border border-[#F3F4F6]">
+            <section className="w-full mb-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-[#1A1D23] text-sm">Reading progress</p>
+                  <p className="text-xs text-[#4B5563] mt-1">
+                    Page {currentPage} of {numPages || '...'} · {minutesRead} minute{minutesRead === 1 ? '' : 's'} tracked
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {readingProgress?.completed && (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-[#5BB974] bg-green-50 px-3 py-2 rounded-xl">
+                      <CheckCircle size={14} /> Complete
+                    </span>
+                  )}
+                  <button
+                    onClick={handleMarkComplete}
+                    disabled={markingComplete || readingProgress?.completed}
+                    className="text-xs font-bold bg-[#1A1D23] text-white px-3 py-2 rounded-xl hover:bg-[#2A2F3A] disabled:opacity-50 transition-colors"
+                  >
+                    {readingProgress?.completed ? 'Completed' : markingComplete ? 'Saving...' : 'Mark Complete'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
+                <div className="h-full bg-[#5BB974] rounded-full" style={{ width: `${readingCompletionPct}%` }} />
+              </div>
+            </section>
+
+            {/* PDF */}
+            <div className="flex-1 w-full flex justify-center">
+              <Document
+                  file={book.storageUrl}
+                  onLoadSuccess={onDocumentLoaded}
+                  onLoadError={onDocumentLoadError}
+                  error={
+                    <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
+                      This PDF could not be rendered. Try re-uploading it or using a different PDF.
+                    </div>
+                  }
+                  loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
+                >
+                  <Page
+                    pageNumber={currentPage}
+                    width={containerWidth}
+                    renderTextLayer
+                    renderAnnotationLayer={false}
+                  />
+                </Document>
+            </div>
+
+            {/* Page navigation */}
+            <div className="w-full mt-4 flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm border border-[#F3F4F6]">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
@@ -187,16 +566,20 @@ export default function ReadingPage() {
           >
             Next <ChevronRight size={20} />
           </button>
-        </div>
+            </div>
+            {readAloudStatus && (
+              <p className="w-full mt-2 text-center text-xs font-semibold text-[#4B5563]">{readAloudStatus}</p>
+            )}
 
-        {/* Annotation toolbar */}
-        <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+            {/* Annotation toolbar */}
+            <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
           <p className="text-sm font-bold text-[#1A1D23] mb-3">How does this page make you feel?</p>
           <div className="grid grid-cols-5 gap-2">
             {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
               <button
                 key={type}
-                onClick={() => openAnnotationPanel()}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => openAnnotationPanel(type)}
                 aria-label={r.label}
                 className="flex flex-col items-center gap-1 p-2 rounded-xl border-2 border-transparent hover:border-[#4A90D9] hover:bg-blue-50 transition-all"
               >
@@ -218,10 +601,18 @@ export default function ReadingPage() {
                       <span className="text-xl">{r.emoji}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-[#4B5563]">{r.label}</p>
-                        {ann.noteText && <p className="text-sm text-[#1A1D23] mt-0.5">{ann.noteText}</p>}
+                        {ann.selectedText && (
+                          <p className="text-sm text-[#1A1D23] mt-1 bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2">
+                            “{ann.selectedText}”
+                          </p>
+                        )}
+                        {ann.noteText
+                          ? <p className="text-sm text-[#1A1D23] mt-1">{ann.noteText}</p>
+                          : <p className="text-xs text-[#9CA3AF] italic mt-1">No note yet — tap Edit to add one</p>
+                        }
                       </div>
                       <button
-                        onClick={() => openAnnotationPanel(ann)}
+                        onClick={() => openAnnotationPanel(undefined, ann)}
                         className="text-xs text-[#4A90D9] hover:underline shrink-0"
                       >
                         Edit
@@ -232,8 +623,126 @@ export default function ReadingPage() {
               </div>
             </div>
           )}
+            </div>
+          </main>
+
+          <aside className="lg:sticky lg:top-20 space-y-4">
+            <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare size={18} className="text-[#9B7FD4]" />
+                <h3 className="font-bold text-[#1A1D23]">Annotation sidebar</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <MiniStat label="Notes" value={annotations.filter((ann) => ann.annotationKind !== 'reflection').length} />
+                <MiniStat label="Quotes" value={quoteCount} />
+                <MiniStat label="Pages" value={annotatedPages.size} />
+              </div>
+              {annotations.length === 0 ? (
+                <p className="text-sm text-[#6B7280]">Select a passage, choose an emoji, and save your first note.</p>
+              ) : (
+                <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
+                  {annotations
+                    .slice()
+                    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+                    .map((ann) => {
+                      const r = REACTIONS[ann.reactionType]
+                      return (
+                        <button
+                          key={ann.id}
+                          onClick={() => {
+                            setCurrentPage(Math.max(1, ann.pageNumber))
+                            openAnnotationPanel(undefined, ann)
+                          }}
+                          className="w-full text-left bg-[#F8F9FC] hover:bg-blue-50 border border-[#EEF0F4] rounded-xl p-3 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-[#1A1D23]">{r.emoji} Page {ann.pageNumber}</span>
+                            <span className="text-[11px] text-[#9CA3AF]">{r.label}</span>
+                          </div>
+                          {ann.annotationKind === 'reflection' && (
+                            <p className="text-xs font-semibold text-[#5BB974] mt-1">Reflection</p>
+                          )}
+                          {ann.selectedText && ann.annotationKind !== 'reflection' && (
+                            <p className="text-xs text-[#4B5563] mt-1 line-clamp-2">“{ann.selectedText}”</p>
+                          )}
+                          {ann.noteText
+                          ? <p className="text-xs text-[#1A1D23] mt-1 line-clamp-2">{ann.noteText}</p>
+                          : <p className="text-xs text-[#9CA3AF] italic mt-1">Tap to add a note</p>
+                        }
+                        </button>
+                      )
+                    })}
+                </div>
+              )}
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
+              <div className="flex items-center gap-2 mb-3 text-sm text-[#4B5563]">
+                <Clock size={16} className="text-[#4A90D9]" />
+                <span>{minutesRead} minute{minutesRead === 1 ? '' : 's'} tracked in this book</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle size={18} className="text-[#5BB974]" />
+                <h3 className="font-bold text-[#1A1D23]">After reading</h3>
+              </div>
+              <p className="text-sm text-[#4B5563] mb-3">Write one short reflection when you finish a chunk of reading.</p>
+              <textarea
+                value={reflectionText}
+                onChange={(e) => setReflectionText(e.target.value)}
+                rows={4}
+                maxLength={600}
+                placeholder="What changed in your thinking? What should your teacher notice?"
+                className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none"
+              />
+              <button
+                onClick={handleReflectionSave}
+                disabled={!reflectionText.trim() || saving}
+                className="mt-3 w-full bg-[#5BB974] hover:bg-[#4AA863] disabled:opacity-50 text-white rounded-xl py-2.5 font-bold transition-colors"
+              >
+                Save Reflection
+              </button>
+            </section>
+          </aside>
         </div>
       </div>
+
+      {/* Floating emoji picker — appears above selected text on mobile and desktop */}
+      {floatingBar && !annotationPanel.open && (
+        <div
+          className="fixed z-[45] bg-white rounded-2xl shadow-xl border border-[#E5E7EB] px-2 py-1.5 flex items-center gap-0.5"
+          style={{
+            left: Math.max(8, Math.min(floatingBar.x - 148, window.innerWidth - 304)),
+            top: Math.max(56, floatingBar.y - 64),
+          }}
+        >
+          <span className="text-xs text-[#6B7280] font-medium px-1.5 shrink-0 select-none">React:</span>
+          {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
+            <button
+              key={type}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const text = capturedSelection
+                setCapturedSelection('')
+                setFloatingBar(null)
+                openAnnotationPanel(type, undefined, text)
+              }}
+              title={r.label}
+              aria-label={r.label}
+              className="w-11 h-11 flex items-center justify-center rounded-xl text-2xl hover:bg-[#F3F4F6] active:scale-95 transition-all"
+            >
+              {r.emoji}
+            </button>
+          ))}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setCapturedSelection(''); setFloatingBar(null); window.getSelection()?.removeAllRanges() }}
+            aria-label="Dismiss"
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#9CA3AF] hover:bg-[#F3F4F6] transition-colors ml-0.5 text-base"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Annotation panel modal */}
       {annotationPanel.open && (
@@ -266,6 +775,21 @@ export default function ReadingPage() {
               ))}
             </div>
 
+            <div className="mb-5">
+              <label className="block text-sm font-semibold text-[#1A1D23] mb-1">
+                Highlighted text
+              </label>
+              {selectedText ? (
+                <div className="bg-yellow-50 border-l-4 border-yellow-300 rounded-r-xl px-4 py-3 text-sm text-[#1A1D23] max-h-32 overflow-y-auto">
+                  “{selectedText}”
+                </div>
+              ) : (
+                <div className="bg-[#F8F9FC] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#6B7280]">
+                  Select text on the page before choosing a reaction to attach a passage.
+                </div>
+              )}
+            </div>
+
             {/* Note text */}
             <div className="mb-5">
               <label className="block text-sm font-semibold text-[#1A1D23] mb-1">
@@ -280,6 +804,10 @@ export default function ReadingPage() {
                 className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none"
               />
             </div>
+
+            {saveError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-1">{saveError}</p>
+            )}
 
             <div className="flex gap-3">
               {annotationPanel.editing && (
@@ -304,6 +832,15 @@ export default function ReadingPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="bg-[#F8F9FC] border border-[#EEF0F4] rounded-xl px-3 py-2 text-center">
+      <div className="text-lg font-bold text-[#1A1D23]">{value}</div>
+      <div className="text-[11px] font-semibold text-[#6B7280]">{label}</div>
     </div>
   )
 }

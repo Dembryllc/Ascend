@@ -17,6 +17,7 @@ export default function ClassroomPage() {
   const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -30,6 +31,9 @@ export default function ClassroomPage() {
         const profiles = await Promise.all(c.studentIds.map((id) => getUserProfile(id)))
         setStudents(profiles.filter(Boolean) as UserProfile[])
       }
+      setLoading(false)
+    }).catch(() => {
+      setLoadError('Could not load classroom data. Please refresh.')
       setLoading(false)
     })
   }, [profile])
@@ -69,6 +73,15 @@ export default function ClassroomPage() {
     <AppShell title="Classroom">
       <div className="flex justify-center py-16">
         <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      </div>
+    </AppShell>
+  )
+
+  if (loadError) return (
+    <AppShell title="Classroom">
+      <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+        <p className="text-red-600 font-semibold mb-2">Something went wrong</p>
+        <p className="text-[#4B5563] text-sm">{loadError}</p>
       </div>
     </AppShell>
   )
@@ -167,11 +180,14 @@ export default function ClassroomPage() {
               <p className="text-sm text-[#4B5563] mb-4">Assign a book to every student at once.</p>
               <div className="space-y-2">
                 {books.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
-                    <span className="text-sm font-medium text-[#1A1D23]">{b.title}</span>
+                  <div key={b.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-[#F3F4F6] last:border-0">
+                    <div>
+                      <span className="text-sm font-medium text-[#1A1D23]">{b.title}</span>
+                      {b.assignmentPrompt && <p className="text-xs text-[#6B7280] mt-1">{b.assignmentPrompt}</p>}
+                    </div>
                     <button
                       onClick={() => handleAssignAll(b.id)}
-                      className="text-xs bg-[#5BB974] text-white px-3 py-1.5 rounded-lg hover:bg-[#4AA863] transition-colors font-semibold"
+                      className="text-xs bg-[#5BB974] text-white px-3 py-1.5 rounded-lg hover:bg-[#4AA863] transition-colors font-semibold self-start sm:self-auto"
                     >
                       Assign All
                     </button>

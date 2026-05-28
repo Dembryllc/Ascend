@@ -1,5 +1,6 @@
 import {
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -23,20 +24,27 @@ export async function registerUser(
 
   let classroomId: string | null = null
 
-  if (role === 'student' && classroomJoinCode) {
-    classroomId = await resolveJoinCode(classroomJoinCode)
-    if (!classroomId) throw new Error('Invalid class join code. Please check with your teacher.')
-    await addStudentToClassroom(user.uid, classroomId)
-  }
+  try {
+    if (role === 'student' && classroomJoinCode) {
+      classroomId = await resolveJoinCode(classroomJoinCode)
+      if (!classroomId) throw new Error('Invalid class join code. Please check with your teacher.')
+      await addStudentToClassroom(user.uid, classroomId)
+    }
 
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    email,
-    displayName,
-    role,
-    classroomId,
-    createdAt: serverTimestamp(),
-  })
+    await setDoc(doc(db, 'users', user.uid), {
+      uid: user.uid,
+      email,
+      displayName,
+      role,
+      classroomId,
+      createdAt: serverTimestamp(),
+    })
+  } catch (err) {
+    // Firestore setup failed — delete the Auth account so the user can retry
+    // without ending up with an orphaned account and no profile document.
+    await user.delete().catch(() => {/* deletion best-effort */})
+    throw err
+  }
 
   return user
 }
@@ -48,6 +56,29 @@ export async function loginUser(email: string, password: string): Promise<User> 
 
 export async function logoutUser(): Promise<void> {
   await signOut(auth)
+}
+
+export async function sendPasswordReset(email: string, redirectUrl?: string): Promise<void> {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!redirectUrl) {
+    await sendPasswordResetEmail(auth, normalizedEmail)
+    return
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, normalizedEmail, {
+      url: redirectUrl,
+      handleCodeInApp: false,
+    })
+  } catch (err: unknown) {
+    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : ''
+    if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+      await sendPasswordResetEmail(auth, normalizedEmail)
+      return
+    }
+    throw err
+  }
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {

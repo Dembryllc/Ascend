@@ -5,13 +5,14 @@ import AppShell from '@/components/layout/AppShell'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import type { Book, Classroom } from '@/types'
-import { BookOpen, Users, Upload, Eye } from 'lucide-react'
+import { BarChart3, BookOpen, Users, Upload, Eye } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -22,6 +23,10 @@ export default function TeacherDashboard() {
       setBooks(b)
       setClassroom(c)
       setLoading(false)
+    }).catch((err: unknown) => {
+      console.error('Failed to load teacher dashboard:', err)
+      setError(err instanceof Error ? err.message : 'Could not load your dashboard. Please refresh.')
+      setLoading(false)
     })
   }, [profile])
 
@@ -30,6 +35,12 @@ export default function TeacherDashboard() {
       <div className="flex justify-center py-16">
         <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
       </div>
+    </AppShell>
+  )
+
+  if (error) return (
+    <AppShell title="Dashboard">
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm">{error}</div>
     </AppShell>
   )
 
@@ -55,6 +66,7 @@ export default function TeacherDashboard() {
         <ActionCard to="/teacher/upload" icon={<Upload size={20} />} label="Upload a Book" desc="Add a new PDF to your library" color="blue" />
         <ActionCard to="/teacher/classroom" icon={<Users size={20} />} label="Manage Classroom" desc="View students and join code" color="green" />
         <ActionCard to="/teacher/annotations" icon={<Eye size={20} />} label="View Annotations" desc="See student reading notes" color="purple" />
+        <ActionCard to="/teacher/progress" icon={<BarChart3 size={20} />} label="Class Progress" desc="Scan activity and reading patterns" color="blue" />
       </div>
 
       {/* Books list */}
@@ -120,6 +132,9 @@ function BookCard({ book }: { book: Book }) {
         <span className="inline-block mt-2 text-xs bg-blue-50 text-[#4A90D9] font-semibold px-2 py-0.5 rounded-full">
           {book.readingLevel}
         </span>
+      )}
+      {book.assignmentPrompt && (
+        <p className="text-xs text-[#4B5563] mt-2 line-clamp-2">{book.assignmentPrompt}</p>
       )}
       <p className="text-xs text-[#9CA3AF] mt-2">
         {book.assignedStudentIds.length} student{book.assignedStudentIds.length !== 1 ? 's' : ''} assigned

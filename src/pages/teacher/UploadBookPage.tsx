@@ -14,6 +14,8 @@ export default function UploadBookPage() {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [readingLevel, setReadingLevel] = useState('')
+  const [assignmentPrompt, setAssignmentPrompt] = useState('')
+  const [successCriteria, setSuccessCriteria] = useState('')
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
@@ -26,17 +28,35 @@ export default function UploadBookPage() {
       setError('Please select a PDF file.')
       return
     }
+    if (f.size > 50 * 1024 * 1024) {
+      setError('File is too large. Maximum size is 50 MB.')
+      return
+    }
     setError('')
     setFile(f)
+    if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
+    if (!author) setAuthor('Unknown author')
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || !profile) return
+    if (!file || !profile) {
+      setError('Please sign in and choose a PDF before uploading.')
+      return
+    }
     setError('')
     setUploading(true)
     try {
-      await uploadBook(file, title, author, readingLevel, profile.uid, setProgress)
+      await uploadBook(
+        file,
+        title || file.name.replace(/\.pdf$/i, ''),
+        author || 'Unknown author',
+        readingLevel,
+        assignmentPrompt,
+        successCriteria,
+        profile.uid,
+        setProgress,
+      )
       setDone(true)
       setTimeout(() => navigate('/teacher'), 1500)
     } catch (err: unknown) {
@@ -84,7 +104,7 @@ export default function UploadBookPage() {
                 <>
                   <Upload size={28} className="mx-auto text-[#9CA3AF] mb-2" />
                   <p className="text-sm text-[#4B5563]">Click to select a PDF</p>
-                  <p className="text-xs text-[#9CA3AF] mt-1">PDF files only</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">PDF files only · max 50 MB</p>
                 </>
               )}
             </button>
@@ -92,8 +112,20 @@ export default function UploadBookPage() {
           </div>
 
           <Field label="Book Title *" value={title} onChange={setTitle} placeholder="e.g. Charlotte's Web" required />
-          <Field label="Author *" value={author} onChange={setAuthor} placeholder="e.g. E.B. White" required />
+          <Field label="Author" value={author} onChange={setAuthor} placeholder="e.g. E.B. White" />
           <Field label="Reading Level / Grade Tag" value={readingLevel} onChange={setReadingLevel} placeholder="e.g. Grade 3, Lexile 680" />
+          <TextAreaField
+            label="Reading Assignment"
+            value={assignmentPrompt}
+            onChange={setAssignmentPrompt}
+            placeholder="e.g. Highlight two confusing moments, one important quote, and one passage you love."
+          />
+          <TextAreaField
+            label="Success Criteria"
+            value={successCriteria}
+            onChange={setSuccessCriteria}
+            placeholder="e.g. Save at least 4 annotations and finish with a short reflection."
+          />
 
           {uploading && (
             <div>
@@ -115,7 +147,7 @@ export default function UploadBookPage() {
 
           <button
             type="submit"
-            disabled={!file || !title || !author || uploading}
+            disabled={!file || uploading}
             className="w-full bg-[#4A90D9] hover:bg-[#357ABD] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-base transition-colors"
           >
             {uploading ? 'Uploading…' : 'Upload Book'}
@@ -123,6 +155,26 @@ export default function UploadBookPage() {
         </form>
       </div>
     </AppShell>
+  )
+}
+
+function TextAreaField({
+  label, value, onChange, placeholder,
+}: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-[#1A1D23] mb-1">{label}</label>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        maxLength={500}
+        className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none"
+      />
+    </div>
   )
 }
 

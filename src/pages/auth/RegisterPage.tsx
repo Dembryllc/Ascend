@@ -17,10 +17,6 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (role === 'student' && !joinCode.trim()) {
-      setError('Please enter your class join code.')
-      return
-    }
     setLoading(true)
     try {
       await registerUser(email, password, displayName, role, joinCode.trim() || undefined)
@@ -40,11 +36,11 @@ export default function RegisterPage() {
           <div className="bg-[#4A90D9] text-white p-2 rounded-xl">
             <BookOpen size={28} />
           </div>
-          <span className="text-2xl font-bold text-[#1A1D23]">Ascend Annotate</span>
+          <span className="text-2xl font-bold text-[#1A1D23]">Easy Annotate</span>
         </div>
 
         <h1 className="text-xl font-bold text-center mb-1 text-[#1A1D23]">Create your account</h1>
-        <p className="text-center text-[#4B5563] mb-6 text-sm">Join Ascend Annotate to start reading and annotating</p>
+        <p className="text-center text-[#4B5563] mb-6 text-sm">Join Easy Annotate to start reading and annotating</p>
 
         {/* Role toggle */}
         <div className="flex rounded-xl overflow-hidden border border-[#E5E7EB] mb-6">
@@ -114,19 +110,18 @@ export default function RegisterPage() {
           {role === 'student' && (
             <div>
               <label htmlFor="joinCode" className="block text-sm font-semibold text-[#1A1D23] mb-1">
-                Class Join Code
+                Class Join Code <span className="text-[#9CA3AF] font-normal">(optional)</span>
               </label>
               <input
                 id="joinCode"
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                required
                 maxLength={6}
-                placeholder="e.g. AB3X7K"
+                placeholder="e.g. AB3X7K — ask your teacher"
                 className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
               />
-              <p className="text-xs text-[#6B7280] mt-1">Ask your teacher for this code</p>
+              <p className="text-xs text-[#6B7280] mt-1">You can join a class later if you don't have a code yet</p>
             </div>
           )}
 
