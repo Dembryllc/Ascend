@@ -4,6 +4,8 @@ import {
   addDoc,
   getDoc,
   getDocs,
+  updateDoc,
+  arrayUnion,
   query,
   where,
   serverTimestamp,
@@ -46,4 +48,16 @@ export async function getClassroom(classroomId: string): Promise<Classroom | nul
   if (!snap.exists()) return null
   const data = snap.data()
   return { id: snap.id, ...data, createdAt: data.createdAt?.toDate() ?? new Date() } as Classroom
+}
+
+export async function joinClassroomByCode(studentId: string, joinCode: string): Promise<string> {
+  const q = query(collection(db, 'classrooms'), where('joinCode', '==', joinCode.toUpperCase().trim()))
+  const snap = await getDocs(q)
+  if (snap.empty) throw new Error('Invalid join code. Check the code with your teacher.')
+  const classroomId = snap.docs[0].id
+  await updateDoc(doc(db, 'classrooms', classroomId), {
+    studentIds: arrayUnion(studentId),
+  })
+  await updateDoc(doc(db, 'users', studentId), { classroomId })
+  return classroomId
 }

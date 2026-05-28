@@ -6,6 +6,7 @@ import AppShell from '@/components/layout/AppShell'
 import { getBooksByStudent, deleteStudentBook } from '@/firebase/books'
 import { getAnnotationsByStudent } from '@/firebase/annotations'
 import { getReadingProgressByStudent } from '@/firebase/readingProgress'
+import { joinClassroomByCode } from '@/firebase/classrooms'
 import type { Annotation, Book, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
@@ -14,6 +15,7 @@ import {
   ArrowRight,
   BookOpen,
   Flame,
+  Hash,
   MessageSquare,
   Plus,
   Sparkles,
@@ -169,6 +171,10 @@ export default function StudentHome() {
           </div>
         </Link>
       </div>
+
+      {profile?.classroomId === null && (
+        <JoinClassroomCard studentId={profile.uid} />
+      )}
 
       {/* Progress dashboard */}
       <section className="mb-8" aria-labelledby="progress-heading">
@@ -454,6 +460,63 @@ function RecentActivityCard({
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+function JoinClassroomCard({ studentId }: { studentId: string }) {
+  const [code, setCode] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
+  const [joined, setJoined] = useState(false)
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault()
+    if (code.trim().length < 6) return
+    setJoining(true)
+    setJoinError('')
+    try {
+      await joinClassroomByCode(studentId, code.trim())
+      setJoined(true)
+      setTimeout(() => window.location.reload(), 1500)
+    } catch (err: unknown) {
+      setJoinError(err instanceof Error ? err.message : 'Could not join. Check the code and try again.')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  return (
+    <div className="bg-[#FEF9ED] border border-[#F5C842]/40 rounded-2xl px-5 py-4 mb-8">
+      <div className="flex items-center gap-2 mb-1">
+        <Hash size={16} className="text-[#E6A817]" />
+        <h3 className="font-bold text-[#1A1D23]">Join a Classroom</h3>
+      </div>
+      <p className="text-sm text-[#4B5563] mb-3">Enter the join code your teacher gave you to see assigned books.</p>
+      {joined ? (
+        <p className="text-sm font-semibold text-[#5BB974]">Joined! Refreshing your dashboard…</p>
+      ) : (
+        <form onSubmit={handleJoin} className="flex gap-2">
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            maxLength={6}
+            placeholder="ABCXYZ"
+            className="flex-1 border border-[#D1D5DB] rounded-xl px-4 py-2.5 text-base font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#F5C842]"
+          />
+          <button
+            type="submit"
+            disabled={joining || code.trim().length < 6}
+            className="bg-[#F5C842] text-[#1A1D23] px-5 py-2.5 rounded-xl font-bold hover:bg-[#E6B93A] disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            {joining ? 'Joining…' : 'Join'}
+          </button>
+        </form>
+      )}
+      {joinError && (
+        <p className="text-xs text-red-600 mt-2">{joinError}</p>
       )}
     </div>
   )
