@@ -10,7 +10,9 @@ import type { Annotation, Book, ReadingProgress, UserProfile } from '@/types'
 import { REACTIONS } from '@/types'
 import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
-import { BarChart3, FileDown, Lightbulb } from 'lucide-react'
+import { BarChart3, FileDown, Lightbulb, Lock } from 'lucide-react'
+import { isPro } from '@/types'
+import UpgradeModal from '@/components/shared/UpgradeModal'
 
 export default function AnnotationsViewerPage() {
   const { profile } = useAuth()
@@ -23,6 +25,7 @@ export default function AnnotationsViewerPage() {
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState('')
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -136,13 +139,24 @@ export default function AnnotationsViewerPage() {
             {fetching ? 'Loading…' : 'View Annotations'}
           </button>
           {annotations.length > 0 && (
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
-            >
-              <FileDown size={18} />
-              Export PDF
-            </button>
+            isPro(profile) ? (
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
+              >
+                <FileDown size={18} />
+                Export PDF
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="flex items-center gap-2 bg-[#9CA3AF] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#6B7280] transition-colors"
+                title="Upgrade to Pro to export PDFs"
+              >
+                <Lock size={18} />
+                Export PDF
+              </button>
+            )
           )}
         </div>
       </div>
@@ -232,6 +246,14 @@ export default function AnnotationsViewerPage() {
           <p className="text-[#4B5563]">No annotations found for this student and book.</p>
         </div>
       ) : null}
+
+      {showUpgradeModal && (
+        <UpgradeModal
+          title="PDF export is a Pro feature"
+          description="Upgrade to Pro to download a formatted PDF of any student's annotations — great for parent conferences and progress reports."
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
     </AppShell>
   )
 }

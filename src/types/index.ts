@@ -1,4 +1,5 @@
 export type UserRole = 'teacher' | 'student'
+export type SubscriptionStatus = 'free' | 'pro' | 'district'
 
 export interface UserProfile {
   uid: string
@@ -6,7 +7,14 @@ export interface UserProfile {
   displayName: string
   role: UserRole
   classroomId: string | null
+  subscriptionStatus?: SubscriptionStatus
+  stripeCustomerId?: string
   createdAt: Date
+}
+
+export function isPro(profile: UserProfile | null | undefined): boolean {
+  const s = profile?.subscriptionStatus
+  return s === 'pro' || s === 'district'
 }
 
 export interface Classroom {

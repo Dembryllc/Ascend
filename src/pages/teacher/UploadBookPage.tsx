@@ -1,9 +1,12 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
-import { uploadBook } from '@/firebase/books'
-import { Upload, FileText, CheckCircle } from 'lucide-react'
+import { uploadBook, getBooksByTeacher } from '@/firebase/books'
+import { isPro } from '@/types'
+import { Lock, Upload, FileText, CheckCircle } from 'lucide-react'
+
+const FREE_BOOK_LIMIT = 3
 
 export default function UploadBookPage() {
   const { profile } = useAuth()
@@ -20,6 +23,12 @@ export default function UploadBookPage() {
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  const [bookCount, setBookCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!profile) return
+    getBooksByTeacher(profile.uid).then((books) => setBookCount(books.length)).catch(() => setBookCount(0))
+  }, [profile])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -64,6 +73,36 @@ export default function UploadBookPage() {
     } finally {
       setUploading(false)
     }
+  }
+
+  const atLimit = bookCount !== null && bookCount >= FREE_BOOK_LIMIT && !isPro(profile)
+
+  if (atLimit) {
+    return (
+      <AppShell title="Upload Book">
+        <div className="max-w-lg mx-auto text-center py-16">
+          <div className="w-16 h-16 bg-[#F5C842]/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Lock size={32} className="text-[#E6A817]" />
+          </div>
+          <h2 className="text-2xl font-bold text-[#1A1D23] mb-2">Book limit reached</h2>
+          <p className="text-[#4B5563] mb-1">
+            Your free plan includes up to {FREE_BOOK_LIMIT} books.
+          </p>
+          <p className="text-[#4B5563] mb-8">
+            Upgrade to Pro for unlimited books, unlimited students, and PDF annotation export.
+          </p>
+          <Link
+            to="/pricing"
+            className="inline-block bg-[#4A90D9] text-white font-bold px-8 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+          >
+            Upgrade to Pro
+          </Link>
+          <p className="mt-4 text-sm text-[#9CA3AF]">
+            <Link to="/teacher" className="hover:text-[#4A90D9]">Back to dashboard</Link>
+          </p>
+        </div>
+      </AppShell>
+    )
   }
 
   if (done) {

@@ -9,6 +9,7 @@ import RegisterPage from '@/pages/auth/RegisterPage'
 // Legal
 import PrivacyPage from '@/pages/legal/PrivacyPage'
 import TermsPage from '@/pages/legal/TermsPage'
+import PricingPage from '@/pages/legal/PricingPage'
 
 // Teacher
 import TeacherDashboard from '@/pages/teacher/TeacherDashboard'
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
 
           {/* Teacher */}
           <Route path="/teacher" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
