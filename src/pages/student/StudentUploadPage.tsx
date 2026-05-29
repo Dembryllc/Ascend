@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
 import { uploadStudentBook } from '@/firebase/books'
@@ -22,14 +22,8 @@ export default function StudentUploadPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.type !== 'application/pdf') {
-      setError('Please select a PDF file.')
-      return
-    }
-    if (f.size > 50 * 1024 * 1024) {
-      setError('File is too large. Maximum size is 50 MB.')
-      return
-    }
+    if (f.type !== 'application/pdf') { setError('Please select a PDF file.'); return }
+    if (f.size > 50 * 1024 * 1024) { setError('File is too large. Maximum size is 50 MB.'); return }
     setError('')
     setFile(f)
     if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
@@ -38,16 +32,13 @@ export default function StudentUploadPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || !profile) {
-      setError('Please sign in and choose a PDF before uploading.')
-      return
-    }
+    if (!file || !profile) { setError('Please sign in and choose a PDF before uploading.'); return }
     setError('')
     setUploading(true)
     try {
-      const book = await uploadStudentBook(file, title || file.name.replace(/\.pdf$/i, ''), author || 'Unknown author', readingLevel, profile.uid, setProgress)
+      await uploadStudentBook(file, title || file.name.replace(/\.pdf$/i, ''), author || 'Unknown author', readingLevel, profile.uid, setProgress)
       setDone(true)
-      setTimeout(() => navigate(`/student/read/${book.id}`), 900)
+      setTimeout(() => navigate('/student'), 1500)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
@@ -55,26 +46,23 @@ export default function StudentUploadPage() {
     }
   }
 
-  if (done) {
-    return (
-      <AppShell title="Add a Book">
-        <div className="flex flex-col items-center justify-center py-20">
-          <CheckCircle size={56} className="text-[#5BB974] mb-4" />
-          <h2 className="text-2xl font-bold text-[#1A1D23]">Book added!</h2>
-          <p className="text-[#4B5563] mt-2">Taking you back to your bookshelf…</p>
-        </div>
-      </AppShell>
-    )
-  }
+  if (done) return (
+    <AppShell title="Add a Book">
+      <div className="flex flex-col items-center justify-center py-20">
+        <CheckCircle size={56} className="text-[#5BB974] mb-4" />
+        <h2 className="text-2xl font-bold text-[#1A1D23]">Book added!</h2>
+        <p className="text-[#4B5563] mt-2">Redirecting to your bookshelf…</p>
+      </div>
+    </AppShell>
+  )
 
   return (
     <AppShell title="Add a Book">
       <div className="max-w-lg mx-auto">
-        <h2 className="text-2xl font-bold text-[#1A1D23] mb-1">Add Your Own Book</h2>
-        <p className="text-[#4B5563] mb-6">Upload a PDF and it will appear on your personal bookshelf.</p>
+        <h2 className="text-2xl font-bold text-[#1A1D23] mb-1">Add a Book</h2>
+        <p className="text-[#4B5563] mb-6">Upload a PDF to your personal reading shelf.</p>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-6 space-y-5">
-          {/* PDF drop zone */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1D23] mb-2">PDF File *</label>
             <button
@@ -100,9 +88,20 @@ export default function StudentUploadPage() {
             <input ref={fileRef} type="file" accept=".pdf,application/pdf" onChange={handleFileChange} className="hidden" />
           </div>
 
-          <Field label="Book Title *" value={title} onChange={setTitle} placeholder="e.g. Charlotte's Web" required />
-          <Field label="Author" value={author} onChange={setAuthor} placeholder="e.g. E.B. White" />
-          <Field label="Reading Level / Tag" value={readingLevel} onChange={setReadingLevel} placeholder="e.g. Grade 3, Chapter Book" />
+          <div>
+            <label htmlFor="title" className="block text-sm font-semibold text-[#1A1D23] mb-1">Book Title *</label>
+            <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. The Outsiders" className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
+          </div>
+
+          <div>
+            <label htmlFor="author" className="block text-sm font-semibold text-[#1A1D23] mb-1">Author</label>
+            <input id="author" type="text" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="e.g. S.E. Hinton" className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
+          </div>
+
+          <div>
+            <label htmlFor="level" className="block text-sm font-semibold text-[#1A1D23] mb-1">Reading Level <span className="font-normal text-[#9CA3AF]">(optional)</span></label>
+            <input id="level" type="text" value={readingLevel} onChange={(e) => setReadingLevel(e.target.value)} placeholder="e.g. Grade 8, Lexile 750" className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
+          </div>
 
           {uploading && (
             <div>
@@ -117,40 +116,18 @@ export default function StudentUploadPage() {
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm" role="alert">
-              {error}
-            </div>
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm" role="alert">{error}</div>
           )}
 
-          <button
-            type="submit"
-            disabled={!file || uploading}
-            className="w-full bg-[#4A90D9] hover:bg-[#357ABD] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-base transition-colors"
-          >
-            {uploading ? 'Uploading…' : 'Add to My Bookshelf'}
+          <button type="submit" disabled={!file || uploading} className="w-full bg-[#4A90D9] hover:bg-[#357ABD] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-base transition-colors">
+            {uploading ? 'Uploading…' : 'Add to My Shelf'}
           </button>
+
+          <p className="text-center text-sm text-[#9CA3AF]">
+            <Link to="/student" className="hover:text-[#4A90D9]">Cancel</Link>
+          </p>
         </form>
       </div>
     </AppShell>
-  )
-}
-
-function Field({
-  label, value, onChange, placeholder, required,
-}: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-[#1A1D23] mb-1">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-      />
-    </div>
   )
 }

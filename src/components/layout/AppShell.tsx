@@ -1,16 +1,29 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { logoutUser } from '@/firebase/auth'
-import { BookOpen, LogOut } from 'lucide-react'
+import { BookOpen, Eye, Home, LogOut, MessageSquare, Upload, Users } from 'lucide-react'
 
 interface Props {
   children: React.ReactNode
   title?: string
 }
 
+const TEACHER_NAV = [
+  { to: '/teacher', icon: Home, label: 'Home' },
+  { to: '/teacher/classroom', icon: Users, label: 'Classroom' },
+  { to: '/teacher/upload', icon: Upload, label: 'Upload' },
+  { to: '/teacher/annotations', icon: Eye, label: 'Annotations' },
+]
+
+const STUDENT_NAV = [
+  { to: '/student', icon: BookOpen, label: 'Books' },
+  { to: '/student/annotations', icon: MessageSquare, label: 'My Notes' },
+]
+
 export default function AppShell({ children, title }: Props) {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   async function handleLogout() {
     await logoutUser()
@@ -18,6 +31,13 @@ export default function AppShell({ children, title }: Props) {
   }
 
   const homeLink = profile?.role === 'teacher' ? '/teacher' : '/student'
+  const navItems = profile?.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV
+
+  // Find the most-specific nav item whose path matches the current route.
+  // Using longest-match-wins so /student/annotations beats /student.
+  const activeNavTo = navItems
+    .filter(({ to }) => pathname === to || pathname.startsWith(to + '/'))
+    .sort((a, b) => b.to.length - a.to.length)[0]?.to ?? null
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
@@ -51,10 +71,48 @@ export default function AppShell({ children, title }: Props) {
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+      {/* Page content — extra bottom padding on mobile for the bottom nav */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 pb-24 sm:pb-6">
         {children}
       </main>
+
+      {/* Footer — desktop only (bottom nav covers mobile) */}
+      <footer className="hidden sm:block border-t border-[#E5E7EB] bg-white mt-auto">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-3 text-xs text-[#9CA3AF]">
+          <span>© 2026 Easy Annotate</span>
+          <div className="flex gap-4">
+            <Link to="/pricing" className="hover:text-[#4A90D9]">Pricing</Link>
+            <Link to="/privacy" className="hover:text-[#4A90D9]">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-[#4A90D9]">Terms of Service</Link>
+          </div>
+        </div>
+      </footer>
+
+      {/* Bottom nav — mobile only */}
+      {profile && (
+        <nav
+          className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E5E7EB] z-40 flex"
+          aria-label="Main navigation"
+        >
+          {navItems.map(({ to, icon: Icon, label }) => {
+            const active = activeNavTo === to
+            return (
+              <Link
+                key={to}
+                to={to}
+                aria-label={label}
+                aria-current={active ? 'page' : undefined}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
+                  active ? 'text-[#4A90D9]' : 'text-[#6B7280] hover:text-[#1A1D23]'
+                }`}
+              >
+                <Icon size={22} strokeWidth={active ? 2.5 : 1.75} />
+                <span className="text-[10px] font-semibold">{label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+      )}
     </div>
   )
 }

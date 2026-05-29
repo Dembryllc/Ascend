@@ -7,10 +7,11 @@ import { getAnnotationsByStudentAndBook } from '@/firebase/annotations'
 import { getReadingProgress } from '@/firebase/readingProgress'
 import { getUserProfile } from '@/firebase/auth'
 import type { Annotation, Book, ReadingProgress, UserProfile } from '@/types'
-import { REACTIONS } from '@/types'
+import { isPro, REACTIONS } from '@/types'
 import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
-import { BarChart3, FileDown, Lightbulb } from 'lucide-react'
+import { BarChart3, FileDown, Lightbulb, Lock } from 'lucide-react'
+import UpgradeModal from '@/components/shared/UpgradeModal'
 
 export default function AnnotationsViewerPage() {
   const { profile } = useAuth()
@@ -22,6 +23,8 @@ export default function AnnotationsViewerPage() {
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState('')
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -35,19 +38,27 @@ export default function AnnotationsViewerPage() {
         setStudents(profs.filter(Boolean) as UserProfile[])
       }
       setLoading(false)
+    }).catch(() => {
+      setLoading(false)
     })
   }, [profile])
 
   async function fetchAnnotations() {
     if (!selectedStudent || !selectedBook) return
     setFetching(true)
-    const [ann, progress] = await Promise.all([
-      getAnnotationsByStudentAndBook(selectedStudent, selectedBook),
-      getReadingProgress(selectedStudent, selectedBook),
-    ])
-    setAnnotations(ann)
-    setReadingProgress(progress)
-    setFetching(false)
+    setFetchError('')
+    try {
+      const [ann, progress] = await Promise.all([
+        getAnnotationsByStudentAndBook(selectedStudent, selectedBook),
+        getReadingProgress(selectedStudent, selectedBook),
+      ])
+      setAnnotations(ann)
+      setReadingProgress(progress)
+    } catch {
+      setFetchError('Could not load annotations. Check your connection and try again.')
+    } finally {
+      setFetching(false)
+    }
   }
 
   const selectedStudentProfile = students.find((s) => s.uid === selectedStudent)
@@ -61,8 +72,19 @@ export default function AnnotationsViewerPage() {
 
   if (loading) return (
     <AppShell title="Annotations">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="h-8 w-56 bg-[#E5E7EB] rounded-xl animate-pulse mb-6" />
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div>
+            <div className="h-4 w-16 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+            <div className="h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+          </div>
+          <div>
+            <div className="h-4 w-12 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+            <div className="h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+          </div>
+        </div>
+        <div className="h-10 w-36 bg-[#E5E7EB] rounded-xl animate-pulse" />
       </div>
     </AppShell>
   )
@@ -75,8 +97,9 @@ export default function AnnotationsViewerPage() {
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Student</label>
+            <label htmlFor="select-student" className="block text-sm font-semibold text-[#1A1D23] mb-1">Student</label>
             <select
+              id="select-student"
               value={selectedStudent}
               onChange={(e) => {
                 setSelectedStudent(e.target.value)
@@ -90,8 +113,9 @@ export default function AnnotationsViewerPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Book</label>
+            <label htmlFor="select-book" className="block text-sm font-semibold text-[#1A1D23] mb-1">Book</label>
             <select
+              id="select-book"
               value={selectedBook}
               onChange={(e) => {
                 setSelectedBook(e.target.value)
@@ -114,13 +138,24 @@ export default function AnnotationsViewerPage() {
             {fetching ? 'Loading…' : 'View Annotations'}
           </button>
           {annotations.length > 0 && (
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
-            >
-              <FileDown size={18} />
-              Export PDF
-            </button>
+            isPro(profile) ? (
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
+              >
+                <FileDown size={18} />
+                Export PDF
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="flex items-center gap-2 bg-[#9CA3AF] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#6B7280] transition-colors"
+                title="Upgrade to Pro to export PDFs"
+              >
+                <Lock size={18} />
+                Export PDF
+              </button>
+            )
           )}
         </div>
       </div>
@@ -200,11 +235,24 @@ export default function AnnotationsViewerPage() {
             )
           })}
         </div>
+      ) : fetchError ? (
+        <div className="text-center py-12 bg-white rounded-2xl border border-red-100">
+          <p className="text-red-600 font-semibold mb-1">Could not load annotations</p>
+          <p className="text-[#4B5563] text-sm">{fetchError}</p>
+        </div>
       ) : selectedStudent && selectedBook && !fetching ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-[#F3F4F6]">
           <p className="text-[#4B5563]">No annotations found for this student and book.</p>
         </div>
       ) : null}
+
+      {showUpgradeModal && (
+        <UpgradeModal
+          title="PDF export is a Pro feature"
+          description="Upgrade to Pro to download a formatted PDF of any student's annotations — great for parent conferences and progress reports."
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
     </AppShell>
   )
 }

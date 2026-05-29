@@ -6,6 +6,7 @@ import AppShell from '@/components/layout/AppShell'
 import { getBooksByStudent, deleteStudentBook } from '@/firebase/books'
 import { getAnnotationsByStudent } from '@/firebase/annotations'
 import { getReadingProgressByStudent } from '@/firebase/readingProgress'
+import { joinClassroomByCode } from '@/firebase/classrooms'
 import type { Annotation, Book, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
@@ -13,6 +14,8 @@ import {
   AlertCircle,
   ArrowRight,
   BookOpen,
+  CheckCircle2,
+  Circle,
   Flame,
   MessageSquare,
   Plus,
@@ -23,7 +26,7 @@ import {
 } from 'lucide-react'
 
 export default function StudentHome() {
-  const { profile, loading: authLoading, error: authError } = useAuth()
+  const { profile, loading: authLoading, error: authError, refreshProfile } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
@@ -170,6 +173,15 @@ export default function StudentHome() {
         </Link>
       </div>
 
+      <StudentOnboardingChecklist
+        studentId={profile!.uid}
+        classroomId={profile!.classroomId}
+        firstBookId={(assignedBooks[0] ?? myBooks[0])?.id ?? null}
+        hasStartedReading={readingProgress.length > 0}
+        hasAnnotated={annotations.length > 0}
+        onJoined={refreshProfile}
+      />
+
       {/* Progress dashboard */}
       <section className="mb-8" aria-labelledby="progress-heading">
         <div className="flex items-center justify-between gap-3 mb-4">
@@ -224,17 +236,36 @@ export default function StudentHome() {
       </section>
 
       {books.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
-          <BookOpen size={48} className="mx-auto text-[#D1D5DB] mb-4" />
-          <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Your bookshelf is empty</h3>
-          <p className="text-[#4B5563] mb-6">Upload your own book or wait for your teacher to assign one.</p>
-          <Link
-            to="/student/upload"
-            className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
-          >
-            <Plus size={18} /> Add a Book
-          </Link>
-        </div>
+        profile?.classroomId ? (
+          /* Joined a classroom but teacher hasn't assigned anything yet */
+          <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <BookOpen size={32} className="text-[#4A90D9]" />
+            </div>
+            <h3 className="text-xl font-bold text-[#1A1D23] mb-2">No books assigned yet</h3>
+            <p className="text-[#4B5563] mb-2">Your teacher hasn't assigned any books to your classroom yet.</p>
+            <p className="text-sm text-[#9CA3AF] mb-6">Check back soon — or add your own book to read in the meantime.</p>
+            <Link
+              to="/student/upload"
+              className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+            >
+              <Plus size={18} /> Add My Own Book
+            </Link>
+          </div>
+        ) : (
+          /* Not in any classroom */
+          <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+            <BookOpen size={48} className="mx-auto text-[#D1D5DB] mb-4" />
+            <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Your bookshelf is empty</h3>
+            <p className="text-[#4B5563] mb-6">Join a classroom to see assigned books, or upload your own PDF to get started.</p>
+            <Link
+              to="/student/upload"
+              className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+            >
+              <Plus size={18} /> Add a Book
+            </Link>
+          </div>
+        )
       ) : (
         <>
           {/* Teacher-assigned books */}
@@ -455,6 +486,136 @@ function RecentActivityCard({
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+function StudentOnboardingChecklist({
+  studentId,
+  classroomId,
+  firstBookId,
+  hasStartedReading,
+  hasAnnotated,
+  onJoined,
+}: {
+  studentId: string
+  classroomId: string | null | undefined
+  firstBookId: string | null
+  hasStartedReading: boolean
+  hasAnnotated: boolean
+  onJoined: () => void
+}) {
+  const [code, setCode] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
+  const [joined, setJoined] = useState(false)
+
+  const step1Done = classroomId != null
+  const step2Done = hasStartedReading
+  const step3Done = hasAnnotated
+
+  if (step1Done && step2Done && step3Done) return null
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault()
+    if (code.trim().length < 6) return
+    setJoining(true)
+    setJoinError('')
+    try {
+      await joinClassroomByCode(studentId, code.trim())
+      setJoined(true)
+      setTimeout(onJoined, 1500)
+    } catch (err: unknown) {
+      setJoinError(err instanceof Error ? err.message : 'Could not join. Check the code and try again.')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  const bookLink = firstBookId ? `/student/read/${firstBookId}` : '/student'
+
+  return (
+    <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-5 mb-8" role="region" aria-label="Getting started checklist">
+      <h3 className="font-bold text-[#1A1D23] mb-0.5">Get started with Easy Annotate</h3>
+      <p className="text-sm text-[#4B5563] mb-4">Three steps to your first annotation.</p>
+      <ol className="space-y-4">
+        <li className="flex items-start gap-3">
+          <span className="mt-0.5 shrink-0" aria-hidden="true">
+            {step1Done ? <CheckCircle2 size={20} className="text-[#5BB974]" /> : <Circle size={20} className="text-[#4A90D9]" />}
+          </span>
+          <div className="flex-1 min-w-0">
+            <span className={`block text-sm font-semibold ${step1Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
+              1. Join your classroom
+            </span>
+            {!step1Done && (
+              <>
+                <span className="block text-xs text-[#4B5563] mt-0.5 mb-2">Enter the code your teacher gave you.</span>
+                {joined ? (
+                  <p className="text-sm font-semibold text-[#5BB974]">Joined! Refreshing…</p>
+                ) : (
+                  <form onSubmit={handleJoin} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.toUpperCase())}
+                      maxLength={6}
+                      placeholder="ABCXYZ"
+                      aria-label="Classroom join code"
+                      className="w-32 border border-[#D1D5DB] rounded-xl px-3 py-2 text-sm font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={joining || code.trim().length < 6}
+                      className="bg-[#4A90D9] text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-[#357ABD] disabled:opacity-50 transition-colors whitespace-nowrap"
+                    >
+                      {joining ? 'Joining…' : 'Join'}
+                    </button>
+                  </form>
+                )}
+                {joinError && <p className="text-xs text-red-600 mt-1.5">{joinError}</p>}
+              </>
+            )}
+          </div>
+        </li>
+
+        <li className="flex items-start gap-3">
+          <span className="mt-0.5 shrink-0" aria-hidden="true">
+            {step2Done ? <CheckCircle2 size={20} className="text-[#5BB974]" /> : <Circle size={20} className="text-[#4A90D9]" />}
+          </span>
+          <div className="flex-1 min-w-0">
+            <span className={`block text-sm font-semibold ${step2Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
+              2. Open your first book
+            </span>
+            {!step2Done && (
+              <span className="block text-xs text-[#4B5563] mt-0.5">Start reading any book in your shelf.</span>
+            )}
+          </div>
+          {!step2Done && firstBookId && (
+            <Link to={bookLink} className="shrink-0 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD] underline-offset-2 hover:underline">
+              Go →
+            </Link>
+          )}
+        </li>
+
+        <li className="flex items-start gap-3">
+          <span className="mt-0.5 shrink-0" aria-hidden="true">
+            {step3Done ? <CheckCircle2 size={20} className="text-[#5BB974]" /> : <Circle size={20} className="text-[#4A90D9]" />}
+          </span>
+          <div className="flex-1 min-w-0">
+            <span className={`block text-sm font-semibold ${step3Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
+              3. Leave your first annotation
+            </span>
+            {!step3Done && (
+              <span className="block text-xs text-[#4B5563] mt-0.5">Select text in a book and tap an emoji to react.</span>
+            )}
+          </div>
+          {!step3Done && firstBookId && (
+            <Link to={bookLink} className="shrink-0 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD] underline-offset-2 hover:underline">
+              Go →
+            </Link>
+          )}
+        </li>
+      </ol>
     </div>
   )
 }

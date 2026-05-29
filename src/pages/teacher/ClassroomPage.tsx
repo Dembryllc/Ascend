@@ -17,6 +17,9 @@ export default function ClassroomPage() {
   const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [createError, setCreateError] = useState('')
+  const [assignSelects, setAssignSelects] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!profile) return
@@ -31,6 +34,9 @@ export default function ClassroomPage() {
         setStudents(profiles.filter(Boolean) as UserProfile[])
       }
       setLoading(false)
+    }).catch(() => {
+      setLoadError('Could not load classroom data. Please refresh.')
+      setLoading(false)
     })
   }, [profile])
 
@@ -38,9 +44,15 @@ export default function ClassroomPage() {
     e.preventDefault()
     if (!profile || !newClassName.trim()) return
     setCreating(true)
-    const c = await createClassroom(newClassName.trim(), profile.uid)
-    setClassroom(c)
-    setCreating(false)
+    setCreateError('')
+    try {
+      const c = await createClassroom(newClassName.trim(), profile.uid)
+      setClassroom(c)
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : 'Could not create classroom. Please try again.')
+    } finally {
+      setCreating(false)
+    }
   }
 
   function copyCode() {
@@ -55,6 +67,7 @@ export default function ClassroomPage() {
     setBooks((prev) => prev.map((b) =>
       b.id === bookId ? { ...b, assignedStudentIds: [...new Set([...b.assignedStudentIds, studentId])] } : b
     ))
+    setAssignSelects((prev) => ({ ...prev, [studentId]: '' }))
   }
 
   async function handleAssignAll(bookId: string) {
@@ -67,8 +80,37 @@ export default function ClassroomPage() {
 
   if (loading) return (
     <AppShell title="Classroom">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="h-8 w-64 bg-[#E5E7EB] rounded-xl animate-pulse mb-6" />
+      <div className="space-y-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6]">
+          <div className="h-5 w-36 bg-[#E5E7EB] rounded animate-pulse mb-2" />
+          <div className="h-4 w-64 bg-[#E5E7EB] rounded animate-pulse mb-4" />
+          <div className="flex items-center gap-3">
+            <div className="h-14 w-44 bg-[#E5E7EB] rounded-xl animate-pulse" />
+            <div className="h-14 w-24 bg-[#E5E7EB] rounded-xl animate-pulse" />
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6]">
+          <div className="h-5 w-32 bg-[#E5E7EB] rounded animate-pulse mb-4" />
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between py-3 border-b border-[#F3F4F6] last:border-0">
+              <div>
+                <div className="h-4 w-32 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+                <div className="h-3 w-24 bg-[#E5E7EB] rounded animate-pulse" />
+              </div>
+              <div className="h-8 w-28 bg-[#E5E7EB] rounded-lg animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </AppShell>
+  )
+
+  if (loadError) return (
+    <AppShell title="Classroom">
+      <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+        <p className="text-red-600 font-semibold mb-2">Something went wrong</p>
+        <p className="text-[#4B5563] text-sm">{loadError}</p>
       </div>
     </AppShell>
   )
@@ -81,8 +123,13 @@ export default function ClassroomPage() {
         <div className="max-w-sm bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6]">
           <h3 className="font-bold text-lg text-[#1A1D23] mb-1">Create your classroom</h3>
           <p className="text-sm text-[#4B5563] mb-4">Give your class a name to get started.</p>
-          <form onSubmit={handleCreateClass} className="flex gap-2">
+          <form onSubmit={handleCreateClass} className="space-y-3">
+            <label htmlFor="class-name" className="block text-sm font-semibold text-[#1A1D23]">
+              Classroom name
+            </label>
+            <div className="flex gap-2">
             <input
+              id="class-name"
               type="text"
               value={newClassName}
               onChange={(e) => setNewClassName(e.target.value)}
@@ -93,10 +140,15 @@ export default function ClassroomPage() {
             <button
               type="submit"
               disabled={creating}
+              aria-label="Create classroom"
               className="bg-[#4A90D9] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#357ABD] transition-colors"
             >
               <Plus size={20} />
             </button>
+            </div>
+            {createError && (
+              <p className="text-sm text-red-600 mt-2">{createError}</p>
+            )}
           </form>
         </div>
       ) : (
@@ -129,7 +181,15 @@ export default function ClassroomPage() {
               </h3>
             </div>
             {students.length === 0 ? (
-              <p className="text-[#4B5563] text-sm">No students have joined yet. Share the join code above!</p>
+              <div className="text-center py-8">
+                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Users size={28} className="text-[#4A90D9]" />
+                </div>
+                <h4 className="font-bold text-[#1A1D23] mb-1">No students yet</h4>
+                <p className="text-sm text-[#4B5563] max-w-xs mx-auto">
+                  Share the join code above with your students. They can enter it from their dashboard after signing up.
+                </p>
+              </div>
             ) : (
               <ul className="divide-y divide-[#F3F4F6]">
                 {students.map((s) => (
@@ -140,8 +200,14 @@ export default function ClassroomPage() {
                     </div>
                     {books.length > 0 && (
                       <select
-                        onChange={(e) => e.target.value && handleAssignBook(e.target.value, s.uid)}
-                        defaultValue=""
+                        value={assignSelects[s.uid] ?? ''}
+                        onChange={(e) => {
+                          const bookId = e.target.value
+                          if (!bookId) return
+                          setAssignSelects((prev) => ({ ...prev, [s.uid]: bookId }))
+                          handleAssignBook(bookId, s.uid)
+                        }}
+                        aria-label={`Assign book to ${s.displayName}`}
                         className="text-xs border border-[#D1D5DB] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#4A90D9]"
                       >
                         <option value="">Assign a book…</option>

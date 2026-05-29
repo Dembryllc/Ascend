@@ -1,182 +1,224 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
-import { getAnnotationsByClassAndBook } from '@/firebase/annotations'
-import { getUserProfile } from '@/firebase/auth'
-import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
+import { getBooksByTeacher } from '@/firebase/books'
 import { getReadingProgressByClassroom } from '@/firebase/readingProgress'
-import type { Annotation, ReadingProgress, UserProfile } from '@/types'
-import { CheckCircle, Clock, MessageSquare, Users } from 'lucide-react'
+import { getUserProfile } from '@/firebase/auth'
+import type { Book, ReadingProgress, UserProfile } from '@/types'
+import { BarChart3, BookOpen, Clock, Users } from 'lucide-react'
 
 export default function ProgressDashboardPage() {
   const { profile } = useAuth()
   const [students, setStudents] = useState<UserProfile[]>([])
-  const [annotations, setAnnotations] = useState<Annotation[]>([])
-  const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
+  const [books, setBooks] = useState<Book[]>([])
+  const [progress, setProgress] = useState<ReadingProgress[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!profile) return
-    let cancelled = false
 
     async function load() {
-      const [classroom, teacherBooks] = await Promise.all([
-        getClassroomByTeacher(profile!.uid),
-        getBooksByTeacher(profile!.uid),
-      ])
-      if (!classroom) {
-        if (!cancelled) {
-          setStudents([])
-          setAnnotations([])
-          setReadingProgress([])
-          setLoading(false)
-        }
-        return
-      }
+      try {
+        const [classroom, bks] = await Promise.all([
+          getClassroomByTeacher(profile!.uid),
+          getBooksByTeacher(profile!.uid),
+        ])
+        setBooks(bks)
+        if (!classroom) { setLoading(false); return }
 
-      const [studentProfiles, bookAnnotations, progressRows] = await Promise.all([
-        Promise.all(classroom.studentIds.map((id) => getUserProfile(id))),
-        Promise.all(teacherBooks.map((book) => getAnnotationsByClassAndBook(classroom.studentIds, book.id))),
-        getReadingProgressByClassroom(classroom.id),
-      ])
-
-      if (cancelled) return
-      setStudents(studentProfiles.filter(Boolean) as UserProfile[])
-      setAnnotations(bookAnnotations.flat())
-      setReadingProgress(progressRows.filter((row) => classroom.studentIds.includes(row.studentId)))
-      setLoading(false)
-    }
-
-    load().catch((err: unknown) => {
-      console.error('Failed to load teacher progress:', err)
-      if (!cancelled) {
+        const [progressRows, studentProfiles] = await Promise.all([
+          getReadingProgressByClassroom(classroom.id),
+          Promise.all(classroom.studentIds.map((id) => getUserProfile(id))),
+        ])
+        setStudents(studentProfiles.filter(Boolean) as UserProfile[])
+        setProgress(progressRows)
+      } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Could not load progress data. Please refresh.')
+      } finally {
         setLoading(false)
       }
-    })
-
-    return () => {
-      cancelled = true
     }
+
+    load()
   }, [profile])
 
-  const rows = useMemo(() => {
-    return students.map((student) => {
-      const studentAnnotations = annotations.filter((ann) => ann.studentId === student.uid)
-      const studentProgress = readingProgress.filter((progress) => progress.studentId === student.uid)
-      const annotatedBooks = new Set(studentAnnotations.map((ann) => ann.bookId))
-      const activeBooks = new Set(studentProgress.map((progress) => progress.bookId))
-      const latest = studentAnnotations.slice().sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]
-      const latestProgress = studentProgress.slice().sort((a, b) => b.lastReadAt.getTime() - a.lastReadAt.getTime())[0]
-      return {
-        student,
-        annotations: studentAnnotations.length,
-        quotes: studentAnnotations.filter((ann) => ann.selectedText && ann.annotationKind !== 'reflection').length,
-        booksStarted: new Set([...annotatedBooks, ...activeBooks]).size,
-        minutesRead: Math.round(studentProgress.reduce((sum, progress) => sum + progress.totalSecondsRead, 0) / 60),
-        completedBooks: studentProgress.filter((progress) => progress.completed).length,
-        averageCompletion: studentProgress.length > 0
-          ? Math.round(studentProgress.reduce((sum, progress) => sum + progress.completionPercent, 0) / studentProgress.length)
-          : 0,
-        latest,
-        latestProgress,
-      }
-    })
-  }, [annotations, readingProgress, students])
-
-  const totalMinutes = Math.round(readingProgress.reduce((sum, progress) => sum + progress.totalSecondsRead, 0) / 60)
-  const completedBooks = readingProgress.filter((progress) => progress.completed).length
-
   if (loading) return (
-    <AppShell title="Progress">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+    <AppShell title="Class Progress">
+      <div className="h-8 w-48 bg-[#E5E7EB] rounded-xl animate-pulse mb-2" />
+      <div className="h-5 w-72 bg-[#E5E7EB] rounded-xl animate-pulse mb-6" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-5 border border-[#F3F4F6]">
+            <div className="h-10 w-10 bg-[#E5E7EB] rounded-xl animate-pulse mb-3" />
+            <div className="h-7 w-12 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+            <div className="h-4 w-20 bg-[#E5E7EB] rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-5 border border-[#F3F4F6]">
+            <div className="flex justify-between mb-4">
+              <div>
+                <div className="h-5 w-32 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+                <div className="h-3 w-24 bg-[#E5E7EB] rounded animate-pulse" />
+              </div>
+              <div className="h-5 w-16 bg-[#E5E7EB] rounded animate-pulse" />
+            </div>
+            <div className="space-y-3">
+              {[...Array(2)].map((_, j) => (
+                <div key={j}>
+                  <div className="flex justify-between mb-1">
+                    <div className="h-3 w-40 bg-[#E5E7EB] rounded animate-pulse" />
+                    <div className="h-3 w-10 bg-[#E5E7EB] rounded animate-pulse" />
+                  </div>
+                  <div className="h-2 bg-[#E5E7EB] rounded-full animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </AppShell>
   )
 
   if (error) return (
-    <AppShell title="Progress">
-      <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm">{error}</div>
+    <AppShell title="Class Progress">
+      <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+        <BarChart3 size={40} className="mx-auto text-[#D1D5DB] mb-4" />
+        <h3 className="text-lg font-bold text-[#1A1D23] mb-2">Couldn't load progress</h3>
+        <p className="text-sm text-[#4B5563] mb-6">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
     </AppShell>
   )
 
+  const progressByStudent = new Map<string, ReadingProgress[]>()
+  for (const row of progress) {
+    const existing = progressByStudent.get(row.studentId) ?? []
+    progressByStudent.set(row.studentId, [...existing, row])
+  }
+
+  const bookById = new Map(books.map((b) => [b.id, b]))
+  const totalMinutes = Math.round(progress.reduce((s, r) => s + r.totalSecondsRead, 0) / 60)
+  const avgCompletion = progress.length > 0
+    ? Math.round(progress.reduce((s, r) => s + r.completionPercent, 0) / progress.length)
+    : 0
+  const booksFinished = progress.filter((r) => r.completed).length
+
   return (
-    <AppShell title="Progress">
+    <AppShell title="Class Progress">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-[#1A1D23]">Class Progress</h2>
-        <p className="text-[#4B5563] mt-1">A quick scan of pages read, time spent, completion, and annotation activity.</p>
+        <p className="text-[#4B5563] mt-1">Reading activity across all students and books.</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <Stat icon={<Users size={20} />} label="Students" value={students.length} />
-        <Stat icon={<Clock size={20} />} label="Minutes read" value={totalMinutes} />
-        <Stat icon={<CheckCircle size={20} />} label="Books completed" value={completedBooks} />
-        <Stat icon={<MessageSquare size={20} />} label="Annotations" value={annotations.length} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <StatCard icon={<Users size={20} />} label="Students" value={students.length} color="blue" />
+        <StatCard icon={<Clock size={20} />} label="Total minutes" value={totalMinutes} color="green" />
+        <StatCard icon={<BarChart3 size={20} />} label="Avg completion" value={`${avgCompletion}%`} color="purple" isText />
+        <StatCard icon={<BookOpen size={20} />} label="Books finished" value={booksFinished} color="blue" />
       </div>
 
-      {rows.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#F3F4F6] p-8 text-center">
-          <p className="text-[#4B5563] mb-4">Create a classroom and assign a book to start tracking progress.</p>
-          <Link to="/teacher/classroom" className="inline-block bg-[#4A90D9] text-white font-bold px-5 py-2.5 rounded-xl hover:bg-[#357ABD] transition-colors">
-            Manage Classroom
+      {students.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+          <Users size={40} className="mx-auto text-[#D1D5DB] mb-4" />
+          <h3 className="text-lg font-bold text-[#1A1D23] mb-2">No students yet</h3>
+          <p className="text-sm text-[#4B5563] mb-6">
+            Progress will appear here once students join your classroom and start reading.
+          </p>
+          <Link
+            to="/teacher/classroom"
+            className="inline-block bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+          >
+            Go to Classroom
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_0.9fr_1.2fr] gap-3 px-5 py-3 bg-[#F8F9FC] text-xs font-bold uppercase tracking-wide text-[#6B7280]">
-            <span>Student</span>
-            <span>Books started</span>
-            <span>Completion</span>
-            <span>Minutes</span>
-            <span>Notes</span>
-            <span>Last activity</span>
-          </div>
-          <div className="divide-y divide-[#F3F4F6]">
-            {rows.map((row) => (
-              <div key={row.student.uid} className="grid grid-cols-2 md:grid-cols-[1.5fr_0.9fr_0.9fr_0.9fr_0.9fr_1.2fr] gap-3 px-5 py-4 items-center">
-                <div className="col-span-2 md:col-span-1">
-                  <p className="font-bold text-[#1A1D23]">{row.student.displayName}</p>
-                  <p className="text-xs text-[#6B7280]">{row.student.email}</p>
+        <div className="space-y-4">
+          {students.map((student) => {
+            const rows = (progressByStudent.get(student.uid) ?? [])
+              .slice()
+              .sort((a, b) => b.lastReadAt.getTime() - a.lastReadAt.getTime())
+            const studentMinutes = Math.round(rows.reduce((s, r) => s + r.totalSecondsRead, 0) / 60)
+            const lastActive = rows[0]?.lastReadAt ?? null
+
+            return (
+              <div key={student.uid} className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="font-bold text-[#1A1D23]">{student.displayName}</h3>
+                    <p className="text-xs text-[#9CA3AF]">
+                      {lastActive
+                        ? `Last read ${lastActive.toLocaleDateString()}`
+                        : 'No activity yet'}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-[#1A1D23]">{studentMinutes} min</p>
+                    <p className="text-xs text-[#9CA3AF]">{rows.length} book{rows.length !== 1 ? 's' : ''}</p>
+                  </div>
                 </div>
-                <Metric label="Books" value={row.booksStarted} />
-                <Metric label="Done" value={`${row.averageCompletion}%`} />
-                <Metric label="Minutes" value={row.minutesRead} />
-                <Metric label="Notes" value={row.annotations} />
-                <div className="col-span-2 md:col-span-1 text-sm text-[#4B5563]">
-                  {row.latestProgress
-                    ? `${row.latestProgress.lastReadAt.toLocaleDateString()} · page ${row.latestProgress.lastReadPage}`
-                    : row.latest
-                      ? row.latest.timestamp.toLocaleDateString()
-                      : 'No activity yet'}
-                </div>
+
+                {rows.length === 0 ? (
+                  <p className="text-sm text-[#9CA3AF] italic">No reading recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {rows.map((row) => {
+                      const book = bookById.get(row.bookId)
+                      return (
+                        <div key={row.id}>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-semibold text-[#1A1D23] truncate max-w-[60%]">
+                              {book?.title ?? 'Unknown Book'}
+                            </span>
+                            <span className="text-[#4B5563] shrink-0 ml-2">
+                              {row.completed
+                                ? 'Complete ✓'
+                                : `p.${row.highestPageRead}${row.totalPages > 0 ? `/${row.totalPages}` : ''} · ${row.completionPercent}%`}
+                            </span>
+                          </div>
+                          <div className="h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${row.completed ? 'bg-[#5BB974]' : 'bg-[#4A90D9]'}`}
+                              style={{ width: `${Math.max(2, row.completionPercent)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )}
     </AppShell>
   )
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function StatCard({ icon, label, value, color, isText }: {
+  icon: React.ReactNode; label: string; value: number | string; color: string; isText?: boolean
+}) {
+  const colors: Record<string, string> = {
+    blue: 'bg-blue-50 text-[#4A90D9]',
+    green: 'bg-green-50 text-[#5BB974]',
+    purple: 'bg-purple-50 text-[#9B7FD4]',
+  }
   return (
-    <div className="bg-white rounded-2xl border border-[#F3F4F6] p-4 shadow-sm">
-      <div className="inline-flex bg-blue-50 text-[#4A90D9] p-2 rounded-xl mb-3">{icon}</div>
-      <p className="text-3xl font-bold text-[#1A1D23]">{value}</p>
-      <p className="text-xs text-[#6B7280] mt-1">{label}</p>
-    </div>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div>
-      <p className="md:hidden text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-      <p className="text-lg font-bold text-[#1A1D23]">{value}</p>
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+      <div className={`inline-flex p-2 rounded-xl mb-3 ${colors[color]}`}>{icon}</div>
+      <div className={`font-bold ${isText ? 'text-2xl' : 'text-3xl'} text-[#1A1D23]`}>{value}</div>
+      <div className="text-sm text-[#4B5563] mt-0.5">{label}</div>
     </div>
   )
 }

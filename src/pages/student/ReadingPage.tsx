@@ -36,6 +36,7 @@ export default function ReadingPage() {
   const [selectedText, setSelectedText] = useState('')
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [containerWidth, setContainerWidth] = useState(700)
   const [loadingBook, setLoadingBook] = useState(true)
   const [readerError, setReaderError] = useState('')
@@ -255,11 +256,13 @@ export default function ReadingPage() {
     setAnnotationPanel({ open: false })
     setCapturedSelection('')
     setFloatingBar(null)
+    setSaveError('')
   }
 
   async function handleSave() {
     if (!profile || !bookId) return
     setSaving(true)
+    setSaveError('')
     try {
       if (annotationPanel.editing) {
         await updateAnnotation(annotationPanel.editing.id, selectedReaction, noteText, selectedText)
@@ -275,6 +278,8 @@ export default function ReadingPage() {
         setAnnotations((prev) => [...prev, ann])
       }
       closePanel()
+    } catch {
+      setSaveError('Could not save. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -799,6 +804,10 @@ export default function ReadingPage() {
                 className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none"
               />
             </div>
+
+            {saveError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-1">{saveError}</p>
+            )}
 
             <div className="flex gap-3">
               {annotationPanel.editing && (

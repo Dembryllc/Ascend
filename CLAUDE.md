@@ -149,6 +149,40 @@ The deploy targets Firebase Hosting only (`--only hosting`). Firestore rules and
 
 ---
 
+## Hosting: Netlify → Firebase (migrated 2026-05-28)
+
+**easy-annotate.com is fully served by Firebase Hosting.** Netlify is no longer the live host.
+
+### DNS (managed at Netlify DNS — not a third-party registrar)
+
+DNS nameservers: `dns1-4.p03.nsone.net`. Records are edited at `app.netlify.com/teams/dembryllc/dns`, not at a separate registrar.
+
+Current records pointing to Firebase:
+
+| Type | Name | Value |
+|---|---|---|
+| A | `easy-annotate.com` | `199.36.158.100` |
+| CNAME | `www.easy-annotate.com` | `ascend-annotate.web.app` |
+| TXT | `easy-annotate.com` | `hosting-site=ascend-annotate` (Firebase ownership verification) |
+
+### Firebase Auth authorized domains
+
+Both `easy-annotate.com` and `www.easy-annotate.com` are in Firebase Console → Authentication → Settings → Authorized Domains. Both must remain there or logins will fail with `auth/unauthorized-domain`.
+
+### Key facts
+
+- **Firebase project ID:** `ascend-annotate`
+- **Firebase Hosting URL:** `ascend-annotate.web.app`
+- **Firebase Hosting IP (apex A record):** `199.36.158.100`
+- **Domain auto-renews:** 2027-04-20 (through Netlify)
+- **Netlify project:** still exists but paused (credit limit exceeded) — do not rely on it, do not delete it until billing is resolved
+
+### Rollback to Netlify
+
+Go to Netlify DNS → delete the `A` record for `199.36.158.100` → add a NETLIFY-type record pointing `easy-annotate.com` to `ascend-annotate.netlify.app`. Netlify DNS propagates in seconds. Requires Netlify billing to be active.
+
+---
+
 ## Environment variables
 
 Required at build time (baked into the bundle by Vite):

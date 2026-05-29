@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
 import { getAnnotationsByStudent, deleteAnnotation, updateAnnotation } from '@/firebase/annotations'
 import { getBooksByStudent } from '@/firebase/books'
 import type { Annotation, Book, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
+import { BookOpen, MessageSquare } from 'lucide-react'
 
 export default function MyAnnotationsPage() {
   const { profile } = useAuth()
@@ -13,6 +15,7 @@ export default function MyAnnotationsPage() {
   const [filterBook, setFilterBook] = useState('')
   const [filterReaction, setFilterReaction] = useState<ReactionType | ''>('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [editing, setEditing] = useState<Annotation | null>(null)
   const [editNote, setEditNote] = useState('')
   const [editReaction, setEditReaction] = useState<ReactionType>('think')
@@ -27,6 +30,10 @@ export default function MyAnnotationsPage() {
     ]).then(([ann, bks]) => {
       setAnnotations(ann)
       setBooks(bks)
+      setLoading(false)
+    }).catch((err: unknown) => {
+      console.error('Failed to load annotations:', err)
+      setLoadError(err instanceof Error ? err.message : 'Could not load your annotations. Please refresh.')
       setLoading(false)
     })
   }, [profile])
@@ -76,8 +83,40 @@ export default function MyAnnotationsPage() {
 
   if (loading) return (
     <AppShell title="My Annotations">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="h-8 w-48 bg-[#E5E7EB] rounded-xl animate-pulse mb-6" />
+      <div className="flex gap-3 mb-6">
+        <div className="flex-1 h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+        <div className="flex-1 h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+      </div>
+      <div className="space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 bg-[#E5E7EB] rounded-xl animate-pulse shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-24 bg-[#E5E7EB] rounded animate-pulse" />
+                <div className="h-3 w-40 bg-[#E5E7EB] rounded animate-pulse" />
+                <div className="h-4 w-full bg-[#E5E7EB] rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </AppShell>
+  )
+
+  if (loadError) return (
+    <AppShell title="My Annotations">
+      <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+        <MessageSquare size={40} className="mx-auto text-[#D1D5DB] mb-4" />
+        <h3 className="text-lg font-bold text-[#1A1D23] mb-2">Couldn't load annotations</h3>
+        <p className="text-sm text-[#4B5563] mb-6">{loadError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     </AppShell>
   )
@@ -88,30 +127,62 @@ export default function MyAnnotationsPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <select
-          value={filterBook}
-          onChange={(e) => setFilterBook(e.target.value)}
-          className="flex-1 border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-        >
-          <option value="">All books</option>
-          {books.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
-        </select>
+        <div className="flex-1">
+          <label htmlFor="filter-book" className="sr-only">Filter by book</label>
+          <select
+            id="filter-book"
+            value={filterBook}
+            onChange={(e) => setFilterBook(e.target.value)}
+            className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+          >
+            <option value="">All books</option>
+            {books.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
+          </select>
+        </div>
 
-        <select
-          value={filterReaction}
-          onChange={(e) => setFilterReaction(e.target.value as ReactionType | '')}
-          className="flex-1 border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-        >
-          <option value="">All reactions</option>
-          {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
-            <option key={type} value={type}>{r.emoji} {r.label}</option>
-          ))}
-        </select>
+        <div className="flex-1">
+          <label htmlFor="filter-reaction" className="sr-only">Filter by reaction</label>
+          <select
+            id="filter-reaction"
+            value={filterReaction}
+            onChange={(e) => setFilterReaction(e.target.value as ReactionType | '')}
+            className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+          >
+            <option value="">All reactions</option>
+            {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
+              <option key={type} value={type}>{r.emoji} {r.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {annotations.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+          <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <BookOpen size={32} className="text-[#9B7FD4]" />
+          </div>
+          <h3 className="text-xl font-bold text-[#1A1D23] mb-2">No annotations yet</h3>
+          <p className="text-[#4B5563] mb-6 max-w-xs mx-auto">
+            Open a book, select some text, and tap an emoji to leave your first reaction.
+          </p>
+          <Link
+            to="/student"
+            className="inline-flex items-center gap-2 bg-[#9B7FD4] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#8A6EC3] transition-colors"
+          >
+            Go to my books
+          </Link>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-[#F3F4F6]">
-          <p className="text-[#4B5563]">No annotations yet. Start reading and leave some notes!</p>
+          <MessageSquare size={32} className="mx-auto text-[#D1D5DB] mb-3" />
+          <h3 className="font-bold text-[#1A1D23] mb-1">No matches</h3>
+          <p className="text-sm text-[#4B5563] mb-4">Try a different book or reaction filter.</p>
+          <button
+            onClick={() => { setFilterBook(''); setFilterReaction('') }}
+            className="text-sm font-bold text-[#4A90D9] hover:text-[#357ABD]"
+          >
+            Clear filters
+          </button>
         </div>
       ) : (
         <div className="space-y-3">

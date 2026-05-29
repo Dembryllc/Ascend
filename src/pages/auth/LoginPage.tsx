@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { loginUser, sendPasswordReset } from '@/firebase/auth'
 import { useAuth } from '@/context/AuthContext'
 import { BookOpen } from 'lucide-react'
@@ -17,7 +17,6 @@ function authErrorMessage(err: unknown): string {
 }
 
 export default function LoginPage() {
-  const navigate = useNavigate()
   const { profile } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -26,10 +25,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [resetMode, setResetMode] = useState(false)
 
-  // If already logged in, redirect
   if (profile) {
-    navigate(profile.role === 'teacher' ? '/teacher' : '/student', { replace: true })
-    return null
+    return <Navigate to={profile.role === 'teacher' ? '/teacher' : '/student'} replace />
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -167,6 +164,9 @@ export default function LoginPage() {
           <Link to="/register" className="text-[#4A90D9] font-semibold hover:underline">
             Create an account
           </Link>
+        </p>
+        <p className="text-center text-xs text-[#9CA3AF] mt-3">
+          <Link to="/" className="hover:text-[#4A90D9]">← Back to home</Link>
         </p>
       </div>
     </div>
