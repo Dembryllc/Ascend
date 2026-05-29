@@ -127,25 +127,33 @@ export default function MyAnnotationsPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <select
-          value={filterBook}
-          onChange={(e) => setFilterBook(e.target.value)}
-          className="flex-1 border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-        >
-          <option value="">All books</option>
-          {books.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
-        </select>
+        <div className="flex-1">
+          <label htmlFor="filter-book" className="sr-only">Filter by book</label>
+          <select
+            id="filter-book"
+            value={filterBook}
+            onChange={(e) => setFilterBook(e.target.value)}
+            className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+          >
+            <option value="">All books</option>
+            {books.map((b) => <option key={b.id} value={b.id}>{b.title}</option>)}
+          </select>
+        </div>
 
-        <select
-          value={filterReaction}
-          onChange={(e) => setFilterReaction(e.target.value as ReactionType | '')}
-          className="flex-1 border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-        >
-          <option value="">All reactions</option>
-          {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
-            <option key={type} value={type}>{r.emoji} {r.label}</option>
-          ))}
-        </select>
+        <div className="flex-1">
+          <label htmlFor="filter-reaction" className="sr-only">Filter by reaction</label>
+          <select
+            id="filter-reaction"
+            value={filterReaction}
+            onChange={(e) => setFilterReaction(e.target.value as ReactionType | '')}
+            className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+          >
+            <option value="">All reactions</option>
+            {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
+              <option key={type} value={type}>{r.emoji} {r.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {annotations.length === 0 ? (

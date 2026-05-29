@@ -70,8 +70,19 @@ export default function AnnotationsViewerPage() {
 
   if (loading) return (
     <AppShell title="Annotations">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="h-8 w-56 bg-[#E5E7EB] rounded-xl animate-pulse mb-6" />
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div>
+            <div className="h-4 w-16 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+            <div className="h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+          </div>
+          <div>
+            <div className="h-4 w-12 bg-[#E5E7EB] rounded animate-pulse mb-1" />
+            <div className="h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+          </div>
+        </div>
+        <div className="h-10 w-36 bg-[#E5E7EB] rounded-xl animate-pulse" />
       </div>
     </AppShell>
   )
@@ -84,8 +95,9 @@ export default function AnnotationsViewerPage() {
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Student</label>
+            <label htmlFor="select-student" className="block text-sm font-semibold text-[#1A1D23] mb-1">Student</label>
             <select
+              id="select-student"
               value={selectedStudent}
               onChange={(e) => {
                 setSelectedStudent(e.target.value)
@@ -99,8 +111,9 @@ export default function AnnotationsViewerPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Book</label>
+            <label htmlFor="select-book" className="block text-sm font-semibold text-[#1A1D23] mb-1">Book</label>
             <select
+              id="select-book"
               value={selectedBook}
               onChange={(e) => {
                 setSelectedBook(e.target.value)

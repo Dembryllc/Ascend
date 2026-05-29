@@ -114,8 +114,13 @@ export default function ClassroomPage() {
         <div className="max-w-sm bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6]">
           <h3 className="font-bold text-lg text-[#1A1D23] mb-1">Create your classroom</h3>
           <p className="text-sm text-[#4B5563] mb-4">Give your class a name to get started.</p>
-          <form onSubmit={handleCreateClass} className="flex gap-2">
+          <form onSubmit={handleCreateClass} className="space-y-3">
+            <label htmlFor="class-name" className="block text-sm font-semibold text-[#1A1D23]">
+              Classroom name
+            </label>
+            <div className="flex gap-2">
             <input
+              id="class-name"
               type="text"
               value={newClassName}
               onChange={(e) => setNewClassName(e.target.value)}
@@ -126,10 +131,12 @@ export default function ClassroomPage() {
             <button
               type="submit"
               disabled={creating}
+              aria-label="Create classroom"
               className="bg-[#4A90D9] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#357ABD] transition-colors"
             >
               <Plus size={20} />
             </button>
+            </div>
           </form>
         </div>
       ) : (
