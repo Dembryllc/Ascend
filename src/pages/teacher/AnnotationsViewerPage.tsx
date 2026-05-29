@@ -7,11 +7,10 @@ import { getAnnotationsByStudentAndBook } from '@/firebase/annotations'
 import { getReadingProgress } from '@/firebase/readingProgress'
 import { getUserProfile } from '@/firebase/auth'
 import type { Annotation, Book, ReadingProgress, UserProfile } from '@/types'
-import { REACTIONS } from '@/types'
+import { isPro, REACTIONS } from '@/types'
 import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
 import { BarChart3, FileDown, Lightbulb, Lock } from 'lucide-react'
-import { isPro } from '@/types'
 import UpgradeModal from '@/components/shared/UpgradeModal'
 
 export default function AnnotationsViewerPage() {

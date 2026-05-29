@@ -18,6 +18,7 @@ export default function ClassroomPage() {
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [createError, setCreateError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -42,9 +43,15 @@ export default function ClassroomPage() {
     e.preventDefault()
     if (!profile || !newClassName.trim()) return
     setCreating(true)
-    const c = await createClassroom(newClassName.trim(), profile.uid)
-    setClassroom(c)
-    setCreating(false)
+    setCreateError('')
+    try {
+      const c = await createClassroom(newClassName.trim(), profile.uid)
+      setClassroom(c)
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : 'Could not create classroom. Please try again.')
+    } finally {
+      setCreating(false)
+    }
   }
 
   function copyCode() {
@@ -137,6 +144,9 @@ export default function ClassroomPage() {
               <Plus size={20} />
             </button>
             </div>
+            {createError && (
+              <p className="text-sm text-red-600 mt-2">{createError}</p>
+            )}
           </form>
         </div>
       ) : (
