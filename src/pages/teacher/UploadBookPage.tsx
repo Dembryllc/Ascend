@@ -6,7 +6,7 @@ import { uploadBook, getBooksByTeacher } from '@/firebase/books'
 import { isPro } from '@/types'
 import { Lock, Upload, FileText, CheckCircle } from 'lucide-react'
 
-const FREE_BOOK_LIMIT = 3
+const FREE_BOOK_LIMIT = 5
 
 export default function UploadBookPage() {
   const { profile } = useAuth()

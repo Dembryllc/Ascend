@@ -9,7 +9,7 @@ const PRO_ANNUAL_URL = import.meta.env.VITE_STRIPE_PRO_ANNUAL_URL as string | un
 const FREE_FEATURES = [
   '1 classroom',
   'Up to 30 students',
-  'Up to 3 books',
+  'Up to 5 books',
   'Emoji reactions + written notes',
   'Student reading progress',
 ]

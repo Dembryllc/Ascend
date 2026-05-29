@@ -235,17 +235,36 @@ export default function StudentHome() {
       </section>
 
       {books.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
-          <BookOpen size={48} className="mx-auto text-[#D1D5DB] mb-4" />
-          <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Your bookshelf is empty</h3>
-          <p className="text-[#4B5563] mb-6">Upload your own book or wait for your teacher to assign one.</p>
-          <Link
-            to="/student/upload"
-            className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
-          >
-            <Plus size={18} /> Add a Book
-          </Link>
-        </div>
+        profile?.classroomId ? (
+          /* Joined a classroom but teacher hasn't assigned anything yet */
+          <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <BookOpen size={32} className="text-[#4A90D9]" />
+            </div>
+            <h3 className="text-xl font-bold text-[#1A1D23] mb-2">No books assigned yet</h3>
+            <p className="text-[#4B5563] mb-2">Your teacher hasn't assigned any books to your classroom yet.</p>
+            <p className="text-sm text-[#9CA3AF] mb-6">Check back soon — or add your own book to read in the meantime.</p>
+            <Link
+              to="/student/upload"
+              className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+            >
+              <Plus size={18} /> Add My Own Book
+            </Link>
+          </div>
+        ) : (
+          /* Not in any classroom */
+          <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+            <BookOpen size={48} className="mx-auto text-[#D1D5DB] mb-4" />
+            <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Your bookshelf is empty</h3>
+            <p className="text-[#4B5563] mb-6">Join a classroom to see assigned books, or upload your own PDF to get started.</p>
+            <Link
+              to="/student/upload"
+              className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+            >
+              <Plus size={18} /> Add a Book
+            </Link>
+          </div>
+        )
       ) : (
         <>
           {/* Teacher-assigned books */}

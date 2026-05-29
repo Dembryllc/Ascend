@@ -165,6 +165,9 @@ export default function LoginPage() {
             Create an account
           </Link>
         </p>
+        <p className="text-center text-xs text-[#9CA3AF] mt-3">
+          <Link to="/" className="hover:text-[#4A90D9]">← Back to home</Link>
+        </p>
       </div>
     </div>
   )

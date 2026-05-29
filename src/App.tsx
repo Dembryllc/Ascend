@@ -6,6 +6,9 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 
+// Landing
+import LandingPage from '@/pages/LandingPage'
+
 // Legal
 import PrivacyPage from '@/pages/legal/PrivacyPage'
 import TermsPage from '@/pages/legal/TermsPage'
@@ -20,6 +23,7 @@ import ProgressDashboardPage from '@/pages/teacher/ProgressDashboardPage'
 
 // Student
 import StudentHome from '@/pages/student/StudentHome'
+import StudentUploadPage from '@/pages/student/StudentUploadPage'
 import ReadingPage from '@/pages/student/ReadingPage'
 import MyAnnotationsPage from '@/pages/student/MyAnnotationsPage'
 
@@ -29,6 +33,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Public */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
@@ -44,12 +49,12 @@ export default function App() {
 
           {/* Student */}
           <Route path="/student" element={<ProtectedRoute requiredRole="student"><StudentHome /></ProtectedRoute>} />
+          <Route path="/student/upload" element={<ProtectedRoute requiredRole="student"><StudentUploadPage /></ProtectedRoute>} />
           <Route path="/student/read/:bookId" element={<ProtectedRoute requiredRole="student"><ReadingPage /></ProtectedRoute>} />
           <Route path="/student/annotations" element={<ProtectedRoute requiredRole="student"><MyAnnotationsPage /></ProtectedRoute>} />
 
-          {/* Default */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
