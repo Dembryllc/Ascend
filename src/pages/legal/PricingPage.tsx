@@ -32,7 +32,8 @@ export default function PricingPage() {
     const params = new URLSearchParams()
     if (profile?.uid) params.set('client_reference_id', profile.uid)
     if (profile?.email) params.set('prefilled_email', profile.email)
-    return `${base}?${params.toString()}`
+    const qs = params.toString()
+    return qs ? `${base}?${qs}` : base
   }
 
   const monthlyUrl = buildCheckoutUrl(PRO_MONTHLY_URL)

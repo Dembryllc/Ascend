@@ -4,7 +4,7 @@ import {
   addDoc,
   getDoc,
   getDocs,
-  updateDoc,
+  writeBatch,
   arrayUnion,
   query,
   where,
@@ -55,9 +55,9 @@ export async function joinClassroomByCode(studentId: string, joinCode: string): 
   const snap = await getDocs(q)
   if (snap.empty) throw new Error('Invalid join code. Check the code with your teacher.')
   const classroomId = snap.docs[0].id
-  await updateDoc(doc(db, 'classrooms', classroomId), {
-    studentIds: arrayUnion(studentId),
-  })
-  await updateDoc(doc(db, 'users', studentId), { classroomId })
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'classrooms', classroomId), { studentIds: arrayUnion(studentId) })
+  batch.update(doc(db, 'users', studentId), { classroomId })
+  await batch.commit()
   return classroomId
 }

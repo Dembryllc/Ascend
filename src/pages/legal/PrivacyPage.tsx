@@ -1,19 +1,23 @@
 import { Link } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 export default function PrivacyPage() {
+  const { profile } = useAuth()
+  const homeLink = profile ? (profile.role === 'teacher' ? '/teacher' : '/student') : '/'
+
   return (
     <div className="min-h-screen bg-[#F8F9FC]">
       <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/login" className="flex items-center gap-2">
+          <Link to={homeLink} className="flex items-center gap-2">
             <div className="bg-[#4A90D9] text-white p-1.5 rounded-lg">
               <BookOpen size={20} />
             </div>
             <span className="text-lg font-bold text-[#1A1D23]">Easy Annotate</span>
           </Link>
-          <Link to="/login" className="text-sm text-[#4A90D9] font-semibold hover:underline">
-            Back to sign in
+          <Link to={homeLink} className="text-sm text-[#4A90D9] font-semibold hover:underline">
+            {profile ? 'Back to dashboard' : 'Back to home'}
           </Link>
         </div>
       </header>

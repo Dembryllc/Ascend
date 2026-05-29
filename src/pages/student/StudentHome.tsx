@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 
 export default function StudentHome() {
-  const { profile, loading: authLoading, error: authError } = useAuth()
+  const { profile, loading: authLoading, error: authError, refreshProfile } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
@@ -179,6 +179,7 @@ export default function StudentHome() {
         firstBookId={(assignedBooks[0] ?? myBooks[0])?.id ?? null}
         hasStartedReading={readingProgress.length > 0}
         hasAnnotated={annotations.length > 0}
+        onJoined={refreshProfile}
       />
 
       {/* Progress dashboard */}
@@ -495,12 +496,14 @@ function StudentOnboardingChecklist({
   firstBookId,
   hasStartedReading,
   hasAnnotated,
+  onJoined,
 }: {
   studentId: string
   classroomId: string | null | undefined
   firstBookId: string | null
   hasStartedReading: boolean
   hasAnnotated: boolean
+  onJoined: () => void
 }) {
   const [code, setCode] = useState('')
   const [joining, setJoining] = useState(false)
@@ -521,7 +524,7 @@ function StudentOnboardingChecklist({
     try {
       await joinClassroomByCode(studentId, code.trim())
       setJoined(true)
-      setTimeout(() => window.location.reload(), 1500)
+      setTimeout(onJoined, 1500)
     } catch (err: unknown) {
       setJoinError(err instanceof Error ? err.message : 'Could not join. Check the code and try again.')
     } finally {

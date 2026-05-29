@@ -33,6 +33,12 @@ export default function AppShell({ children, title }: Props) {
   const homeLink = profile?.role === 'teacher' ? '/teacher' : '/student'
   const navItems = profile?.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV
 
+  // Find the most-specific nav item whose path matches the current route.
+  // Using longest-match-wins so /student/annotations beats /student.
+  const activeNavTo = navItems
+    .filter(({ to }) => pathname === to || pathname.startsWith(to + '/'))
+    .sort((a, b) => b.to.length - a.to.length)[0]?.to ?? null
+
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
       {/* Top nav */}
@@ -89,7 +95,7 @@ export default function AppShell({ children, title }: Props) {
           aria-label="Main navigation"
         >
           {navItems.map(({ to, icon: Icon, label }) => {
-            const active = pathname === to
+            const active = activeNavTo === to
             return (
               <Link
                 key={to}

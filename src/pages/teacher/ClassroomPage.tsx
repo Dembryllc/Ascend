@@ -19,6 +19,7 @@ export default function ClassroomPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [createError, setCreateError] = useState('')
+  const [assignSelects, setAssignSelects] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!profile) return
@@ -66,6 +67,7 @@ export default function ClassroomPage() {
     setBooks((prev) => prev.map((b) =>
       b.id === bookId ? { ...b, assignedStudentIds: [...new Set([...b.assignedStudentIds, studentId])] } : b
     ))
+    setAssignSelects((prev) => ({ ...prev, [studentId]: '' }))
   }
 
   async function handleAssignAll(bookId: string) {
@@ -198,8 +200,14 @@ export default function ClassroomPage() {
                     </div>
                     {books.length > 0 && (
                       <select
-                        onChange={(e) => e.target.value && handleAssignBook(e.target.value, s.uid)}
-                        defaultValue=""
+                        value={assignSelects[s.uid] ?? ''}
+                        onChange={(e) => {
+                          const bookId = e.target.value
+                          if (!bookId) return
+                          setAssignSelects((prev) => ({ ...prev, [s.uid]: bookId }))
+                          handleAssignBook(bookId, s.uid)
+                        }}
+                        aria-label={`Assign book to ${s.displayName}`}
                         className="text-xs border border-[#D1D5DB] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#4A90D9]"
                       >
                         <option value="">Assign a book…</option>

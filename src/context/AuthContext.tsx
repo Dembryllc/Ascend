@@ -9,9 +9,10 @@ interface AuthContextValue {
     profile: UserProfile | null
     loading: boolean
     error: string | null
+    refreshProfile: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextValue>({ user: null, profile: null, loading: true, error: null })
+const AuthContext = createContext<AuthContextValue>({ user: null, profile: null, loading: true, error: null, refreshProfile: async () => {} })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
@@ -19,10 +20,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+  const userRef = { current: null as User | null }
+
+  async function refreshProfile() {
+    if (!userRef.current) return
+    try {
+      const p = await getUserProfile(userRef.current.uid)
+      setProfile(p)
+    } catch (err: unknown) {
+      console.error('Failed to refresh profile:', err)
+    }
+  }
+
   useEffect(() => {
         const unsub = onAuthStateChanged(
                 auth,
                 async (firebaseUser) => {
+                          userRef.current = firebaseUser
                           setUser(firebaseUser)
                           setError(null)
                           if (firebaseUser) {
@@ -49,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return unsub
   }, [])
 
-  return <AuthContext.Provider value={{ user, profile, loading, error }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, profile, loading, error, refreshProfile }}>{children}</AuthContext.Provider>
     }
 
 export function useAuth() {
