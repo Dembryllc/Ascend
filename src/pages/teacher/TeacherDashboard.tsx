@@ -32,8 +32,36 @@ export default function TeacherDashboard() {
 
   if (loading) return (
     <AppShell title="Dashboard">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="mb-6">
+        <div className="h-8 w-52 bg-[#E5E7EB] rounded-xl animate-pulse mb-2" />
+        <div className="h-5 w-72 bg-[#E5E7EB] rounded-xl animate-pulse" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+            <div className="h-10 w-10 bg-[#E5E7EB] rounded-xl animate-pulse mb-3" />
+            <div className="h-8 w-16 bg-[#E5E7EB] rounded-lg animate-pulse mb-1" />
+            <div className="h-4 w-24 bg-[#E5E7EB] rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
+      <div className="h-6 w-32 bg-[#E5E7EB] rounded-xl animate-pulse mb-3" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-[#E5E7EB] rounded-2xl h-24 animate-pulse" />
+        ))}
+      </div>
+      <div className="h-6 w-24 bg-[#E5E7EB] rounded-xl animate-pulse mb-3" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-[#F3F4F6] overflow-hidden">
+            <div className="h-28 bg-[#E5E7EB] animate-pulse" />
+            <div className="p-4 space-y-2">
+              <div className="h-4 bg-[#E5E7EB] rounded animate-pulse" />
+              <div className="h-3 w-2/3 bg-[#E5E7EB] rounded animate-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
     </AppShell>
   )

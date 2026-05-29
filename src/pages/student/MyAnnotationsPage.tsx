@@ -83,8 +83,24 @@ export default function MyAnnotationsPage() {
 
   if (loading) return (
     <AppShell title="My Annotations">
-      <div className="flex justify-center py-16">
-        <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+      <div className="h-8 w-48 bg-[#E5E7EB] rounded-xl animate-pulse mb-6" />
+      <div className="flex gap-3 mb-6">
+        <div className="flex-1 h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+        <div className="flex-1 h-11 bg-[#E5E7EB] rounded-xl animate-pulse" />
+      </div>
+      <div className="space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 bg-[#E5E7EB] rounded-xl animate-pulse shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-24 bg-[#E5E7EB] rounded animate-pulse" />
+                <div className="h-3 w-40 bg-[#E5E7EB] rounded animate-pulse" />
+                <div className="h-4 w-full bg-[#E5E7EB] rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </AppShell>
   )
