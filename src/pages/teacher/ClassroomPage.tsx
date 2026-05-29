@@ -142,7 +142,15 @@ export default function ClassroomPage() {
               </h3>
             </div>
             {students.length === 0 ? (
-              <p className="text-[#4B5563] text-sm">No students have joined yet. Share the join code above!</p>
+              <div className="text-center py-8">
+                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Users size={28} className="text-[#4A90D9]" />
+                </div>
+                <h4 className="font-bold text-[#1A1D23] mb-1">No students yet</h4>
+                <p className="text-sm text-[#4B5563] max-w-xs mx-auto">
+                  Share the join code above with your students. They can enter it from their dashboard after signing up.
+                </p>
+              </div>
             ) : (
               <ul className="divide-y divide-[#F3F4F6]">
                 {students.map((s) => (
