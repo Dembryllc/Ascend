@@ -34,7 +34,7 @@ export function exportAnnotationsPDF(
   }
 
   // Header
-  addText('Ascend Annotate — Annotation Report', 20, true, '#4A90D9')
+  addText('Easy Annotate — Annotation Report', 20, true, '#4A90D9')
   y += 4
   addText(`Student: ${studentName}`, 13, true)
   addText(`Book: ${bookTitle}`, 13)
@@ -58,6 +58,10 @@ export function exportAnnotationsPDF(
       `Date: ${ann.timestamp.toLocaleDateString()} ${ann.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
       9, false, '#6B7280',
     )
+    if (ann.selectedText && ann.annotationKind !== 'reflection') {
+      y += 2
+      addText(`Highlighted: “${ann.selectedText}”`, 10, false, '#4B5563')
+    }
     if (ann.noteText) {
       y += 2
       addText(ann.noteText, 11)
