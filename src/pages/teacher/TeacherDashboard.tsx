@@ -5,7 +5,7 @@ import AppShell from '@/components/layout/AppShell'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import type { Book, Classroom } from '@/types'
-import { BookOpen, CheckCircle2, Circle, Users, Upload, Eye } from 'lucide-react'
+import { BarChart3, BookOpen, CheckCircle2, Circle, Users, Upload, Eye } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile } = useAuth()
@@ -96,6 +96,7 @@ export default function TeacherDashboard() {
         <ActionCard to="/teacher/upload" icon={<Upload size={20} />} label="Upload a Book" desc="Add a new PDF to your library" color="blue" />
         <ActionCard to="/teacher/classroom" icon={<Users size={20} />} label="Manage Classroom" desc="View students and join code" color="green" />
         <ActionCard to="/teacher/annotations" icon={<Eye size={20} />} label="View Annotations" desc="See student reading notes" color="purple" />
+        <ActionCard to="/teacher/progress" icon={<BarChart3 size={20} />} label="Class Progress" desc="Reading time and completion rates" color="blue" />
       </div>
 
       {/* Books list */}
