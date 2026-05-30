@@ -6,9 +6,10 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth'
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore'
+import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from './config'
 import type { UserRole, UserProfile } from '@/types'
+import { joinClassroomByCode } from './classrooms'
 
 export async function registerUser(
   email: string,
@@ -22,13 +23,12 @@ export async function registerUser(
 
   await updateProfile(user, { displayName })
 
-  let classroomId: string | null = null
-
   try {
-    if (role === 'student' && classroomJoinCode) {
-      classroomId = await resolveJoinCode(classroomJoinCode)
-      if (!classroomId) throw new Error('Invalid class join code. Please check with your teacher.')
-      await addStudentToClassroom(user.uid, classroomId)
+    // Validate join code while signed in, before committing the profile.
+    // Invalid code → throw here so the auth account is cleaned up and user can retry.
+    if (role === 'student' && classroomJoinCode?.trim()) {
+      const found = await resolveJoinCode(classroomJoinCode.trim())
+      if (!found) throw new Error('Invalid class join code. Please check the code with your teacher.')
     }
 
     await setDoc(doc(db, 'users', user.uid), {
@@ -36,14 +36,22 @@ export async function registerUser(
       email,
       displayName,
       role,
-      classroomId,
+      classroomId: null,
       createdAt: serverTimestamp(),
     })
   } catch (err) {
-    // Firestore setup failed — delete the Auth account so the user can retry
-    // without ending up with an orphaned account and no profile document.
-    await user.delete().catch(() => {/* deletion best-effort */})
+    await user.delete().catch(() => {})
     throw err
+  }
+
+  // Non-critical: join the classroom after the profile exists.
+  // Any failure here is recoverable — the student can join later via the onboarding checklist.
+  if (role === 'student' && classroomJoinCode?.trim()) {
+    try {
+      await joinClassroomByCode(user.uid, classroomJoinCode.trim())
+    } catch (err) {
+      console.warn('Classroom join during registration failed; user can join later:', err)
+    }
   }
 
   return user
@@ -96,10 +104,4 @@ async function resolveJoinCode(joinCode: string): Promise<string | null> {
   const snap = await getDocs(q)
   if (snap.empty) return null
   return snap.docs[0].id
-}
-
-async function addStudentToClassroom(studentId: string, classroomId: string): Promise<void> {
-  await updateDoc(doc(db, 'classrooms', classroomId), {
-    studentIds: arrayUnion(studentId),
-  })
 }

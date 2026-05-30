@@ -4,6 +4,26 @@ import { registerUser } from '@/firebase/auth'
 import type { UserRole } from '@/types'
 import { BookOpen } from 'lucide-react'
 
+function getAuthErrorMessage(err: unknown): string {
+  const code = typeof err === 'object' && err !== null && 'code' in err
+    ? String((err as { code: string }).code)
+    : ''
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists. Try signing in instead.'
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.'
+    case 'auth/weak-password':
+      return 'Password must be at least 6 characters.'
+    case 'auth/network-request-failed':
+      return 'Connection failed. Check your internet and try again.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.'
+    default:
+      return err instanceof Error ? err.message : 'Registration failed. Please try again.'
+  }
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate()
   const [role, setRole] = useState<UserRole>('student')
@@ -22,7 +42,7 @@ export default function RegisterPage() {
       await registerUser(email, password, displayName, role, joinCode.trim() || undefined)
       navigate(role === 'teacher' ? '/teacher' : '/student')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.')
+      setError(getAuthErrorMessage(err))
     } finally {
       setLoading(false)
     }
