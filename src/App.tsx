@@ -26,6 +26,7 @@ import StudentHome from '@/pages/student/StudentHome'
 import StudentUploadPage from '@/pages/student/StudentUploadPage'
 import ReadingPage from '@/pages/student/ReadingPage'
 import MyAnnotationsPage from '@/pages/student/MyAnnotationsPage'
+import StudentProgressPage from '@/pages/student/StudentProgressPage'
 
 export default function App() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/student/upload" element={<ProtectedRoute requiredRole="student"><StudentUploadPage /></ProtectedRoute>} />
           <Route path="/student/read/:bookId" element={<ProtectedRoute requiredRole="student"><ReadingPage /></ProtectedRoute>} />
           <Route path="/student/annotations" element={<ProtectedRoute requiredRole="student"><MyAnnotationsPage /></ProtectedRoute>} />
+          <Route path="/student/progress" element={<ProtectedRoute requiredRole="student"><StudentProgressPage /></ProtectedRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
