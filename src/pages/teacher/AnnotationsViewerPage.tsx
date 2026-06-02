@@ -12,6 +12,7 @@ import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
 import { BarChart3, FileDown, Lightbulb, Lock } from 'lucide-react'
 import UpgradeModal from '@/components/shared/UpgradeModal'
+import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
 
 export default function AnnotationsViewerPage() {
   const { profile } = useAuth()
@@ -64,6 +65,11 @@ export default function AnnotationsViewerPage() {
   const selectedStudentProfile = students.find((s) => s.uid === selectedStudent)
   const selectedBookData = books.find((b) => b.id === selectedBook)
   const summary = buildAnnotationSummary(annotations)
+
+  const trialExpired = profile?.role === 'teacher'
+    && profile?.trialEndsAt != null
+    && profile.trialEndsAt <= new Date()
+    && !isPro(profile)
 
   function handleExport() {
     if (!selectedStudentProfile || !selectedBookData) return
@@ -247,11 +253,15 @@ export default function AnnotationsViewerPage() {
       ) : null}
 
       {showUpgradeModal && (
-        <UpgradeModal
-          title="PDF export is a Pro feature"
-          description="Upgrade to Pro to download a formatted PDF of any student's annotations — great for parent conferences and progress reports."
-          onClose={() => setShowUpgradeModal(false)}
-        />
+        trialExpired ? (
+          <TrialExpiredModal onClose={() => setShowUpgradeModal(false)} />
+        ) : (
+          <UpgradeModal
+            title="PDF export is a Pro feature"
+            description="Upgrade to Pro to download a formatted PDF of any student's annotations — great for parent conferences and progress reports."
+            onClose={() => setShowUpgradeModal(false)}
+          />
+        )
       )}
     </AppShell>
   )

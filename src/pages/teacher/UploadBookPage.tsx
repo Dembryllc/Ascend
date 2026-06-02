@@ -5,6 +5,7 @@ import AppShell from '@/components/layout/AppShell'
 import { uploadBook, getBooksByTeacher } from '@/firebase/books'
 import { isPro } from '@/types'
 import { Lock, Upload, FileText, CheckCircle } from 'lucide-react'
+import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
 
 const FREE_BOOK_LIMIT = 5
 
@@ -75,9 +76,21 @@ export default function UploadBookPage() {
     }
   }
 
+  const trialExpired = profile?.role === 'teacher'
+    && profile?.trialEndsAt != null
+    && profile.trialEndsAt <= new Date()
+    && !isPro(profile)
+
   const atLimit = bookCount !== null && bookCount >= FREE_BOOK_LIMIT && !isPro(profile)
 
   if (atLimit) {
+    if (trialExpired) {
+      return (
+        <AppShell title="Upload Book">
+          <TrialExpiredModal onClose={() => navigate('/teacher')} />
+        </AppShell>
+      )
+    }
     return (
       <AppShell title="Upload Book">
         <div className="max-w-lg mx-auto text-center py-16">

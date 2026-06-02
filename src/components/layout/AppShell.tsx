@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { logoutUser } from '@/firebase/auth'
-import { BookOpen, Eye, Home, LogOut, MessageSquare, Upload, Users } from 'lucide-react'
+import { getTrialDaysRemaining } from '@/types'
+import { BookOpen, Eye, Home, LogOut, MessageSquare, Upload, Users, X } from 'lucide-react'
 
 interface Props {
   children: React.ReactNode
@@ -19,6 +21,50 @@ const STUDENT_NAV = [
   { to: '/student', icon: BookOpen, label: 'Books' },
   { to: '/student/annotations', icon: MessageSquare, label: 'My Notes' },
 ]
+
+function TrialBanner({ daysRemaining }: { daysRemaining: number }) {
+  const [dismissed, setDismissed] = useState(
+    () => sessionStorage.getItem('trial-banner-dismissed') === 'true'
+  )
+
+  if (dismissed) return null
+
+  function dismiss() {
+    sessionStorage.setItem('trial-banner-dismissed', 'true')
+    setDismissed(true)
+  }
+
+  const urgent = daysRemaining <= 3
+  const warning = daysRemaining <= 7
+
+  const bgColor = urgent ? 'bg-red-50 border-red-200' : warning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-100'
+  const textColor = urgent ? 'text-red-700' : warning ? 'text-amber-700' : 'text-[#185FA5]'
+  const linkColor = urgent ? 'text-red-800 underline font-bold' : warning ? 'text-amber-800 underline font-semibold' : 'text-[#4A90D9] underline font-semibold'
+
+  const message = urgent
+    ? `Your free trial ends in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — upgrade now to keep your classroom running.`
+    : warning
+    ? `${daysRemaining} days left in your Pro trial.`
+    : `${daysRemaining} days left in your free Pro trial.`
+
+  return (
+    <div className={`border-b ${bgColor} ${textColor} px-4 py-2 flex items-center justify-between gap-3 text-sm`}>
+      <p>
+        {message}{' '}
+        <Link to="/pricing" className={linkColor}>
+          Upgrade to Pro →
+        </Link>
+      </p>
+      <button
+        onClick={dismiss}
+        aria-label="Dismiss trial banner"
+        className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  )
+}
 
 export default function AppShell({ children, title }: Props) {
   const { profile } = useAuth()
@@ -70,6 +116,12 @@ export default function AppShell({ children, title }: Props) {
           </div>
         </div>
       </header>
+
+      {/* Trial banner — teachers only, active trial only */}
+      {profile?.role === 'teacher' && (() => {
+        const days = getTrialDaysRemaining(profile)
+        return days !== null ? <TrialBanner daysRemaining={days} /> : null
+      })()}
 
       {/* Page content — extra bottom padding on mobile for the bottom nav */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 pb-24 sm:pb-6">
