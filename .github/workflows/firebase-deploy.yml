@@ -33,6 +33,8 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ascend-annotate.firebasestorage.app
           VITE_FIREBASE_MESSAGING_SENDER_ID: "97329229065"
           VITE_FIREBASE_APP_ID: "1:97329229065:web:7120ef7d461ff67ba6f7d8"
+          VITE_STRIPE_PRO_MONTHLY_URL: https://buy.stripe.com/test_8x2fZg86rbr1gk57V9a3u00
+          VITE_STRIPE_PRO_ANNUAL_URL: https://buy.stripe.com/test_4gMbJ086rcv59VHdfta3u01
 
       - name: Deploy to Firebase Hosting
         env:
