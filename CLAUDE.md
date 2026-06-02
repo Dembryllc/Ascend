@@ -53,7 +53,7 @@ Role is set at registration and never changes. `ProtectedRoute` enforces role pe
 
 | Collection | Purpose |
 |---|---|
-| `users` | Auth profile (uid, role, displayName, classroomId) |
+| `users` | Auth profile (uid, role, displayName, classroomId, trialEndsAt?) |
 | `classrooms` | Teacher-owned, students join via 6-char code |
 | `books` | PDFs in Storage, metadata in Firestore; `assignedStudentIds[]` controls access |
 | `annotations` | Per-student per-book per-page reactions + notes |
@@ -81,12 +81,17 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 |---|---|
 | `src/pages/student/ReadingPage.tsx` | Main reader. PDF viewer, annotation toolbar, floating emoji bar, speech, progress tracking. Most complexity lives here. |
 | `src/pages/student/MyAnnotationsPage.tsx` | All annotations across books, filter by book/reaction, edit modal. |
-| `src/pages/teacher/AnnotationsViewerPage.tsx` | Teacher view of student annotations, PDF export. |
+| `src/pages/teacher/AnnotationsViewerPage.tsx` | Teacher view of student annotations, PDF export. Shows `TrialExpiredModal` when trial is expired and teacher hits PDF export gate. |
 | `src/pages/teacher/ProgressDashboardPage.tsx` | Reading time + completion tracking per student. |
+| `src/pages/teacher/UploadBookPage.tsx` | Book upload form. Shows `TrialExpiredModal` when trial is expired and teacher hits the 5-book free limit. |
 | `src/firebase/annotations.ts` | `saveAnnotation`, `updateAnnotation`, `deleteAnnotation`, `getAnnotationsByStudentAndBook`, `getAnnotationsByStudent`, `getAnnotationsByClassAndBook` |
+| `src/firebase/auth.ts` | `registerUser` (sets `trialEndsAt` for teachers), `loginUser`, `logoutUser`, `sendPasswordReset`, `getUserProfile` (deserializes `trialEndsAt` from Firestore Timestamp). |
 | `src/firebase/books.ts` | `uploadBook` (teacher), `uploadStudentBook` (student), both ≤50 MB, both wrap Firestore `addDoc` in try/catch with Storage rollback on failure. |
 | `src/firebase/readingProgress.ts` | Upserts progress; never allows `totalSecondsRead` or `highestPageRead` to decrease. |
-| `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. |
+| `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. `isPro()` and `getTrialDaysRemaining()` helpers. |
+| `src/components/layout/AppShell.tsx` | App chrome. Contains `TrialBanner` component (teachers only, dismissible per session via `sessionStorage`). |
+| `src/components/shared/TrialExpiredModal.tsx` | Modal shown when a teacher's trial has ended and they hit a Pro gate. Distinct from `UpgradeModal`. |
+| `src/components/shared/UpgradeModal.tsx` | Generic upgrade prompt for free-tier teachers (no trial). Keep as-is. |
 | `vite.config.ts` | Contains `pdfWorkerPlugin` — copies `pdf.worker.mjs` to `dist/` at build time. |
 | `.github/workflows/firebase-deploy.yml` | CI/CD pipeline. Node 22, `npm ci --legacy-peer-deps`, Vite build, Firebase CLI deploy. |
 
@@ -114,6 +119,66 @@ The worker is copied to `dist/pdf.worker.mjs` by `pdfWorkerPlugin` in `vite.conf
 
 ---
 
+## Reverse free trial
+
+Every new **teacher** gets 14 days of full Pro access automatically at signup — no credit card required. Students never get a trial.
+
+### How it works
+
+- `registerUser()` writes `trialEndsAt: new Date(now + 14 days)` into the `users/{uid}` Firestore doc for teachers. Students get no `trialEndsAt` field.
+- `getUserProfile()` deserializes `trialEndsAt` from Firestore Timestamp to `Date`.
+- `isPro(profile)` returns `true` if `subscriptionStatus === 'pro' | 'district'` **OR** if `trialEndsAt > now`. Both conditions grant full Pro access.
+- `getTrialDaysRemaining(profile)` returns the integer days left (ceiling), or `null` if trial is expired, not set, or user is already paid Pro.
+
+### Trial banner (`AppShell`)
+
+Renders between the sticky header and `<main>` for teachers with an active trial. Color shifts by urgency:
+
+| Days remaining | Color |
+|---|---|
+| 8+ | Blue (`bg-blue-50`) |
+| 4–7 | Amber (`bg-amber-50`) |
+| 1–3 | Red (`bg-red-50`) |
+
+Dismissible once per browser session via `sessionStorage` key `trial-banner-dismissed`. Disappears automatically when the trial expires.
+
+### Trial-expired gate (`TrialExpiredModal`)
+
+Shown instead of the generic `UpgradeModal` when a teacher's trial has ended and they hit a Pro-gated feature. Two places it appears:
+
+1. **Upload book** — when `atLimit && trialExpired` (teacher is at the 5-book free cap AND their trial is past). `onClose` navigates to `/teacher`.
+2. **PDF export** — when teacher clicks the locked Export button and `trialExpired` is true.
+
+The `trialExpired` condition used in both pages:
+```ts
+const trialExpired = profile?.role === 'teacher'
+  && profile?.trialEndsAt != null
+  && profile.trialEndsAt <= new Date()
+  && !isPro(profile)
+```
+
+### What is NOT done yet (future phases)
+
+- No Stripe integration — pricing page links are already wired but payment is Phase 2.
+- No automated trial-expiry email — that is Phase 3 (a Cloud Function scheduled task).
+- No server-side enforcement of trial expiry — the `trialEndsAt` check is client-only. Firestore rules do not gate on it.
+
+---
+
+## Student registration flow
+
+`registerUser()` in `src/firebase/auth.ts` — order matters:
+
+1. `createUserWithEmailAndPassword` — auth account created, user is now signed in.
+2. `updateProfile` — display name set.
+3. *(Students only)* Validate join code via Firestore query (requires being signed in). Invalid code → delete auth account and throw so the user can retry.
+4. `setDoc users/{uid}` — profile written. This is the critical step; auth account is deleted and error re-thrown if this fails.
+5. *(Students only, non-critical)* `joinClassroomByCode` WriteBatch — updates `classrooms/{id}.studentIds` and `users/{uid}.classroomId` atomically. Failure here is logged but does not block registration; the student joins later via the onboarding checklist.
+
+**Do not reorder steps 4 and 5.** The profile must exist before the classroom join so that any classroom join failure leaves the user with a valid account rather than an orphaned auth entry.
+
+---
+
 ## Speech / Read Aloud
 
 Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
@@ -135,6 +200,9 @@ Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
 - **Do not weaken Firestore security rules.** The annotation read rule allows teacher access scoped to `classroomId`; the progress write rule enforces monotonic increases.
 - **Do not change the `annotationKind` field values** (`'annotation'` | `'reflection'`). Reflections are stored in the same collection and filtered by this field throughout.
 - **Do not push to main without a passing build.** The CI workflow (`firebase-deploy.yml`) will attempt a deploy on every push.
+- **Do not add Stripe or email logic to the trial system yet** — payment is Phase 2, trial-expiry email is Phase 3.
+- **Do not reorder the registration steps in `registerUser()`** — profile `setDoc` must happen before the classroom join. See the Student registration flow section above.
+- **Do not use `UpgradeModal` for trial-expired teachers** — use `TrialExpiredModal`. `UpgradeModal` is for free-tier teachers who never had a trial.
 
 ---
 
