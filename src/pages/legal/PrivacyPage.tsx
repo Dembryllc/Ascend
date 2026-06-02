@@ -39,7 +39,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-bold mb-3">What data we collect</h2>
             <p className="text-[#4B5563] leading-relaxed mb-3">We collect only the data necessary to provide the service:</p>
             <ul className="list-disc pl-5 space-y-2 text-[#4B5563]">
-              <li><strong>Account information:</strong> name, email address, and role (teacher or student) provided at registration.</li>
+              <li><strong>Teacher accounts:</strong> full name, email address, and classroom data. Email is stored to enable account recovery and (when applicable) billing.</li>
+              <li><strong>Student accounts:</strong> a chosen display name (first name or nickname — we encourage students not to use their full name) and role. Student email addresses are used only for login authentication and are <strong>not</strong> stored in our database.</li>
               <li><strong>Reading activity:</strong> which pages a student has visited, how many minutes they spent reading, and their completion percentage per book.</li>
               <li><strong>Annotations:</strong> emoji reactions and optional written notes students leave on specific pages of assigned books.</li>
               <li><strong>Uploaded content:</strong> PDF files uploaded by teachers or students. Files are stored in Google Firebase Storage.</li>
@@ -69,8 +70,18 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-bold mb-3">FERPA and student records</h2>
-            <p className="text-[#4B5563] leading-relaxed">
-              We are committed to complying with the Family Educational Rights and Privacy Act (FERPA). Student data is used solely for educational purposes within the teacher-student relationship. We do not disclose student education records to third parties without consent. Schools and districts that use Easy Annotate act as the educational authority governing their students' data.
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              Easy Annotate is designed for use in K-12 and higher-education classrooms. We are committed to complying with the Family Educational Rights and Privacy Act (FERPA).
+            </p>
+            <ul className="list-disc pl-5 space-y-2 text-[#4B5563]">
+              <li><strong>Purpose limitation:</strong> student data is used solely for educational purposes within the teacher-student relationship.</li>
+              <li><strong>No third-party disclosure:</strong> we do not disclose student education records to any third party without consent from the school or parent.</li>
+              <li><strong>PII minimization by design:</strong> student email addresses are not stored in our Firestore database — only in Firebase Authentication, which is isolated from the annotation and progress data. Students are encouraged to register with a first name or nickname rather than their full name.</li>
+              <li><strong>Teacher access is scoped:</strong> teachers can only view annotations and progress for students in their own classroom. No cross-classroom access exists.</li>
+              <li><strong>Deletion on request:</strong> schools or authorized administrators may request deletion of all student records associated with their institution by contacting us at the address below. We will process requests within 30 days.</li>
+            </ul>
+            <p className="text-[#4B5563] leading-relaxed mt-3">
+              Schools and districts that use Easy Annotate act as the educational authority governing their students' data under FERPA.
             </p>
           </section>
 

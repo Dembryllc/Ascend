@@ -119,6 +119,7 @@ export default function ProgressDashboardPage() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-[#1A1D23]">Class Progress</h2>
         <p className="text-[#4B5563] mt-1">Reading activity across all students and books.</p>
+        <p className="text-xs text-[#9CA3AF] mt-1">Student data is protected under FERPA and used solely for educational purposes.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">

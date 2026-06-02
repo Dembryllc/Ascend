@@ -3,7 +3,7 @@ export type SubscriptionStatus = 'free' | 'pro' | 'district'
 
 export interface UserProfile {
   uid: string
-  email: string
+  email?: string
   displayName: string
   role: UserRole
   classroomId: string | null

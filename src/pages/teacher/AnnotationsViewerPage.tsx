@@ -97,7 +97,10 @@ export default function AnnotationsViewerPage() {
 
   return (
     <AppShell title="View Annotations">
-      <h2 className="text-2xl font-bold text-[#1A1D23] mb-6">Student Annotations</h2>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-[#1A1D23]">Student Annotations</h2>
+        <p className="text-xs text-[#9CA3AF] mt-1">Student data is protected under FERPA and used solely for educational purposes.</p>
+      </div>
 
       {/* Selector */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">

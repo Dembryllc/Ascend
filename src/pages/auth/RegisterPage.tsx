@@ -83,7 +83,7 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="displayName" className="block text-sm font-semibold text-[#1A1D23] mb-1">
-              Full Name
+              {role === 'student' ? 'First name or nickname' : 'Full Name'}
             </label>
             <input
               id="displayName"
@@ -91,9 +91,12 @@ export default function RegisterPage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
-              placeholder="Your name"
+              placeholder={role === 'student' ? 'e.g. Alex or AlexReads' : 'Your full name'}
               className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
             />
+            {role === 'student' && (
+              <p className="text-xs text-[#6B7280] mt-1">You can use just your first name — no need to use your full name</p>
+            )}
           </div>
 
           <div>

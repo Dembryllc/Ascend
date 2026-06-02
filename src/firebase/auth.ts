@@ -37,10 +37,13 @@ export async function registerUser(
 
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
-      email,
+      // Student emails are not stored in Firestore — kept in Firebase Auth only (FERPA PII minimization).
+      // Teacher emails are stored so the Stripe checkout can be pre-filled.
+      ...(role === 'teacher' ? { email } : {}),
       displayName,
       role,
       classroomId: null,
+      subscriptionStatus: 'free',
       ...(trialEndsAt ? { trialEndsAt } : {}),
       createdAt: serverTimestamp(),
     })
