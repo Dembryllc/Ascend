@@ -31,12 +31,17 @@ export async function registerUser(
       if (!found) throw new Error('Invalid class join code. Please check the code with your teacher.')
     }
 
+    const trialEndsAt = role === 'teacher'
+      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      : null
+
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
       email,
       displayName,
       role,
       classroomId: null,
+      ...(trialEndsAt ? { trialEndsAt } : {}),
       createdAt: serverTimestamp(),
     })
   } catch (err) {
@@ -96,6 +101,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   return {
     ...data,
     createdAt: data.createdAt?.toDate() ?? new Date(),
+    trialEndsAt: data.trialEndsAt?.toDate() ?? undefined,
   } as UserProfile
 }
 
