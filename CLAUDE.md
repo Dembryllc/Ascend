@@ -53,7 +53,7 @@ Role is set at registration and never changes. `ProtectedRoute` enforces role pe
 
 | Collection | Purpose |
 |---|---|
-| `users` | Auth profile (uid, role, displayName, classroomId, trialEndsAt?) |
+| `users` | Auth profile (uid, role, displayName, classroomId, subscriptionStatus, trialEndsAt?). **Teachers** include `email`. **Students** do not — email stays in Firebase Auth only (FERPA PII minimization). |
 | `classrooms` | Teacher-owned, students join via 6-char code |
 | `books` | PDFs in Storage, metadata in Firestore; `assignedStudentIds[]` controls access |
 | `annotations` | Per-student per-book per-page reactions + notes |
@@ -81,14 +81,15 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 |---|---|
 | `src/pages/student/ReadingPage.tsx` | Main reader. PDF viewer, annotation toolbar, floating emoji bar, speech, progress tracking. Most complexity lives here. |
 | `src/pages/student/MyAnnotationsPage.tsx` | All annotations across books, filter by book/reaction, edit modal. |
-| `src/pages/teacher/AnnotationsViewerPage.tsx` | Teacher view of student annotations, PDF export. Shows `TrialExpiredModal` when trial is expired and teacher hits PDF export gate. |
-| `src/pages/teacher/ProgressDashboardPage.tsx` | Reading time + completion tracking per student. |
+| `src/pages/student/StudentProgressPage.tsx` | Student's own reading stats: minutes, annotations, books completed, streak, per-book progress bars with reaction breakdowns, weekly goal meter. Route: `/student/progress`. |
+| `src/pages/teacher/AnnotationsViewerPage.tsx` | Teacher view of student annotations, PDF export. Shows `TrialExpiredModal` when trial is expired and teacher hits PDF export gate. Contains FERPA notice. |
+| `src/pages/teacher/ProgressDashboardPage.tsx` | Reading time + completion tracking per student. Contains FERPA notice. |
 | `src/pages/teacher/UploadBookPage.tsx` | Book upload form. Shows `TrialExpiredModal` when trial is expired and teacher hits the 5-book free limit. |
 | `src/firebase/annotations.ts` | `saveAnnotation`, `updateAnnotation`, `deleteAnnotation`, `getAnnotationsByStudentAndBook`, `getAnnotationsByStudent`, `getAnnotationsByClassAndBook` |
-| `src/firebase/auth.ts` | `registerUser` (sets `trialEndsAt` for teachers), `loginUser`, `logoutUser`, `sendPasswordReset`, `getUserProfile` (deserializes `trialEndsAt` from Firestore Timestamp). |
+| `src/firebase/auth.ts` | `registerUser` (sets `trialEndsAt` for teachers, writes `subscriptionStatus: 'free'` for all users, does NOT write student email to Firestore), `loginUser`, `logoutUser`, `sendPasswordReset`, `getUserProfile` (deserializes `trialEndsAt` from Firestore Timestamp). |
 | `src/firebase/books.ts` | `uploadBook` (teacher), `uploadStudentBook` (student), both ≤50 MB, both wrap Firestore `addDoc` in try/catch with Storage rollback on failure. |
 | `src/firebase/readingProgress.ts` | Upserts progress; never allows `totalSecondsRead` or `highestPageRead` to decrease. |
-| `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. `isPro()` and `getTrialDaysRemaining()` helpers. |
+| `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. `isPro()` and `getTrialDaysRemaining()` helpers. `UserProfile.email` is optional (`email?: string`) — students have no email in Firestore. |
 | `src/components/layout/AppShell.tsx` | App chrome. Contains `TrialBanner` component (teachers only, dismissible per session via `sessionStorage`). |
 | `src/components/shared/TrialExpiredModal.tsx` | Modal shown when a teacher's trial has ended and they hit a Pro gate. Distinct from `UpgradeModal`. |
 | `src/components/shared/UpgradeModal.tsx` | Generic upgrade prompt for free-tier teachers (no trial). Keep as-is. |
@@ -165,6 +166,28 @@ const trialExpired = profile?.role === 'teacher'
 
 ---
 
+## FERPA compliance
+
+Easy Annotate is used in K-12 and higher-education classrooms. The following design decisions are intentional and must not be reversed:
+
+### PII minimization
+
+- **Student email is not stored in Firestore.** It lives in Firebase Authentication only, which is isolated from annotation and progress data. The `setDoc` call for student profiles intentionally omits `email`.
+- **Teacher email is stored** (needed for account recovery and future billing).
+- `UserProfile.email` is typed as `email?: string` — always treat it as potentially undefined.
+- The `RegisterPage` prompts students for a first name or nickname, not their full name. The label, placeholder, and helper text are role-conditional.
+
+### Data scoping
+
+- Teacher access to annotations and progress is restricted by Firestore security rules to their own classroom only. No cross-classroom reads exist.
+- FERPA notice ("Student data is protected under FERPA and used solely for educational purposes.") appears on both `AnnotationsViewerPage` and `ProgressDashboardPage`.
+
+### PrivacyPage
+
+`src/pages/legal/PrivacyPage.tsx` has a full FERPA section explaining purpose limitation, no third-party disclosure, PII minimization by design, scoped teacher access, and deletion-on-request policy. Keep it in sync with any future data model changes.
+
+---
+
 ## Student registration flow
 
 `registerUser()` in `src/firebase/auth.ts` — order matters:
@@ -172,7 +195,7 @@ const trialExpired = profile?.role === 'teacher'
 1. `createUserWithEmailAndPassword` — auth account created, user is now signed in.
 2. `updateProfile` — display name set.
 3. *(Students only)* Validate join code via Firestore query (requires being signed in). Invalid code → delete auth account and throw so the user can retry.
-4. `setDoc users/{uid}` — profile written. This is the critical step; auth account is deleted and error re-thrown if this fails.
+4. `setDoc users/{uid}` — profile written. **This is the critical step.** Auth account is deleted and error re-thrown if this fails. Always writes `subscriptionStatus: 'free'`. Teachers get `email` and `trialEndsAt`; students get neither.
 5. *(Students only, non-critical)* `joinClassroomByCode` WriteBatch — updates `classrooms/{id}.studentIds` and `users/{uid}.classroomId` atomically. Failure here is logged but does not block registration; the student joins later via the onboarding checklist.
 
 **Do not reorder steps 4 and 5.** The profile must exist before the classroom join so that any classroom join failure leaves the user with a valid account rather than an orphaned auth entry.
@@ -203,6 +226,9 @@ Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
 - **Do not add Stripe or email logic to the trial system yet** — payment is Phase 2, trial-expiry email is Phase 3.
 - **Do not reorder the registration steps in `registerUser()`** — profile `setDoc` must happen before the classroom join. See the Student registration flow section above.
 - **Do not use `UpgradeModal` for trial-expired teachers** — use `TrialExpiredModal`. `UpgradeModal` is for free-tier teachers who never had a trial.
+- **Do not write student email to Firestore** — student emails belong in Firebase Auth only. This is a deliberate FERPA PII minimization decision. Teachers still get their email stored.
+- **Do not make `UserProfile.email` required** — it is `email?: string` because student profiles never have it. Any code reading `profile.email` must handle undefined.
+- **Do not remove the FERPA notices** from `AnnotationsViewerPage` and `ProgressDashboardPage` — they are visible signals to teachers that student data is handled compliantly.
 
 ---
 
