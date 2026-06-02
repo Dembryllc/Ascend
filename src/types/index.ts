@@ -9,12 +9,23 @@ export interface UserProfile {
   classroomId: string | null
   subscriptionStatus?: SubscriptionStatus
   stripeCustomerId?: string
+  trialEndsAt?: Date
   createdAt: Date
 }
 
 export function isPro(profile: UserProfile | null | undefined): boolean {
   const s = profile?.subscriptionStatus
-  return s === 'pro' || s === 'district'
+  if (s === 'pro' || s === 'district') return true
+  if (profile?.trialEndsAt && profile.trialEndsAt > new Date()) return true
+  return false
+}
+
+export function getTrialDaysRemaining(profile: UserProfile | null | undefined): number | null {
+  if (!profile?.trialEndsAt) return null
+  if (profile.subscriptionStatus === 'pro' || profile.subscriptionStatus === 'district') return null
+  const msRemaining = profile.trialEndsAt.getTime() - Date.now()
+  if (msRemaining <= 0) return null
+  return Math.ceil(msRemaining / (1000 * 60 * 60 * 24))
 }
 
 export interface Classroom {
