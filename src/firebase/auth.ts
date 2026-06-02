@@ -45,6 +45,7 @@ export async function registerUser(
       createdAt: serverTimestamp(),
     })
   } catch (err) {
+    console.error('Registration failed — profile write error:', err)
     await user.delete().catch(() => {})
     throw err
   }

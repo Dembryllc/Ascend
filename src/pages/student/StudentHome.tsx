@@ -182,59 +182,6 @@ export default function StudentHome() {
         onJoined={refreshProfile}
       />
 
-      {/* Progress dashboard */}
-      <section className="mb-8" aria-labelledby="progress-heading">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 id="progress-heading" className="text-lg font-bold text-[#1A1D23]">My Progress</h3>
-            <p className="text-sm text-[#4B5563]">Your reading activity updates from your books and annotations.</p>
-          </div>
-          <Link
-            to="/student/annotations"
-            className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD]"
-          >
-            View notes <ArrowRight size={16} />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <ProgressCard
-            icon={<BookOpen size={20} />}
-            label="Books in shelf"
-            value={progress.booksInShelf.toString()}
-            detail={`${assignedBooks.length} assigned, ${myBooks.length} uploaded`}
-          />
-          <ProgressCard
-            icon={<MessageSquare size={20} />}
-            label="Annotations"
-            value={progress.annotationsCount.toString()}
-            detail={`${progress.pagesAnnotated} page${progress.pagesAnnotated === 1 ? '' : 's'} annotated`}
-          />
-          <ProgressCard
-            icon={<Flame size={20} />}
-            label="Minutes read"
-            value={`${progress.minutesRead}`}
-            detail={`${progress.completedBooks} completed, ${progress.booksInProgress} in progress`}
-          />
-          <ProgressCard
-            icon={<Target size={20} />}
-            label="Weekly goal"
-            value={`${progress.pagesAnnotatedThisWeek}/${progress.weeklyPageGoal}`}
-            detail="pages annotated this week"
-            meterValue={progress.weeklyGoalPercent}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <NextActionCard progress={progress} />
-          <ReactionMixCard reactionCounts={progress.reactionCounts} topReaction={progress.topReaction} />
-          <RecentActivityCard
-            annotations={progress.recentAnnotations}
-            bookTitleById={bookTitleById}
-          />
-        </div>
-      </section>
-
       {books.length === 0 ? (
         profile?.classroomId ? (
           /* Joined a classroom but teacher hasn't assigned anything yet */
@@ -299,6 +246,59 @@ export default function StudentHome() {
           )}
         </>
       )}
+
+      {/* Progress dashboard */}
+      <section className="mt-8 mb-8" aria-labelledby="progress-heading">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 id="progress-heading" className="text-lg font-bold text-[#1A1D23]">My Progress</h3>
+            <p className="text-sm text-[#4B5563]">Your reading activity updates from your books and annotations.</p>
+          </div>
+          <Link
+            to="/student/annotations"
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD]"
+          >
+            View notes <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <ProgressCard
+            icon={<BookOpen size={20} />}
+            label="Books in shelf"
+            value={progress.booksInShelf.toString()}
+            detail={`${assignedBooks.length} assigned, ${myBooks.length} uploaded`}
+          />
+          <ProgressCard
+            icon={<MessageSquare size={20} />}
+            label="Annotations"
+            value={progress.annotationsCount.toString()}
+            detail={`${progress.pagesAnnotated} page${progress.pagesAnnotated === 1 ? '' : 's'} annotated`}
+          />
+          <ProgressCard
+            icon={<Flame size={20} />}
+            label="Minutes read"
+            value={`${progress.minutesRead}`}
+            detail={`${progress.completedBooks} completed, ${progress.booksInProgress} in progress`}
+          />
+          <ProgressCard
+            icon={<Target size={20} />}
+            label="Weekly goal"
+            value={`${progress.pagesAnnotatedThisWeek}/${progress.weeklyPageGoal}`}
+            detail="pages annotated this week"
+            meterValue={progress.weeklyGoalPercent}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <NextActionCard progress={progress} />
+          <ReactionMixCard reactionCounts={progress.reactionCounts} topReaction={progress.topReaction} />
+          <RecentActivityCard
+            annotations={progress.recentAnnotations}
+            bookTitleById={bookTitleById}
+          />
+        </div>
+      </section>
 
       {/* Delete confirmation modal */}
       {confirmDelete && (

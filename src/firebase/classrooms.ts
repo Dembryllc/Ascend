@@ -54,10 +54,25 @@ export async function joinClassroomByCode(studentId: string, joinCode: string): 
   const q = query(collection(db, 'classrooms'), where('joinCode', '==', joinCode.toUpperCase().trim()))
   const snap = await getDocs(q)
   if (snap.empty) throw new Error('Invalid join code. Check the code with your teacher.')
-  const classroomId = snap.docs[0].id
+
+  const classroomDoc = snap.docs[0]
+  const classroomId = classroomDoc.id
+  const teacherId = classroomDoc.data().teacherId as string
+
   const batch = writeBatch(db)
   batch.update(doc(db, 'classrooms', classroomId), { studentIds: arrayUnion(studentId) })
   batch.update(doc(db, 'users', studentId), { classroomId })
   await batch.commit()
+
+  // Add student to all books already uploaded by this classroom's teacher
+  const booksSnap = await getDocs(query(collection(db, 'books'), where('uploadedBy', '==', teacherId)))
+  if (!booksSnap.empty) {
+    const bookBatch = writeBatch(db)
+    booksSnap.docs.forEach((bookDoc) => {
+      bookBatch.update(bookDoc.ref, { assignedStudentIds: arrayUnion(studentId) })
+    })
+    await bookBatch.commit()
+  }
+
   return classroomId
 }

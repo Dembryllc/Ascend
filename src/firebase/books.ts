@@ -81,12 +81,20 @@ export async function getBooksByTeacher(teacherId: string): Promise<Book[]> {
 }
 
 export async function getBooksByStudent(studentId: string): Promise<Book[]> {
-  const q = query(collection(db, 'books'), where('assignedStudentIds', 'array-contains', studentId))
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => {
-    const data = d.data()
-    return { id: d.id, ...data, createdAt: data.createdAt?.toDate() ?? new Date() } as Book
-  })
+  const [assignedSnap, ownedSnap] = await Promise.all([
+    getDocs(query(collection(db, 'books'), where('assignedStudentIds', 'array-contains', studentId))),
+    getDocs(query(collection(db, 'books'), where('uploadedBy', '==', studentId))),
+  ])
+  const bookMap = new Map<string, Book>()
+  for (const snap of [assignedSnap, ownedSnap]) {
+    for (const d of snap.docs) {
+      if (!bookMap.has(d.id)) {
+        const data = d.data()
+        bookMap.set(d.id, { id: d.id, ...data, createdAt: data.createdAt?.toDate() ?? new Date() } as Book)
+      }
+    }
+  }
+  return Array.from(bookMap.values())
 }
 
 export async function getBook(bookId: string): Promise<Book | null> {
