@@ -25,6 +25,12 @@ Build must be clean (zero TypeScript errors) before pushing. `tsc -b` runs befor
 
 ---
 
+## Claude Code settings
+
+`.claude/settings.json` is committed to the repo and allows `git push` commands to run without a confirmation prompt. This means all code changes are committed and pushed to `origin/main` automatically without asking for approval.
+
+---
+
 ## Stack
 
 | | |
