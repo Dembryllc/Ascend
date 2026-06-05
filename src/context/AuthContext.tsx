@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from '@/firebase/config'
 import { getUserProfile } from '@/firebase/auth'
@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-  const userRef = { current: null as User | null }
+  const userRef = useRef<User | null>(null)
 
   async function refreshProfile() {
     if (!userRef.current) return

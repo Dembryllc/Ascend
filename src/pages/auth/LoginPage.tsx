@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { loginUser, loginWithGoogle, sendPasswordReset } from '@/firebase/auth'
 import { useAuth } from '@/context/AuthContext'
 import { BookOpen } from 'lucide-react'
@@ -17,8 +17,7 @@ function authErrorMessage(err: unknown): string {
 }
 
 export default function LoginPage() {
-  const { profile } = useAuth()
-  const navigate = useNavigate()
+  const { profile, refreshProfile } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -64,7 +63,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await loginWithGoogle()
-      navigate('/teacher')
+      // Force AuthContext to reload the profile now that it's been written.
+      // Navigation is handled by the `if (profile)` redirect at the top of this component.
+      await refreshProfile()
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
