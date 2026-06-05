@@ -190,7 +190,10 @@ export default function RegisterPage() {
                 placeholder="e.g. AB3X7K — ask your teacher"
                 className="w-full border border-[#D1D5DB] rounded-xl px-4 py-3 text-base font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
               />
-              <p className="text-xs text-[#6B7280] mt-1">You can join a class later if you don't have a code yet</p>
+              {joinCode.length > 0 && joinCode.length < 6
+                ? <p className="text-xs text-amber-600 mt-1">Join codes are 6 characters — keep typing ({joinCode.length}/6)</p>
+                : <p className="text-xs text-[#6B7280] mt-1">You can join a class later if you don't have a code yet</p>
+              }
             </div>
           )}
 
@@ -202,7 +205,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (role === 'student' && joinCode.length > 0 && joinCode.length < 6)}
             className="w-full bg-[#4A90D9] hover:bg-[#357ABD] disabled:opacity-60 text-white font-bold py-3 rounded-xl text-base transition-colors"
           >
             {loading ? 'Creating account…' : 'Create Account'}

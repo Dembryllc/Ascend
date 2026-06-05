@@ -117,8 +117,7 @@ export default function StudentHome() {
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <AlertCircle size={44} className="text-red-400 mb-4" />
         <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Couldn't load your books</h3>
-        <p className="text-[#4B5563] max-w-sm mb-2">{displayedError}</p>
-        <p className="text-xs text-[#9CA3AF] mb-6">Check the browser console for details.</p>
+        <p className="text-[#4B5563] max-w-sm mb-6">{displayedError}</p>
         <button
           onClick={() => window.location.reload()}
           className="bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"

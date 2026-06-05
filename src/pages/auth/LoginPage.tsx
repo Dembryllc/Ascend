@@ -133,6 +133,7 @@ export default function LoginPage() {
               </svg>
               Continue with Google
             </button>
+            <p className="text-xs text-center text-[#9CA3AF] -mt-2 mb-4">For teachers — students sign in with email below</p>
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-1 h-px bg-[#E5E7EB]" />
               <span className="text-xs text-[#9CA3AF] font-medium">or sign in with email</span>

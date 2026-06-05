@@ -1,18 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import AppShell from '@/components/layout/AppShell'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
+import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BarChart3, BookOpen, CheckCircle2, Circle, Users, Upload, Eye } from 'lucide-react'
+import { BarChart3, BookOpen, CheckCircle2, Circle, Users, Upload, Eye, Pencil, X, Check } from 'lucide-react'
 
 export default function TeacherDashboard() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameError, setNameError] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -29,6 +35,28 @@ export default function TeacherDashboard() {
       setLoading(false)
     })
   }, [profile])
+
+  function startEditingName() {
+    setNameValue(profile?.displayName ?? '')
+    setNameError('')
+    setEditingName(true)
+    setTimeout(() => nameInputRef.current?.focus(), 0)
+  }
+
+  async function saveDisplayName() {
+    if (!profile) return
+    setNameSaving(true)
+    setNameError('')
+    try {
+      await updateTeacherDisplayName(profile.uid, nameValue)
+      await refreshProfile()
+      setEditingName(false)
+    } catch (err: unknown) {
+      setNameError(err instanceof Error ? err.message : 'Could not update name.')
+    } finally {
+      setNameSaving(false)
+    }
+  }
 
   if (loading) return (
     <AppShell title="Dashboard">
@@ -75,10 +103,37 @@ export default function TeacherDashboard() {
   return (
     <AppShell title="Teacher Dashboard">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[#1A1D23]">
-          Hello, {profile?.displayName} 🍎
-        </h2>
-        <p className="text-[#4B5563] mt-1">Here's what's happening in your classroom today.</p>
+        {editingName ? (
+          <div className="flex flex-col gap-1 mb-1">
+            <div className="flex items-center gap-2">
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveDisplayName(); if (e.key === 'Escape') setEditingName(false) }}
+                maxLength={60}
+                className="text-2xl font-bold text-[#1A1D23] border-b-2 border-[#4A90D9] bg-transparent focus:outline-none w-full max-w-xs"
+                aria-label="Edit your display name"
+              />
+              <button onClick={saveDisplayName} disabled={nameSaving} aria-label="Save name" className="p-1 text-[#5BB974] hover:text-[#4AA863] disabled:opacity-50">
+                <Check size={20} />
+              </button>
+              <button onClick={() => setEditingName(false)} aria-label="Cancel edit" className="p-1 text-[#9CA3AF] hover:text-[#4B5563]">
+                <X size={20} />
+              </button>
+            </div>
+            {nameError && <p className="text-xs text-red-600">{nameError}</p>}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-2xl font-bold text-[#1A1D23]">Hello, {profile?.displayName} 🍎</h2>
+            <button onClick={startEditingName} aria-label="Edit display name" className="p-1 text-[#9CA3AF] hover:text-[#4A90D9] transition-colors mt-0.5">
+              <Pencil size={16} />
+            </button>
+          </div>
+        )}
+        <p className="text-[#4B5563]">Here's what's happening in your classroom today.</p>
       </div>
 
       <TeacherOnboardingChecklist classroom={classroom} bookCount={books.length} />

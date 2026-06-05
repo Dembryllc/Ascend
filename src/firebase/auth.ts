@@ -8,7 +8,7 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth'
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from './config'
 import type { UserRole, UserProfile } from '@/types'
 import { joinClassroomByCode } from './classrooms'
@@ -84,11 +84,13 @@ export async function loginWithGoogle(): Promise<{ user: User; isNewUser: boolea
   }
 
   // New user — create a teacher profile (Google sign-in is teacher-only)
+  const googleEmail = user.email
+  if (!googleEmail) throw new Error('Your Google account has no email address. Please use a Google account with an email.')
   const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
   await setDoc(doc(db, 'users', user.uid), {
     uid: user.uid,
-    email: user.email ?? '',
-    displayName: user.displayName ?? user.email ?? 'Teacher',
+    email: googleEmail,
+    displayName: user.displayName ?? googleEmail ?? 'Teacher',
     role: 'teacher' as UserRole,
     classroomId: null,
     subscriptionStatus: 'free',
@@ -101,6 +103,15 @@ export async function loginWithGoogle(): Promise<{ user: User; isNewUser: boolea
 
 export async function logoutUser(): Promise<void> {
   await signOut(auth)
+}
+
+export async function updateTeacherDisplayName(uid: string, displayName: string): Promise<void> {
+  const trimmed = displayName.trim()
+  if (!trimmed) throw new Error('Display name cannot be empty.')
+  await Promise.all([
+    auth.currentUser ? updateProfile(auth.currentUser, { displayName: trimmed }) : Promise.resolve(),
+    updateDoc(doc(db, 'users', uid), { displayName: trimmed }),
+  ])
 }
 
 export async function sendPasswordReset(email: string, redirectUrl?: string): Promise<void> {
