@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from '@/firebase/config'
-import { getUserProfile } from '@/firebase/auth'
+import { getUserProfile, handleGoogleRedirectResult } from '@/firebase/auth'
 import type { UserProfile } from '@/types'
 
 interface AuthContextValue {
@@ -31,6 +31,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to refresh profile:', err)
     }
   }
+
+  // Handle the case where signInWithPopup fell back to redirect mode (popup-blocked
+  // browsers, mobile Safari). When the page reloads after the OAuth redirect, the
+  // signInWithPopup promise is gone — getRedirectResult recovers the result and
+  // ensures the Firestore profile gets written if this was a new teacher signing up.
+  useEffect(() => {
+    handleGoogleRedirectResult()
+      .then((handled) => { if (handled) refreshProfile() })
+      .catch((err) => console.error('Redirect result error:', err))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
         const unsub = onAuthStateChanged(

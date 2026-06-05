@@ -28,7 +28,7 @@ jobs:
         run: npm run build
         env:
           VITE_FIREBASE_API_KEY: AIzaSyD5sUHH11e0Y1KeNpzEX6Ba9XNlhpNFKKk
-          VITE_FIREBASE_AUTH_DOMAIN: ascend-annotate.firebaseapp.com
+          VITE_FIREBASE_AUTH_DOMAIN: easy-annotate.com
           VITE_FIREBASE_PROJECT_ID: ascend-annotate
           VITE_FIREBASE_STORAGE_BUCKET: ascend-annotate.firebasestorage.app
           VITE_FIREBASE_MESSAGING_SENDER_ID: "97329229065"

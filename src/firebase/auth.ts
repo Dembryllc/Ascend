@@ -1,5 +1,6 @@
 import {
   createUserWithEmailAndPassword,
+  getRedirectResult,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -103,6 +104,31 @@ export async function loginWithGoogle(): Promise<{ user: User; isNewUser: boolea
 
 export async function logoutUser(): Promise<void> {
   await signOut(auth)
+}
+
+export async function finalizeGoogleSignIn(user: User): Promise<void> {
+  const existing = await getUserProfile(user.uid)
+  if (existing) return
+  const email = user.email
+  if (!email) throw new Error('Google account has no email address.')
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+  await setDoc(doc(db, 'users', user.uid), {
+    uid: user.uid,
+    email,
+    displayName: user.displayName ?? email,
+    role: 'teacher' as UserRole,
+    classroomId: null,
+    subscriptionStatus: 'free',
+    trialEndsAt,
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function handleGoogleRedirectResult(): Promise<boolean> {
+  const result = await getRedirectResult(auth)
+  if (!result?.user) return false
+  await finalizeGoogleSignIn(result.user)
+  return true
 }
 
 export async function updateTeacherDisplayName(uid: string, displayName: string): Promise<void> {
