@@ -1,7 +1,9 @@
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
   type User,
@@ -69,6 +71,32 @@ export async function registerUser(
 export async function loginUser(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password)
   return credential.user
+}
+
+export async function loginWithGoogle(): Promise<{ user: User; isNewUser: boolean }> {
+  const provider = new GoogleAuthProvider()
+  const credential = await signInWithPopup(auth, provider)
+  const user = credential.user
+
+  const existingProfile = await getUserProfile(user.uid)
+  if (existingProfile) {
+    return { user, isNewUser: false }
+  }
+
+  // New user — create a teacher profile (Google sign-in is teacher-only)
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+  await setDoc(doc(db, 'users', user.uid), {
+    uid: user.uid,
+    email: user.email ?? '',
+    displayName: user.displayName ?? user.email ?? 'Teacher',
+    role: 'teacher' as UserRole,
+    classroomId: null,
+    subscriptionStatus: 'free',
+    trialEndsAt,
+    createdAt: serverTimestamp(),
+  })
+
+  return { user, isNewUser: true }
 }
 
 export async function logoutUser(): Promise<void> {
