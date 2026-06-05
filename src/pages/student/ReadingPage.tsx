@@ -334,10 +334,16 @@ export default function ReadingPage() {
 
     const page = await pdfDocument.getPage(currentPage)
     const content = await page.getTextContent()
-    const text = content.items
+    const rawText = content.items
       .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
       .join(' ')
-      .replace(/\s+/g, ' ')
+
+    // Clean up common PDF extraction artifacts before speaking
+    const text = rawText
+      .replace(/(\w)-\s+(\w)/g, '$1$2')        // rejoin hyphenated line-breaks: "nat- ural" → "natural"
+      .replace(/\s+/g, ' ')                      // collapse whitespace
+      .replace(/\b(\d{1,3})\b(?=\s|$)/g, '')   // strip bare page numbers
+      .replace(/[ \t]{2,}/g, ' ')               // remove extra spaces
       .trim()
 
     if (!text) {
@@ -345,25 +351,32 @@ export default function ReadingPage() {
       return
     }
 
-    // Pick the most natural available en-US voice. Browsers label
-    // high-quality voices as "enhanced", "neural", "premium", or "Google".
+    // Score voices by quality. Microsoft Edge neural voices and Apple enhanced
+    // voices are the most natural available through Web Speech API.
     function pickVoice(): SpeechSynthesisVoice | null {
       const voices = window.speechSynthesis.getVoices()
-      const enUS = voices.filter((v) => v.lang.startsWith('en'))
-      const ranked = [
-        enUS.find((v) => /enhanced|neural|premium/i.test(v.name)),
-        enUS.find((v) => /google/i.test(v.name)),
-        enUS.find((v) => v.lang === 'en-US'),
-        enUS[0] ?? null,
-      ]
-      return ranked.find(Boolean) ?? null
+      const en = voices.filter((v) => v.lang.startsWith('en'))
+
+      function score(v: SpeechSynthesisVoice): number {
+        const n = v.name
+        if (/Microsoft.*Neural|Aria Neural|Guy Neural|Jenny Neural|Ana Neural|Christopher Neural|Eric Neural|Michelle Neural/i.test(n)) return 6
+        if (/Microsoft.*Online/i.test(n)) return 5
+        if (/enhanced/i.test(n) && /Samantha|Karen|Daniel|Moira|Tessa|Fiona/i.test(n)) return 4
+        if (/enhanced|premium|neural/i.test(n)) return 3
+        if (/google/i.test(n)) return 2
+        if (v.lang === 'en-US') return 1
+        return 0
+      }
+
+      const sorted = [...en].sort((a, b) => score(b) - score(a))
+      return sorted[0] ?? null
     }
 
     const trySpeak = () => {
       const utt = new SpeechSynthesisUtterance(text)
       const voice = pickVoice()
       if (voice) utt.voice = voice
-      utt.rate = 0.88
+      utt.rate = 0.92
       utt.pitch = 1.0
       utt.volume = 1.0
       utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
