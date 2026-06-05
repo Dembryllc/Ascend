@@ -5,9 +5,9 @@ import path from 'path'
 import { copyFileSync, existsSync } from 'fs'
 
 // Copies the PDF.js worker to dist/pdf.worker.mjs with a stable, unhashed URL.
-// Using ?url imports produces a content-hashed URL that can differ between local
-// and CI/Netlify builds, causing the SPA fallback (HTML) to be served instead of
-// the JS file, which iOS Safari rejects with a MIME-type error.
+// Using ?url imports produces a content-hashed URL that can change between builds,
+// causing the SPA fallback (HTML) to be served instead of the JS file, which iOS
+// Safari rejects with a MIME-type error.
 //
 // pdfjs-dist is a nested dep of react-pdf, so we resolve it relative to
 // react-pdf's own node_modules rather than the root node_modules.
