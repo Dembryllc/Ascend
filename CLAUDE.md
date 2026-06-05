@@ -94,7 +94,8 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 | `src/components/shared/TrialExpiredModal.tsx` | Modal shown when a teacher's trial has ended and they hit a Pro gate. Distinct from `UpgradeModal`. |
 | `src/components/shared/UpgradeModal.tsx` | Generic upgrade prompt for free-tier teachers (no trial). Keep as-is. |
 | `vite.config.ts` | Contains `pdfWorkerPlugin` — copies `pdf.worker.mjs` to `dist/` at build time. |
-| `.github/workflows/firebase-deploy.yml` | CI/CD pipeline. Node 22, `npm ci --legacy-peer-deps`, Vite build, Firebase CLI deploy. |
+| `functions/src/index.ts` | Stripe webhook Cloud Function (firebase-functions v2). Handles `checkout.session.completed` (→ `subscriptionStatus: 'pro'`), `customer.subscription.deleted/updated` (→ free/pro). Deployed to `us-central1`. Secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. |
+| `.github/workflows/firebase-deploy.yml` | CI/CD pipeline. Node 22, `npm ci --legacy-peer-deps`, Vite build, Firebase CLI deploy. Includes `VITE_STRIPE_PRO_MONTHLY_URL` and `VITE_STRIPE_PRO_ANNUAL_URL`. |
 
 ---
 
@@ -160,7 +161,7 @@ const trialExpired = profile?.role === 'teacher'
 
 ### What is NOT done yet (future phases)
 
-- No Stripe integration — pricing page links are already wired but payment is Phase 2.
+- **Stripe checkout flow** — the webhook is deployed and payment links are in CI, but the actual checkout button/redirect to Stripe is not wired in the UI yet (Phase 2 remaining work).
 - No automated trial-expiry email — that is Phase 3 (a Cloud Function scheduled task).
 - No server-side enforcement of trial expiry — the `trialEndsAt` check is client-only. Firestore rules do not gate on it.
 
@@ -223,7 +224,7 @@ Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
 - **Do not weaken Firestore security rules.** The annotation read rule allows teacher access scoped to `classroomId`; the progress write rule enforces monotonic increases.
 - **Do not change the `annotationKind` field values** (`'annotation'` | `'reflection'`). Reflections are stored in the same collection and filtered by this field throughout.
 - **Do not push to main without a passing build.** The CI workflow (`firebase-deploy.yml`) will attempt a deploy on every push.
-- **Do not add Stripe or email logic to the trial system yet** — payment is Phase 2, trial-expiry email is Phase 3.
+- **Do not add trial-expiry email logic yet** — that is Phase 3 (Cloud Function scheduled task). Stripe webhook backend is already deployed; don't duplicate or conflict with it.
 - **Do not reorder the registration steps in `registerUser()`** — profile `setDoc` must happen before the classroom join. See the Student registration flow section above.
 - **Do not use `UpgradeModal` for trial-expired teachers** — use `TrialExpiredModal`. `UpgradeModal` is for free-tier teachers who never had a trial.
 - **Do not write student email to Firestore** — student emails belong in Firebase Auth only. This is a deliberate FERPA PII minimization decision. Teachers still get their email stored.
@@ -240,6 +241,15 @@ Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
 3. Firebase CLI deploy via `GOOGLE_APPLICATION_CREDENTIALS` pointing to the service account JSON stored in GitHub secret `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE`
 
 The deploy targets Firebase Hosting only (`--only hosting`). Firestore rules and indexes are **not** deployed by CI — apply them manually from the Firebase Console.
+
+### Stripe webhook (Cloud Function)
+
+Deployed separately via Firebase CLI (`firebase deploy --only functions`). Not part of the GitHub Actions workflow.
+
+- **Live URL:** `https://stripewebhook-v7wgh3m3ca-uc.a.run.app`
+- **Secrets** (set via `firebase functions:secrets:set`): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- **Firestore writes:** sets `subscriptionStatus` and `stripeCustomerId` on `users/{uid}`
+- **Events handled:** `checkout.session.completed`, `customer.subscription.deleted`, `customer.subscription.updated`
 
 ---
 
@@ -288,6 +298,8 @@ VITE_FIREBASE_PROJECT_ID
 VITE_FIREBASE_STORAGE_BUCKET
 VITE_FIREBASE_MESSAGING_SENDER_ID
 VITE_FIREBASE_APP_ID
+VITE_STRIPE_PRO_MONTHLY_URL   # Stripe payment link for monthly Pro plan
+VITE_STRIPE_PRO_ANNUAL_URL    # Stripe payment link for annual Pro plan
 ```
 
 For local dev, put these in a `.env` file (gitignored). In CI, they are hardcoded in the workflow YAML. Firebase API keys are safe to expose in client bundles — security is enforced by Firestore and Storage rules.
