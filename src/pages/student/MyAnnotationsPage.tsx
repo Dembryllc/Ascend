@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getAnnotationsByStudent, deleteAnnotation, updateAnnotation } from '@/firebase/annotations'
 import { getBooksByStudent } from '@/firebase/books'

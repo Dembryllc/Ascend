@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from '@/firebase/config'
 import { getUserProfile, handleGoogleRedirectResult } from '@/firebase/auth'
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     handleGoogleRedirectResult()
       .then((handled) => { if (handled) refreshProfile() })
       .catch((err) => console.error('Redirect result error:', err))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
         const unsub = onAuthStateChanged(
@@ -76,6 +76,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={{ user, profile, loading, error, refreshProfile }}>{children}</AuthContext.Provider>
     }
 
-export function useAuth() {
-    return useContext(AuthContext)
-}
+export { AuthContext }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { loginUser, loginWithGoogle, sendPasswordReset } from '@/firebase/auth'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import { BookOpen } from 'lucide-react'
 
 function authErrorMessage(err: unknown): string {

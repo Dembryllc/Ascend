@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { BookOpen, Check, Lock } from 'lucide-react'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import { isPro } from '@/types'
 
 const PRO_MONTHLY_URL = import.meta.env.VITE_STRIPE_PRO_MONTHLY_URL as string | undefined

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import { getBook } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
@@ -199,14 +199,16 @@ export default function ReadingPage() {
   }, [])
 
   useEffect(() => {
-    setCapturedSelection('')
-    setFloatingBar(null)
-    // Stop any in-progress speech when the user turns the page
-    if (window.speechSynthesis?.speaking) {
-      window.speechSynthesis.cancel()
-      setIsSpeaking(false)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Defer all setState calls out of the synchronous effect body to satisfy
+    // the react-hooks/set-state-in-effect rule while preserving the behaviour.
+    const speaking = window.speechSynthesis?.speaking
+    if (speaking) window.speechSynthesis.cancel()
+    const id = requestAnimationFrame(() => {
+      setCapturedSelection('')
+      setFloatingBar(null)
+      if (speaking) setIsSpeaking(false)
+    })
+    return () => cancelAnimationFrame(id)
   }, [currentPage])
 
   async function handleMarkComplete() {

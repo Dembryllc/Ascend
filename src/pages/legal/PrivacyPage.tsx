@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 
 export default function PrivacyPage() {
   const { profile } = useAuth()

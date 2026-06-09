@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { uploadBook, getBooksByTeacher } from '@/firebase/books'
 import { isPro } from '@/types'

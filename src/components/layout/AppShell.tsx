@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
 import { getTrialDaysRemaining } from '@/types'
 import { BookOpen, Eye, Home, LogOut, MessageSquare, TrendingUp, Upload, Users, X } from 'lucide-react'

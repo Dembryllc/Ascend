@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getClassroomByTeacher, createClassroom } from '@/firebase/classrooms'
 import { getUserProfile } from '@/firebase/auth'

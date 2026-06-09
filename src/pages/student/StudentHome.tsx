@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getBooksByStudent, deleteStudentBook } from '@/firebase/books'
 import { getAnnotationsByStudent } from '@/firebase/annotations'

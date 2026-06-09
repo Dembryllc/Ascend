@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { uploadStudentBook } from '@/firebase/books'
 import { Upload, FileText, CheckCircle } from 'lucide-react'
