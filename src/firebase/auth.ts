@@ -74,32 +74,34 @@ export async function loginUser(email: string, password: string): Promise<User> 
   return credential.user
 }
 
-export async function loginWithGoogle(): Promise<{ user: User; isNewUser: boolean }> {
+export async function loginWithGoogle(role: UserRole = 'teacher'): Promise<{ user: User; isNewUser: boolean }> {
+  sessionStorage.setItem('google-signup-role', role)
   const provider = new GoogleAuthProvider()
   const credential = await signInWithPopup(auth, provider)
   const user = credential.user
 
   const existingProfile = await getUserProfile(user.uid)
   if (existingProfile) {
+    sessionStorage.removeItem('google-signup-role')
     return { user, isNewUser: false }
   }
 
-  // New user — create a teacher profile (Google sign-in is teacher-only)
-  const googleEmail = user.email
-  if (!googleEmail) throw new Error('Your Google account has no email address. Please use a Google account with an email.')
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    email: googleEmail,
-    displayName: user.displayName ?? googleEmail ?? 'Teacher',
-    role: 'teacher' as UserRole,
-    classroomId: null,
-    subscriptionStatus: 'free',
-    trialEndsAt,
-    createdAt: serverTimestamp(),
-  })
-
+  await writeGoogleProfile(user, role)
+  sessionStorage.removeItem('google-signup-role')
   return { user, isNewUser: true }
+}
+
+// Used on the Login page — signs in with Google but never auto-creates a profile.
+// Returns true if an existing profile was found, false if the user has no account yet.
+export async function signInWithGoogleOnly(): Promise<boolean> {
+  const provider = new GoogleAuthProvider()
+  const credential = await signInWithPopup(auth, provider)
+  const profile = await getUserProfile(credential.user.uid)
+  if (!profile) {
+    await signOut(auth)
+    return false
+  }
+  return true
 }
 
 export async function logoutUser(): Promise<void> {
@@ -109,17 +111,25 @@ export async function logoutUser(): Promise<void> {
 export async function finalizeGoogleSignIn(user: User): Promise<void> {
   const existing = await getUserProfile(user.uid)
   if (existing) return
+  const role = (sessionStorage.getItem('google-signup-role') ?? 'teacher') as UserRole
+  sessionStorage.removeItem('google-signup-role')
+  await writeGoogleProfile(user, role)
+}
+
+// Shared profile-write logic for Google sign-up (popup and redirect paths).
+async function writeGoogleProfile(user: User, role: UserRole): Promise<void> {
   const email = user.email
-  if (!email) throw new Error('Google account has no email address.')
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+  if (!email) throw new Error('Your Google account has no email address. Please use a Google account with an email.')
+  const isTeacher = role === 'teacher'
   await setDoc(doc(db, 'users', user.uid), {
     uid: user.uid,
-    email,
-    displayName: user.displayName ?? email,
-    role: 'teacher' as UserRole,
+    // FERPA: student email stays in Firebase Auth only, never Firestore.
+    ...(isTeacher ? { email } : {}),
+    displayName: user.displayName ?? (isTeacher ? email : 'Student'),
+    role,
     classroomId: null,
     subscriptionStatus: 'free',
-    trialEndsAt,
+    ...(isTeacher ? { trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) } : {}),
     createdAt: serverTimestamp(),
   })
 }
