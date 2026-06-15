@@ -6,7 +6,7 @@ import { getUserProfile } from '@/firebase/auth'
 import { getBooksByTeacher } from '@/firebase/books'
 import { assignBookToStudent, assignBookToClass } from '@/firebase/books'
 import type { Classroom, Book, UserProfile } from '@/types'
-import { Users, Copy, CheckCheck, Plus } from 'lucide-react'
+import { Users, Copy, CheckCheck, CheckCircle2, Plus } from 'lucide-react'
 
 export default function ClassroomPage() {
   const { profile } = useAuth()
@@ -21,6 +21,7 @@ export default function ClassroomPage() {
   const [createError, setCreateError] = useState('')
   const [assignError, setAssignError] = useState('')
   const [assignSelects, setAssignSelects] = useState<Record<string, string>>({})
+  const [assignedAll, setAssignedAll] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (!profile) return
@@ -84,6 +85,8 @@ export default function ClassroomPage() {
       setBooks((prev) => prev.map((b) =>
         b.id === bookId ? { ...b, assignedStudentIds: [...new Set([...b.assignedStudentIds, ...ids])] } : b
       ))
+      setAssignedAll((prev) => ({ ...prev, [bookId]: true }))
+      setTimeout(() => setAssignedAll((prev) => ({ ...prev, [bookId]: false })), 3000)
     } catch {
       setAssignError('Could not assign book to class. Please try again.')
     }
@@ -254,9 +257,17 @@ export default function ClassroomPage() {
                     </div>
                     <button
                       onClick={() => handleAssignAll(b.id)}
-                      className="text-xs bg-[#5BB974] text-white px-3 py-1.5 rounded-lg hover:bg-[#4AA863] transition-colors font-semibold self-start sm:self-auto"
+                      disabled={assignedAll[b.id]}
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold self-start sm:self-auto transition-colors ${
+                        assignedAll[b.id]
+                          ? 'bg-[#5BB974]/20 text-[#5BB974] cursor-default'
+                          : 'bg-[#5BB974] text-white hover:bg-[#4AA863]'
+                      }`}
                     >
-                      Assign All
+                      {assignedAll[b.id]
+                        ? <><CheckCircle2 size={14} /> Assigned!</>
+                        : 'Assign All'
+                      }
                     </button>
                   </div>
                 ))}

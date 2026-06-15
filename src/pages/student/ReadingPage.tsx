@@ -43,6 +43,7 @@ export default function ReadingPage() {
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
   const [readAloudStatus, setReadAloudStatus] = useState('')
   const [reflectionText, setReflectionText] = useState('')
+  const [reflectionError, setReflectionError] = useState('')
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [markingComplete, setMarkingComplete] = useState(false)
   const lastProgressTickRef = useRef(0)
@@ -296,6 +297,7 @@ export default function ReadingPage() {
   async function handleReflectionSave() {
     if (!profile || !bookId || !reflectionText.trim()) return
     setSaving(true)
+    setReflectionError('')
     try {
       const ann = await saveAnnotation(
         profile.uid,
@@ -309,6 +311,8 @@ export default function ReadingPage() {
       )
       setAnnotations((prev) => [...prev, ann])
       setReflectionText('')
+    } catch {
+      setReflectionError('Could not save. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -714,8 +718,11 @@ export default function ReadingPage() {
                 disabled={!reflectionText.trim() || saving}
                 className="mt-3 w-full bg-[#5BB974] hover:bg-[#4AA863] disabled:opacity-50 text-white rounded-xl py-2.5 font-bold transition-colors"
               >
-                Save Reflection
+                {saving ? 'Saving…' : 'Save Reflection'}
               </button>
+              {reflectionError && (
+                <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{reflectionError}</p>
+              )}
             </section>
           </aside>
         </div>
