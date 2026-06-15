@@ -337,9 +337,17 @@ function ReactionBreakdown({ reactionCounts }: { reactionCounts: Record<Reaction
 
   if (total === 0) {
     return (
-      <p className="text-sm text-[#4B5563]">
-        No annotations yet. Start reading to see your reaction mix here.
-      </p>
+      <div>
+        <p className="text-sm text-[#4B5563] mb-3">
+          No annotations yet. Start reading to see your reaction mix here.
+        </p>
+        <Link
+          to="/student"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD]"
+        >
+          <BookOpen size={15} /> Go to my books
+        </Link>
+      </div>
     )
   }
 
