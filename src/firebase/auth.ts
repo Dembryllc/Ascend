@@ -5,6 +5,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
   type User,
@@ -77,31 +78,47 @@ export async function loginUser(email: string, password: string): Promise<User> 
 export async function loginWithGoogle(role: UserRole = 'teacher'): Promise<{ user: User; isNewUser: boolean }> {
   sessionStorage.setItem('google-signup-role', role)
   const provider = new GoogleAuthProvider()
-  const credential = await signInWithPopup(auth, provider)
-  const user = credential.user
-
-  const existingProfile = await getUserProfile(user.uid)
-  if (existingProfile) {
+  try {
+    const credential = await signInWithPopup(auth, provider)
+    const user = credential.user
+    const existingProfile = await getUserProfile(user.uid)
+    if (existingProfile) {
+      sessionStorage.removeItem('google-signup-role')
+      return { user, isNewUser: false }
+    }
+    await writeGoogleProfile(user, role)
     sessionStorage.removeItem('google-signup-role')
-    return { user, isNewUser: false }
+    return { user, isNewUser: true }
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code
+    if (code === 'auth/popup-blocked') {
+      await signInWithRedirect(auth, provider)
+      // Page navigates away — this line is never reached
+    }
+    throw err
   }
-
-  await writeGoogleProfile(user, role)
-  sessionStorage.removeItem('google-signup-role')
-  return { user, isNewUser: true }
 }
 
 // Used on the Login page — signs in with Google but never auto-creates a profile.
 // Returns true if an existing profile was found, false if the user has no account yet.
 export async function signInWithGoogleOnly(): Promise<boolean> {
   const provider = new GoogleAuthProvider()
-  const credential = await signInWithPopup(auth, provider)
-  const profile = await getUserProfile(credential.user.uid)
-  if (!profile) {
-    await signOut(auth)
-    return false
+  try {
+    const credential = await signInWithPopup(auth, provider)
+    const profile = await getUserProfile(credential.user.uid)
+    if (!profile) {
+      await signOut(auth)
+      return false
+    }
+    return true
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code
+    if (code === 'auth/popup-blocked') {
+      await signInWithRedirect(auth, provider)
+      // Page navigates away — this line is never reached
+    }
+    throw err
   }
-  return true
 }
 
 export async function logoutUser(): Promise<void> {
