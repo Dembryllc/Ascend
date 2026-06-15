@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
 import { getTrialDaysRemaining } from '@/types'
-import { BookOpen, Eye, Home, LogOut, MessageSquare, TrendingUp, Upload, Users, X } from 'lucide-react'
+import { BarChart3, BookOpen, Eye, Home, LogOut, MessageSquare, TrendingUp, Upload, Users, X } from 'lucide-react'
 
 interface Props {
   children: React.ReactNode
@@ -15,6 +15,7 @@ const TEACHER_NAV = [
   { to: '/teacher/classroom', icon: Users, label: 'Classroom' },
   { to: '/teacher/upload', icon: Upload, label: 'Upload' },
   { to: '/teacher/annotations', icon: Eye, label: 'Annotations' },
+  { to: '/teacher/progress', icon: BarChart3, label: 'Progress' },
 ]
 
 const STUDENT_NAV = [

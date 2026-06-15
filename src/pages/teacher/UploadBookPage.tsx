@@ -4,7 +4,7 @@ import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { uploadBook, getBooksByTeacher } from '@/firebase/books'
 import { isPro } from '@/types'
-import { Lock, Upload, FileText, CheckCircle } from 'lucide-react'
+import { ArrowRight, Lock, Upload, FileText, CheckCircle } from 'lucide-react'
 import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
 
 const FREE_BOOK_LIMIT = 5
@@ -68,7 +68,6 @@ export default function UploadBookPage() {
         setProgress,
       )
       setDone(true)
-      setTimeout(() => navigate('/teacher'), 1500)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
@@ -121,10 +120,29 @@ export default function UploadBookPage() {
   if (done) {
     return (
       <AppShell title="Upload Book">
-        <div className="flex flex-col items-center justify-center py-20">
+        <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
           <CheckCircle size={56} className="text-[#5BB974] mb-4" />
-          <h2 className="text-2xl font-bold text-[#1A1D23]">Book uploaded!</h2>
-          <p className="text-[#4B5563] mt-2">Redirecting you back to the dashboard…</p>
+          <h2 className="text-2xl font-bold text-[#1A1D23] mb-2">Book uploaded!</h2>
+          <p className="text-[#4B5563] mb-2">
+            Your PDF is ready. Now assign it to your students so they can start reading.
+          </p>
+          <p className="text-sm text-[#9CA3AF] mb-8">
+            Students won't see this book until you assign it from your classroom.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <Link
+              to="/teacher/classroom"
+              className="flex-1 flex items-center justify-center gap-2 bg-[#4A90D9] hover:bg-[#357ABD] text-white font-bold py-3 rounded-xl transition-colors"
+            >
+              Assign to My Class <ArrowRight size={18} />
+            </Link>
+            <Link
+              to="/teacher"
+              className="flex-1 flex items-center justify-center gap-2 border border-[#D1D5DB] text-[#4B5563] font-semibold py-3 rounded-xl hover:bg-[#F3F4F6] transition-colors"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
       </AppShell>
     )
