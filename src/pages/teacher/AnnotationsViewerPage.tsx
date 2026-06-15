@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
@@ -16,9 +17,10 @@ import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
 
 export default function AnnotationsViewerPage() {
   const { profile } = useAuth()
+  const [searchParams] = useSearchParams()
   const [students, setStudents] = useState<UserProfile[]>([])
   const [books, setBooks] = useState<Book[]>([])
-  const [selectedStudent, setSelectedStudent] = useState('')
+  const [selectedStudent, setSelectedStudent] = useState(searchParams.get('student') ?? '')
   const [selectedBook, setSelectedBook] = useState('')
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)

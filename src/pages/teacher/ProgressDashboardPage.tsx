@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
@@ -7,10 +7,11 @@ import { getBooksByTeacher } from '@/firebase/books'
 import { getReadingProgressByClassroom } from '@/firebase/readingProgress'
 import { getUserProfile } from '@/firebase/auth'
 import type { Book, ReadingProgress, UserProfile } from '@/types'
-import { BarChart3, BookOpen, Clock, Users } from 'lucide-react'
+import { BarChart3, BookOpen, Clock, ExternalLink, Users } from 'lucide-react'
 
 export default function ProgressDashboardPage() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [students, setStudents] = useState<UserProfile[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [progress, setProgress] = useState<ReadingProgress[]>([])
@@ -163,9 +164,19 @@ export default function ProgressDashboardPage() {
                         : 'No activity yet'}
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-[#1A1D23]">{studentMinutes} min</p>
-                    <p className="text-xs text-[#9CA3AF]">{rows.length} book{rows.length !== 1 ? 's' : ''}</p>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-[#1A1D23]">{studentMinutes} min</p>
+                      <p className="text-xs text-[#9CA3AF]">{rows.length} book{rows.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/teacher/annotations?student=${student.uid}`)}
+                      aria-label={`View annotations for ${student.displayName}`}
+                      title="View annotations"
+                      className="p-2 text-[#4A90D9] hover:bg-blue-50 rounded-xl transition-colors"
+                    >
+                      <ExternalLink size={16} />
+                    </button>
                   </div>
                 </div>
 
