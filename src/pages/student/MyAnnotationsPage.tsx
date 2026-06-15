@@ -21,6 +21,7 @@ export default function MyAnnotationsPage() {
   const [editReaction, setEditReaction] = useState<ReactionType>('think')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -213,7 +214,29 @@ export default function MyAnnotationsPage() {
                     {ann.noteText && <p className="text-base text-[#1A1D23]">{ann.noteText}</p>}
                     <div className="flex gap-3 mt-2">
                       <button onClick={() => startEdit(ann)} className="text-xs text-[#4A90D9] hover:underline">Edit</button>
-                      <button onClick={() => handleDelete(ann.id)} className="text-xs text-red-500 hover:underline">Delete</button>
+                      {confirmDeleteId === ann.id ? (
+                        <>
+                          <button
+                            onClick={() => { handleDelete(ann.id); setConfirmDeleteId(null) }}
+                            className="text-xs text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded transition-colors"
+                          >
+                            Yes, delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-xs text-[#6B7280] hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(ann.id)}
+                          className="text-xs text-red-500 hover:underline"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
