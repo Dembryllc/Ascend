@@ -62,6 +62,11 @@ export default function AnnotationsViewerPage() {
     }
   }
 
+  useEffect(() => {
+    if (selectedStudent && selectedBook) fetchAnnotations()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStudent, selectedBook])
+
   const selectedStudentProfile = students.find((s) => s.uid === selectedStudent)
   const selectedBookData = books.find((b) => b.id === selectedBook)
   const summary = buildAnnotationSummary(annotations)
@@ -144,7 +149,7 @@ export default function AnnotationsViewerPage() {
             disabled={!selectedStudent || !selectedBook || fetching}
             className="bg-[#4A90D9] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#357ABD] disabled:opacity-50 transition-colors"
           >
-            {fetching ? 'Loading…' : 'View Annotations'}
+            {fetching ? 'Loading…' : 'Refresh'}
           </button>
           {annotations.length > 0 && (
             isPro(profile) ? (

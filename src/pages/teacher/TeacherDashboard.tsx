@@ -277,16 +277,16 @@ function EmptyState({ message, action }: { message: string; action?: { to: strin
 function TeacherOnboardingChecklist({ classroom, books }: { classroom: Classroom | null; books: Book[] }) {
   const step1Done = classroom !== null
   const step2Done = books.length > 0
-  const step3Done = books.some((b) => b.assignedStudentIds.length > 0)
-  const step4Done = (classroom?.studentIds.length ?? 0) > 0
+  const step3Done = (classroom?.studentIds.length ?? 0) > 0
+  const step4Done = books.some((b) => b.assignedStudentIds.length > 0)
 
   if (step1Done && step2Done && step3Done && step4Done) return null
 
   const steps = [
     { done: step1Done, label: 'Create your classroom', to: '/teacher/classroom', hint: 'Get your 6-letter join code' },
     { done: step2Done, label: 'Upload your first book', to: '/teacher/upload', hint: 'Add a PDF for students to read' },
-    { done: step3Done, label: 'Assign your book to students', to: '/teacher/classroom', hint: 'Go to Classroom → select a book → Assign All' },
-    { done: step4Done, label: 'Students join your classroom', to: '/teacher/classroom', hint: 'Share your join code with them' },
+    { done: step3Done, label: 'Students join your classroom', to: '/teacher/classroom', hint: 'Share your join code — students enter it at sign-up or from their dashboard' },
+    { done: step4Done, label: 'Assign your book to students', to: '/teacher/classroom', hint: 'Go to Classroom → Assign to Whole Class' },
   ]
 
   return (
