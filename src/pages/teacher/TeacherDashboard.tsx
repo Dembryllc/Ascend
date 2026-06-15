@@ -6,7 +6,7 @@ import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BarChart3, BookOpen, CheckCircle2, Circle, Users, Upload, Eye, Pencil, X, Check } from 'lucide-react'
+import { BarChart3, BookOpen, CheckCircle2, Circle, Copy, CopyCheck, Users, Upload, Eye, Pencil, X, Check } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile, refreshProfile } = useAuth()
@@ -18,7 +18,15 @@ export default function TeacherDashboard() {
   const [nameValue, setNameValue] = useState('')
   const [nameSaving, setNameSaving] = useState(false)
   const [nameError, setNameError] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  function copyJoinCode() {
+    if (!classroom?.joinCode) return
+    navigator.clipboard.writeText(classroom.joinCode)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
+  }
 
   useEffect(() => {
     if (!profile) return
@@ -136,13 +144,37 @@ export default function TeacherDashboard() {
         <p className="text-[#4B5563]">Here's what's happening in your classroom today.</p>
       </div>
 
-      <TeacherOnboardingChecklist classroom={classroom} bookCount={books.length} />
+      <TeacherOnboardingChecklist classroom={classroom} books={books} />
 
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <StatCard icon={<BookOpen size={22} />} label="Books uploaded" value={books.length} color="blue" />
         <StatCard icon={<Users size={22} />} label="Students" value={classroom?.studentIds.length ?? 0} color="green" />
-        <StatCard icon={<Eye size={22} />} label="Classroom" value={classroom ? classroom.name : '—'} color="purple" isText />
+        {/* Join code card — more actionable than showing classroom name */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6] col-span-2 md:col-span-1">
+          <div className="inline-flex p-2 rounded-xl mb-3 bg-purple-50 text-[#9B7FD4]"><Eye size={22} /></div>
+          {classroom ? (
+            <>
+              <p className="text-xs text-[#4B5563] font-semibold uppercase tracking-wide mb-1">Join Code</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-[#1A1D23] font-mono tracking-widest">{classroom.joinCode}</span>
+                <button
+                  onClick={copyJoinCode}
+                  aria-label="Copy join code"
+                  className="p-1.5 rounded-lg text-[#9CA3AF] hover:text-[#4A90D9] hover:bg-blue-50 transition-colors"
+                >
+                  {codeCopied ? <CopyCheck size={16} className="text-[#5BB974]" /> : <Copy size={16} />}
+                </button>
+              </div>
+              <p className="text-xs text-[#9CA3AF] mt-1">{classroom.name}</p>
+            </>
+          ) : (
+            <>
+              <div className="text-lg font-bold text-[#1A1D23]">—</div>
+              <div className="text-sm text-[#4B5563] mt-0.5">No classroom yet</div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Quick actions */}
@@ -242,17 +274,19 @@ function EmptyState({ message, action }: { message: string; action?: { to: strin
   )
 }
 
-function TeacherOnboardingChecklist({ classroom, bookCount }: { classroom: Classroom | null; bookCount: number }) {
+function TeacherOnboardingChecklist({ classroom, books }: { classroom: Classroom | null; books: Book[] }) {
   const step1Done = classroom !== null
-  const step2Done = bookCount > 0
-  const step3Done = (classroom?.studentIds.length ?? 0) > 0
+  const step2Done = books.length > 0
+  const step3Done = books.some((b) => b.assignedStudentIds.length > 0)
+  const step4Done = (classroom?.studentIds.length ?? 0) > 0
 
-  if (step1Done && step2Done && step3Done) return null
+  if (step1Done && step2Done && step3Done && step4Done) return null
 
   const steps = [
     { done: step1Done, label: 'Create your classroom', to: '/teacher/classroom', hint: 'Get your 6-letter join code' },
     { done: step2Done, label: 'Upload your first book', to: '/teacher/upload', hint: 'Add a PDF for students to read' },
-    { done: step3Done, label: 'Students join your classroom', to: '/teacher/classroom', hint: 'Share your join code with them' },
+    { done: step3Done, label: 'Assign your book to students', to: '/teacher/classroom', hint: 'Go to Classroom → select a book → Assign All' },
+    { done: step4Done, label: 'Students join your classroom', to: '/teacher/classroom', hint: 'Share your join code with them' },
   ]
 
   return (
