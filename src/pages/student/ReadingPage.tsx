@@ -123,6 +123,10 @@ export default function ReadingPage() {
 
   function onDocumentLoaded(pdf: unknown) {
     const loadedPdf = pdf as PdfDocument
+    if (!loadedPdf.numPages || loadedPdf.numPages < 1) {
+      setReaderError('This PDF appears to be empty or corrupt. Please contact your teacher.')
+      return
+    }
     setPdfDocument(loadedPdf)
     setNumPages(loadedPdf.numPages)
     setReaderError('')
@@ -289,9 +293,13 @@ export default function ReadingPage() {
   }
 
   async function handleDelete(annotationId: string) {
-    await deleteAnnotation(annotationId)
-    setAnnotations((prev) => prev.filter((a) => a.id !== annotationId))
-    closePanel()
+    try {
+      await deleteAnnotation(annotationId)
+      setAnnotations((prev) => prev.filter((a) => a.id !== annotationId))
+      closePanel()
+    } catch {
+      setSaveError('Could not delete. Check your connection and try again.')
+    }
   }
 
   async function handleReflectionSave() {
@@ -338,8 +346,21 @@ export default function ReadingPage() {
     setIsSpeaking(false)
     setReadAloudStatus('Loading…')
 
-    const page = await pdfDocument.getPage(currentPage)
-    const content = await page.getTextContent()
+    let page: Awaited<ReturnType<PdfDocument['getPage']>>
+    try {
+      page = await pdfDocument.getPage(currentPage)
+    } catch {
+      setReadAloudStatus('Could not load this page for reading. Try navigating away and back.')
+      return
+    }
+
+    let content: Awaited<ReturnType<typeof page.getTextContent>>
+    try {
+      content = await page.getTextContent()
+    } catch {
+      setReadAloudStatus('Could not extract text from this page.')
+      return
+    }
     const rawText = content.items
       .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
       .join(' ')
