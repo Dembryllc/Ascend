@@ -36,6 +36,7 @@ export default function ReadingPage() {
   const [selectedText, setSelectedText] = useState('')
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [savingReflection, setSavingReflection] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [containerWidth, setContainerWidth] = useState(700)
   const [loadingBook, setLoadingBook] = useState(true)
@@ -211,6 +212,8 @@ export default function ReadingPage() {
     const id = requestAnimationFrame(() => {
       setCapturedSelection('')
       setFloatingBar(null)
+      setAnnotationPanel({ open: false })
+      setSaveError('')
       if (speaking) setIsSpeaking(false)
     })
     return () => cancelAnimationFrame(id)
@@ -304,7 +307,7 @@ export default function ReadingPage() {
 
   async function handleReflectionSave() {
     if (!profile || !bookId || !reflectionText.trim()) return
-    setSaving(true)
+    setSavingReflection(true)
     setReflectionError('')
     try {
       const ann = await saveAnnotation(
@@ -322,7 +325,7 @@ export default function ReadingPage() {
     } catch {
       setReflectionError('Could not save. Check your connection and try again.')
     } finally {
-      setSaving(false)
+      setSavingReflection(false)
     }
   }
 
@@ -736,10 +739,10 @@ export default function ReadingPage() {
               />
               <button
                 onClick={handleReflectionSave}
-                disabled={!reflectionText.trim() || saving}
+                disabled={!reflectionText.trim() || savingReflection}
                 className="mt-3 w-full bg-[#5BB974] hover:bg-[#4AA863] disabled:opacity-50 text-white rounded-xl py-2.5 font-bold transition-colors"
               >
-                {saving ? 'Saving…' : 'Save Reflection'}
+                {savingReflection ? 'Saving…' : 'Save Reflection'}
               </button>
               {reflectionError && (
                 <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{reflectionError}</p>
