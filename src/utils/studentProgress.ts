@@ -85,7 +85,13 @@ export function buildStudentProgressSummary(
   const today = startOfToday()
   let streakDays = 0
 
-  for (let cursor = new Date(today); annotationDays.has(dateKey(cursor)); cursor.setDate(cursor.getDate() - 1)) {
+  // Start streak from yesterday if the student hasn't annotated today yet,
+  // so a valid consecutive streak isn't wiped at midnight.
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const streakStart = annotationDays.has(dateKey(today)) ? today : yesterday
+
+  for (let cursor = new Date(streakStart); annotationDays.has(dateKey(cursor)); cursor.setDate(cursor.getDate() - 1)) {
     streakDays += 1
   }
 

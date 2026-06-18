@@ -219,6 +219,15 @@ export default function ReadingPage() {
     return () => cancelAnimationFrame(id)
   }, [currentPage])
 
+  useEffect(() => {
+    if (!annotationPanel.open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') closePanel()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [annotationPanel.open])
+
   async function handleMarkComplete() {
     setMarkingComplete(true)
     try {
@@ -524,7 +533,15 @@ export default function ReadingPage() {
                     {book.assignmentPrompt && <p className="text-sm text-[#4B5563] mt-1">{book.assignmentPrompt}</p>}
                     {book.successCriteria && <p className="text-xs font-semibold text-[#5BB974] mt-2">{book.successCriteria}</p>}
                     <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#4A90D9] rounded-full" style={{ width: `${completionPct}%` }} />
+                      <div
+                        role="progressbar"
+                        aria-valuenow={completionPct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Reading task completion"
+                        className="h-full bg-[#4A90D9] rounded-full"
+                        style={{ width: `${completionPct}%` }}
+                      />
                     </div>
                     <p className="text-xs text-[#6B7280] mt-1">{completedTaskCount} of {taskCount} reading actions complete</p>
                   </div>
@@ -556,7 +573,15 @@ export default function ReadingPage() {
                 </div>
               </div>
               <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                <div className="h-full bg-[#5BB974] rounded-full" style={{ width: `${readingCompletionPct}%` }} />
+                <div
+                  role="progressbar"
+                  aria-valuenow={readingCompletionPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Book reading progress"
+                  className="h-full bg-[#5BB974] rounded-full"
+                  style={{ width: `${readingCompletionPct}%` }}
+                />
               </div>
             </section>
 
@@ -588,7 +613,7 @@ export default function ReadingPage() {
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
             aria-label="Previous page"
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#F3F4F6] rounded-xl font-semibold text-[#1A1D23] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-base"
+            className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-[#F3F4F6] rounded-xl font-semibold text-[#1A1D23] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-base"
           >
             <ChevronLeft size={20} /> Prev
           </button>
@@ -605,7 +630,7 @@ export default function ReadingPage() {
             onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
             disabled={currentPage >= numPages}
             aria-label="Next page"
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#F3F4F6] rounded-xl font-semibold text-[#1A1D23] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-base"
+            className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-[#F3F4F6] rounded-xl font-semibold text-[#1A1D23] hover:bg-[#E5E7EB] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-base"
           >
             Next <ChevronRight size={20} />
           </button>
@@ -794,10 +819,13 @@ export default function ReadingPage() {
       {annotationPanel.open && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={closePanel}>
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="annotation-panel-title"
             className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-bold text-xl text-[#1A1D23] mb-4">
+            <h3 id="annotation-panel-title" className="font-bold text-xl text-[#1A1D23] mb-4">
               {annotationPanel.editing ? 'Edit Annotation' : 'Add Annotation'} — Page {currentPage}
             </h3>
 
@@ -842,8 +870,9 @@ export default function ReadingPage() {
                 Add a note <span className="text-[#9CA3AF] font-normal">(optional)</span>
               </label>
               <textarea
+                autoFocus
                 value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
+                onChange={(e) => { setNoteText(e.target.value); setSaveError('') }}
                 rows={3}
                 maxLength={500}
                 placeholder="Write a short note… (2–3 sentences is perfect)"

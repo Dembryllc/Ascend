@@ -219,6 +219,11 @@ export default function StudentProgressPage() {
                   </div>
                   <div className="h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
                     <div
+                      role="progressbar"
+                      aria-valuenow={percent}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${book.title} reading progress`}
                       className="h-full rounded-full transition-all"
                       style={{
                         width: `${percent}%`,
@@ -284,6 +289,11 @@ export default function StudentProgressPage() {
 
           <div className="h-3 bg-[#E5E7EB] rounded-full overflow-hidden mb-4">
             <div
+              role="progressbar"
+              aria-valuenow={summary.weeklyGoalPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Weekly annotation goal progress"
               className="h-full rounded-full transition-all"
               style={{
                 width: `${summary.weeklyGoalPercent}%`,
@@ -366,6 +376,11 @@ function ReactionBreakdown({ reactionCounts }: { reactionCounts: Record<Reaction
             </div>
             <div className="h-3 bg-[#E5E7EB] rounded-full overflow-hidden">
               <div
+                role="progressbar"
+                aria-valuenow={percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${reaction.label} reaction percentage`}
                 className="h-full rounded-full transition-all"
                 style={{ width: `${percent}%`, backgroundColor: reaction.color }}
               />
