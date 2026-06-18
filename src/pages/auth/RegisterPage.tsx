@@ -199,6 +199,13 @@ export default function RegisterPage() {
             </div>
           )}
 
+          <p className="text-xs text-[#9CA3AF] text-center">
+            By creating an account you agree to our{' '}
+            <Link to="/terms" className="underline hover:text-[#4B5563]">Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline hover:text-[#4B5563]">Privacy Policy</Link>.
+          </p>
+
           <button
             type="submit"
             disabled={loading || (role === 'student' && joinCode.length > 0 && joinCode.length < 6)}

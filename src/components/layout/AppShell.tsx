@@ -138,6 +138,12 @@ export default function AppShell({ children, title }: Props) {
             <Link to="/pricing" className="hover:text-[#4A90D9]">Pricing</Link>
             <Link to="/privacy" className="hover:text-[#4A90D9]">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-[#4A90D9]">Terms of Service</Link>
+            <a
+              href={`mailto:dembryllc@gmail.com?subject=${encodeURIComponent('Account deletion request')}&body=${encodeURIComponent('Please delete my Easy Annotate account and all associated data.\n\nDisplay name: \nEmail: ')}`}
+              className="hover:text-[#4A90D9]"
+            >
+              Delete Account
+            </a>
           </div>
         </div>
       </footer>
