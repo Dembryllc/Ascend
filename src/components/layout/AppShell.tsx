@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
 import { getTrialDaysRemaining, homeForRole } from '@/types'
+import { stripeAnnualUrl } from '@/utils/stripe'
 import { BarChart3, BookOpen, Eye, Home, LogOut, MessageSquare, TrendingUp, Upload, Users, X } from 'lucide-react'
 
 interface Props {
@@ -24,7 +25,7 @@ const STUDENT_NAV = [
   { to: '/student/progress',    icon: TrendingUp,    label: 'Progress' },
 ]
 
-function TrialBanner({ daysRemaining }: { daysRemaining: number }) {
+function TrialBanner({ daysRemaining, upgradeUrl }: { daysRemaining: number; upgradeUrl: string | null }) {
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem('trial-banner-dismissed') === 'true'
   )
@@ -44,7 +45,7 @@ function TrialBanner({ daysRemaining }: { daysRemaining: number }) {
   const linkColor = urgent ? 'text-red-800 underline font-bold' : warning ? 'text-amber-800 underline font-semibold' : 'text-[#4A90D9] underline font-semibold'
 
   const message = urgent
-    ? `Your free trial ends in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — upgrade now to keep your classroom running.`
+    ? `Your free trial ends in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} — upgrade now to keep Pro access.`
     : warning
     ? `${daysRemaining} days left in your Pro trial.`
     : `${daysRemaining} days left in your free Pro trial.`
@@ -53,9 +54,15 @@ function TrialBanner({ daysRemaining }: { daysRemaining: number }) {
     <div className={`border-b ${bgColor} ${textColor} px-4 py-2 flex items-center justify-between gap-3 text-sm`}>
       <p>
         {message}{' '}
-        <Link to="/pricing" className={linkColor}>
-          Upgrade to Pro →
-        </Link>
+        {upgradeUrl ? (
+          <a href={upgradeUrl} className={linkColor}>
+            Upgrade to Pro →
+          </a>
+        ) : (
+          <Link to="/pricing" className={linkColor}>
+            Upgrade to Pro →
+          </Link>
+        )}
       </p>
       <button
         onClick={dismiss}
@@ -122,7 +129,7 @@ export default function AppShell({ children, title }: Props) {
       {/* Trial banner — teachers and individuals with an active trial */}
       {(profile?.role === 'teacher' || profile?.role === 'individual') && (() => {
         const days = getTrialDaysRemaining(profile)
-        return days !== null ? <TrialBanner daysRemaining={days} /> : null
+        return days !== null ? <TrialBanner daysRemaining={days} upgradeUrl={stripeAnnualUrl(profile)} /> : null
       })()}
 
       {/* Page content — extra bottom padding on mobile for the bottom nav */}

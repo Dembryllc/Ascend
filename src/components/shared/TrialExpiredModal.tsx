@@ -1,11 +1,17 @@
 import { Link } from 'react-router-dom'
 import { Clock, X } from 'lucide-react'
+import { useAuth } from '@/context/auth-context'
+import { stripeAnnualUrl, stripeMonthlyUrl } from '@/utils/stripe'
 
 interface Props {
   onClose: () => void
 }
 
 export default function TrialExpiredModal({ onClose }: Props) {
+  const { profile } = useAuth()
+  const annualUrl = stripeAnnualUrl(profile)
+  const monthlyUrl = stripeMonthlyUrl(profile)
+
   return (
     <div
       className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
@@ -32,18 +38,38 @@ export default function TrialExpiredModal({ onClose }: Props) {
           Your free trial has ended
         </h3>
         <p className="text-sm text-[#4B5563] mb-1">
-          You had full Pro access for 14 days — we hope it was useful for your classroom.
+          You had full Pro access for 14 days — we hope it was useful.
         </p>
         <p className="text-sm text-[#4B5563] mb-6">
           Upgrade to Pro to keep unlimited books, unlimited students, and PDF annotation export.
         </p>
 
-        <Link
-          to="/pricing"
-          className="block w-full text-center bg-[#4A90D9] text-white font-bold py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
-        >
-          Upgrade to Pro — $8/month
-        </Link>
+        {annualUrl ? (
+          <div className="space-y-2">
+            <a
+              href={annualUrl}
+              className="block w-full text-center bg-[#4A90D9] text-white font-bold py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+            >
+              Upgrade to Pro — $72/year
+            </a>
+            {monthlyUrl && (
+              <a
+                href={monthlyUrl}
+                className="block w-full text-center py-2 text-sm text-[#4B5563] hover:text-[#1A1D23] transition-colors"
+              >
+                or $8/month
+              </a>
+            )}
+          </div>
+        ) : (
+          <Link
+            to="/pricing"
+            className="block w-full text-center bg-[#4A90D9] text-white font-bold py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
+          >
+            Upgrade to Pro — $8/month
+          </Link>
+        )}
+
         <button
           onClick={onClose}
           className="block w-full text-center mt-2 py-2 text-sm text-[#9CA3AF] hover:text-[#4B5563] transition-colors"

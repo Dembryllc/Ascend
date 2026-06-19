@@ -2,9 +2,7 @@ import { Link } from 'react-router-dom'
 import { BookOpen, Check, Lock } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
 import { isPro, homeForRole } from '@/types'
-
-const PRO_MONTHLY_URL = import.meta.env.VITE_STRIPE_PRO_MONTHLY_URL as string | undefined
-const PRO_ANNUAL_URL = import.meta.env.VITE_STRIPE_PRO_ANNUAL_URL as string | undefined
+import { stripeMonthlyUrl, stripeAnnualUrl } from '@/utils/stripe'
 
 const FREE_FEATURES = [
   '1 classroom',
@@ -27,17 +25,8 @@ export default function PricingPage() {
   const { profile } = useAuth()
   const userIsPro = isPro(profile)
 
-  function buildCheckoutUrl(base: string | undefined) {
-    if (!base) return null
-    const params = new URLSearchParams()
-    if (profile?.uid) params.set('client_reference_id', profile.uid)
-    if (profile?.email) params.set('prefilled_email', profile.email)
-    const qs = params.toString()
-    return qs ? `${base}?${qs}` : base
-  }
-
-  const monthlyUrl = buildCheckoutUrl(PRO_MONTHLY_URL)
-  const annualUrl = buildCheckoutUrl(PRO_ANNUAL_URL)
+  const monthlyUrl = stripeMonthlyUrl(profile)
+  const annualUrl = stripeAnnualUrl(profile)
 
   return (
     <div className="min-h-screen bg-[#F8F9FC]">
