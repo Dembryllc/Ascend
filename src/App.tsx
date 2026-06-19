@@ -48,12 +48,12 @@ export default function App() {
           <Route path="/teacher/annotations" element={<ProtectedRoute requiredRole="teacher"><AnnotationsViewerPage /></ProtectedRoute>} />
           <Route path="/teacher/progress" element={<ProtectedRoute requiredRole="teacher"><ProgressDashboardPage /></ProtectedRoute>} />
 
-          {/* Student */}
-          <Route path="/student" element={<ProtectedRoute requiredRole="student"><StudentHome /></ProtectedRoute>} />
-          <Route path="/student/upload" element={<ProtectedRoute requiredRole="student"><StudentUploadPage /></ProtectedRoute>} />
-          <Route path="/student/read/:bookId" element={<ProtectedRoute requiredRole="student"><ReadingPage /></ProtectedRoute>} />
-          <Route path="/student/annotations" element={<ProtectedRoute requiredRole="student"><MyAnnotationsPage /></ProtectedRoute>} />
-          <Route path="/student/progress" element={<ProtectedRoute requiredRole="student"><StudentProgressPage /></ProtectedRoute>} />
+          {/* Student + Individual — shared shelf/reading/annotation routes */}
+          <Route path="/student" element={<ProtectedRoute requiredRole={['student', 'individual']}><StudentHome /></ProtectedRoute>} />
+          <Route path="/student/upload" element={<ProtectedRoute requiredRole={['student', 'individual']}><StudentUploadPage /></ProtectedRoute>} />
+          <Route path="/student/read/:bookId" element={<ProtectedRoute requiredRole={['student', 'individual']}><ReadingPage /></ProtectedRoute>} />
+          <Route path="/student/annotations" element={<ProtectedRoute requiredRole={['student', 'individual']}><MyAnnotationsPage /></ProtectedRoute>} />
+          <Route path="/student/progress" element={<ProtectedRoute requiredRole={['student', 'individual']}><StudentProgressPage /></ProtectedRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

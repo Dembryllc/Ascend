@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser, loginWithGoogle } from '@/firebase/auth'
+import { homeForRole } from '@/types'
 import type { UserRole } from '@/types'
 import { BookOpen } from 'lucide-react'
 
@@ -39,7 +40,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await loginWithGoogle(role)
-      navigate(role === 'teacher' ? '/teacher' : '/student')
+      navigate(homeForRole(role))
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
@@ -62,7 +63,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await registerUser(email, password, displayName, role, joinCode.trim() || undefined)
-      navigate(role === 'teacher' ? '/teacher' : '/student')
+      navigate(homeForRole(role))
     } catch (err: unknown) {
       setError(getAuthErrorMessage(err))
     } finally {
@@ -86,18 +87,18 @@ export default function RegisterPage() {
 
         {/* Role toggle */}
         <div className="flex rounded-xl overflow-hidden border border-[#E5E7EB] mb-6">
-          {(['student', 'teacher'] as UserRole[]).map((r) => (
+          {(['student', 'teacher', 'individual'] as UserRole[]).map((r) => (
             <button
               key={r}
               type="button"
               onClick={() => setRole(r)}
-              className={`flex-1 py-3 text-base font-semibold capitalize transition-colors ${
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
                 role === r
                   ? 'bg-[#4A90D9] text-white'
                   : 'bg-white text-[#4B5563] hover:bg-[#F3F4F6]'
               }`}
             >
-              {r === 'student' ? '🎒 Student' : '🍎 Teacher'}
+              {r === 'student' ? '🎒 Student' : r === 'teacher' ? '🍎 Teacher' : '📖 Individual'}
             </button>
           ))}
         </div>

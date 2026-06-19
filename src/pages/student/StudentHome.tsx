@@ -179,6 +179,7 @@ export default function StudentHome() {
         hasStartedReading={readingProgress.length > 0}
         hasAnnotated={annotations.length > 0}
         onJoined={refreshProfile}
+        role={profile!.role}
       />
 
       {books.length === 0 ? (
@@ -496,6 +497,7 @@ function StudentOnboardingChecklist({
   hasStartedReading,
   hasAnnotated,
   onJoined,
+  role,
 }: {
   studentId: string
   classroomId: string | null | undefined
@@ -503,13 +505,15 @@ function StudentOnboardingChecklist({
   hasStartedReading: boolean
   hasAnnotated: boolean
   onJoined: () => void
+  role: string
 }) {
   const [code, setCode] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
   const [joined, setJoined] = useState(false)
 
-  const step1Done = classroomId != null
+  const isIndividual = role === 'individual'
+  const step1Done = isIndividual || classroomId != null
   const step2Done = hasStartedReading
   const step3Done = hasAnnotated
 

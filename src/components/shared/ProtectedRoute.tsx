@@ -1,11 +1,12 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
+import { homeForRole } from '@/types'
 import type { UserRole } from '@/types'
 
 interface Props {
   children: React.ReactNode
-  requiredRole?: UserRole
+  requiredRole?: UserRole | UserRole[]
 }
 
 export default function ProtectedRoute({ children, requiredRole }: Props) {
@@ -25,9 +26,13 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
 
   if (!user) return <Navigate to="/login" replace />
 
+  const allowedRoles = requiredRole
+    ? (Array.isArray(requiredRole) ? requiredRole : [requiredRole])
+    : null
+
   // Authenticated but no Firestore profile — registration failed mid-flight.
   // Show a recovery screen rather than entering an infinite redirect loop.
-  if (requiredRole && !profile) {
+  if (allowedRoles && !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
         <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
@@ -46,8 +51,8 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
     )
   }
 
-  if (requiredRole && profile?.role !== requiredRole) {
-    return <Navigate to={profile?.role === 'teacher' ? '/teacher' : '/student'} replace />
+  if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
+    return <Navigate to={homeForRole(profile.role)} replace />
   }
 
   return <>{children}</>

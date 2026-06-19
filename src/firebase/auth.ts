@@ -35,15 +35,15 @@ export async function registerUser(
       if (!found) throw new Error('Invalid class join code. Please check the code with your teacher.')
     }
 
-    const trialEndsAt = role === 'teacher'
+    const trialEndsAt = (role === 'teacher' || role === 'individual')
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
       : null
 
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
-      // Student emails are not stored in Firestore — kept in Firebase Auth only (FERPA PII minimization).
-      // Teacher emails are stored so the Stripe checkout can be pre-filled.
-      ...(role === 'teacher' ? { email } : {}),
+      // Student emails are not stored in Firestore (FERPA PII minimization — Auth only).
+      // Teacher and individual emails are stored for billing and account recovery.
+      ...(role !== 'student' ? { email } : {}),
       displayName,
       role,
       classroomId: null,
@@ -137,16 +137,17 @@ export async function finalizeGoogleSignIn(user: User): Promise<void> {
 async function writeGoogleProfile(user: User, role: UserRole): Promise<void> {
   const email = user.email
   if (!email) throw new Error('Your Google account has no email address. Please use a Google account with an email.')
-  const isTeacher = role === 'teacher'
+  const isStudent = role === 'student'
+  const hasTrial = role === 'teacher' || role === 'individual'
   await setDoc(doc(db, 'users', user.uid), {
     uid: user.uid,
     // FERPA: student email stays in Firebase Auth only, never Firestore.
-    ...(isTeacher ? { email } : {}),
-    displayName: user.displayName ?? (isTeacher ? email : 'Student'),
+    ...(isStudent ? {} : { email }),
+    displayName: user.displayName ?? (isStudent ? 'Student' : email),
     role,
     classroomId: null,
     subscriptionStatus: 'free',
-    ...(isTeacher ? { trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) } : {}),
+    ...(hasTrial ? { trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) } : {}),
     createdAt: serverTimestamp(),
   })
 }

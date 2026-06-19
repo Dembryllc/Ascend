@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
-import { getTrialDaysRemaining } from '@/types'
+import { getTrialDaysRemaining, homeForRole } from '@/types'
 import { BarChart3, BookOpen, Eye, Home, LogOut, MessageSquare, TrendingUp, Upload, Users, X } from 'lucide-react'
 
 interface Props {
@@ -78,7 +78,7 @@ export default function AppShell({ children, title }: Props) {
     navigate('/login')
   }
 
-  const homeLink = profile?.role === 'teacher' ? '/teacher' : '/student'
+  const homeLink = profile ? homeForRole(profile.role) : '/'
   const navItems = profile?.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV
 
   // Find the most-specific nav item whose path matches the current route.
@@ -119,8 +119,8 @@ export default function AppShell({ children, title }: Props) {
         </div>
       </header>
 
-      {/* Trial banner — teachers only, active trial only */}
-      {profile?.role === 'teacher' && (() => {
+      {/* Trial banner — teachers and individuals with an active trial */}
+      {(profile?.role === 'teacher' || profile?.role === 'individual') && (() => {
         const days = getTrialDaysRemaining(profile)
         return days !== null ? <TrialBanner daysRemaining={days} /> : null
       })()}

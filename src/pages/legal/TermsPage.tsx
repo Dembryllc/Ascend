@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
+import { homeForRole } from '@/types'
 
 export default function TermsPage() {
   const { profile } = useAuth()
-  const homeLink = profile ? (profile.role === 'teacher' ? '/teacher' : '/student') : '/'
+  const homeLink = profile ? homeForRole(profile.role) : '/'
 
   return (
     <div className="min-h-screen bg-[#F8F9FC]">

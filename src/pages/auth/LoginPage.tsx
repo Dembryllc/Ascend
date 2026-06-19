@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { loginUser, signInWithGoogleOnly, sendPasswordReset } from '@/firebase/auth'
+import { homeForRole } from '@/types'
 import { useAuth } from '@/context/auth-context'
 import { BookOpen } from 'lucide-react'
 
@@ -26,7 +27,7 @@ export default function LoginPage() {
   const [resetMode, setResetMode] = useState(false)
 
   if (profile) {
-    return <Navigate to={profile.role === 'teacher' ? '/teacher' : '/student'} replace />
+    return <Navigate to={homeForRole(profile.role)} replace />
   }
 
   async function handleSubmit(e: React.FormEvent) {

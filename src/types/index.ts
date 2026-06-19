@@ -1,4 +1,4 @@
-export type UserRole = 'teacher' | 'student'
+export type UserRole = 'teacher' | 'student' | 'individual'
 export type SubscriptionStatus = 'free' | 'pro' | 'district'
 
 export interface UserProfile {
@@ -18,6 +18,10 @@ export function isPro(profile: UserProfile | null | undefined): boolean {
   if (s === 'pro' || s === 'district') return true
   if (profile?.trialEndsAt && profile.trialEndsAt > new Date()) return true
   return false
+}
+
+export function homeForRole(role: UserRole): string {
+  return role === 'teacher' ? '/teacher' : '/student'
 }
 
 export function getTrialDaysRemaining(profile: UserProfile | null | undefined): number | null {

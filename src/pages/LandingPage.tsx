@@ -1,12 +1,13 @@
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
+import { homeForRole } from '@/types'
 import { BookOpen, CheckCircle2, Eye, MessageSquare, TrendingUp, Users } from 'lucide-react'
 
 export default function LandingPage() {
   const { profile, loading } = useAuth()
 
   if (!loading && profile) {
-    return <Navigate to={profile.role === 'teacher' ? '/teacher' : '/student'} replace />
+    return <Navigate to={homeForRole(profile.role)} replace />
   }
 
   return (

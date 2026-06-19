@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { BookOpen, Check, Lock } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
-import { isPro } from '@/types'
+import { isPro, homeForRole } from '@/types'
 
 const PRO_MONTHLY_URL = import.meta.env.VITE_STRIPE_PRO_MONTHLY_URL as string | undefined
 const PRO_ANNUAL_URL = import.meta.env.VITE_STRIPE_PRO_ANNUAL_URL as string | undefined
@@ -43,14 +43,14 @@ export default function PricingPage() {
     <div className="min-h-screen bg-[#F8F9FC]">
       <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to={profile ? (profile.role === 'teacher' ? '/teacher' : '/student') : '/login'} className="flex items-center gap-2">
+          <Link to={profile ? homeForRole(profile.role) : '/login'} className="flex items-center gap-2">
             <div className="bg-[#4A90D9] text-white p-1.5 rounded-lg">
               <BookOpen size={20} />
             </div>
             <span className="text-lg font-bold text-[#1A1D23]">Easy Annotate</span>
           </Link>
           {profile ? (
-            <Link to={profile.role === 'teacher' ? '/teacher' : '/student'} className="text-sm text-[#4A90D9] font-semibold hover:underline">
+            <Link to={homeForRole(profile.role)} className="text-sm text-[#4A90D9] font-semibold hover:underline">
               Back to dashboard
             </Link>
           ) : (
