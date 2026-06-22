@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser, loginWithGoogle } from '@/firebase/auth'
+import { useAuth } from '@/context/auth-context'
 import { homeForRole } from '@/types'
 import type { UserRole } from '@/types'
 import { BookOpen } from 'lucide-react'
@@ -27,6 +28,7 @@ function getAuthErrorMessage(err: unknown): string {
 
 export default function RegisterPage() {
   const navigate = useNavigate()
+  const { refreshProfile } = useAuth()
   const [role, setRole] = useState<UserRole>('student')
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -40,6 +42,10 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await loginWithGoogle(role)
+      // Firestore profile is written by loginWithGoogle, but onAuthStateChanged may
+      // have already read an empty profile during the auth state change. Refresh so
+      // ProtectedRoute sees a valid profile before we navigate.
+      await refreshProfile()
       navigate(homeForRole(role))
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
