@@ -540,46 +540,48 @@ function StudentOnboardingChecklist({
   return (
     <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-5 mb-8" role="region" aria-label="Getting started checklist">
       <h3 className="font-bold text-[#1A1D23] mb-0.5">Get started with Easy Annotate</h3>
-      <p className="text-sm text-[#4B5563] mb-4">Three steps to your first annotation.</p>
+      <p className="text-sm text-[#4B5563] mb-4">{isIndividual ? 'Two steps to your first annotation.' : 'Three steps to your first annotation.'}</p>
       <ol className="space-y-4">
-        <li className="flex items-start gap-3">
-          <span className="mt-0.5 shrink-0" aria-hidden="true">
-            {step1Done ? <CheckCircle2 size={20} className="text-[#5BB974]" /> : <Circle size={20} className="text-[#4A90D9]" />}
-          </span>
-          <div className="flex-1 min-w-0">
-            <span className={`block text-sm font-semibold ${step1Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
-              1. Join your classroom
+        {!isIndividual && (
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 shrink-0" aria-hidden="true">
+              {step1Done ? <CheckCircle2 size={20} className="text-[#5BB974]" /> : <Circle size={20} className="text-[#4A90D9]" />}
             </span>
-            {!step1Done && (
-              <>
-                <span className="block text-xs text-[#4B5563] mt-0.5 mb-2">Enter the code your teacher gave you.</span>
-                {joined ? (
-                  <p className="text-sm font-semibold text-[#5BB974]">Joined! Refreshing…</p>
-                ) : (
-                  <form onSubmit={handleJoin} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
-                      maxLength={6}
-                      placeholder="ABCXYZ"
-                      aria-label="Classroom join code"
-                      className="w-32 border border-[#D1D5DB] rounded-xl px-3 py-2 text-sm font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={joining || code.trim().length < 6}
-                      className="bg-[#4A90D9] text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-[#357ABD] disabled:opacity-50 transition-colors whitespace-nowrap"
-                    >
-                      {joining ? 'Joining…' : 'Join'}
-                    </button>
-                  </form>
-                )}
-                {joinError && <p className="text-xs text-red-600 mt-1.5">{joinError}</p>}
-              </>
-            )}
-          </div>
-        </li>
+            <div className="flex-1 min-w-0">
+              <span className={`block text-sm font-semibold ${step1Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
+                1. Join your classroom
+              </span>
+              {!step1Done && (
+                <>
+                  <span className="block text-xs text-[#4B5563] mt-0.5 mb-2">Enter the code your teacher gave you.</span>
+                  {joined ? (
+                    <p className="text-sm font-semibold text-[#5BB974]">Joined! Refreshing…</p>
+                  ) : (
+                    <form onSubmit={handleJoin} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.toUpperCase())}
+                        maxLength={6}
+                        placeholder="ABCXYZ"
+                        aria-label="Classroom join code"
+                        className="w-32 border border-[#D1D5DB] rounded-xl px-3 py-2 text-sm font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={joining || code.trim().length < 6}
+                        className="bg-[#4A90D9] text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-[#357ABD] disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        {joining ? 'Joining…' : 'Join'}
+                      </button>
+                    </form>
+                  )}
+                  {joinError && <p className="text-xs text-red-600 mt-1.5">{joinError}</p>}
+                </>
+              )}
+            </div>
+          </li>
+        )}
 
         <li className="flex items-start gap-3">
           <span className="mt-0.5 shrink-0" aria-hidden="true">
@@ -587,7 +589,7 @@ function StudentOnboardingChecklist({
           </span>
           <div className="flex-1 min-w-0">
             <span className={`block text-sm font-semibold ${step2Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
-              2. Open your first book
+              {isIndividual ? '1.' : '2.'} Open your first book
             </span>
             {!step2Done && (
               <span className="block text-xs text-[#4B5563] mt-0.5">Start reading any book in your shelf.</span>
@@ -606,7 +608,7 @@ function StudentOnboardingChecklist({
           </span>
           <div className="flex-1 min-w-0">
             <span className={`block text-sm font-semibold ${step3Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
-              3. Leave your first annotation
+              {isIndividual ? '2.' : '3.'} Leave your first annotation
             </span>
             {!step3Done && (
               <span className="block text-xs text-[#4B5563] mt-0.5">Select text in a book and tap an emoji to react.</span>
