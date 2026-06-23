@@ -25,6 +25,16 @@ import {
   TrendingUp,
 } from 'lucide-react'
 
+function readStreak(uid: string): { count: number; lastDate: string } {
+  try {
+    const raw = localStorage.getItem(`ea:streak:${uid}`)
+    if (!raw) return { count: 0, lastDate: '' }
+    return JSON.parse(raw) as { count: number; lastDate: string }
+  } catch {
+    return { count: 0, lastDate: '' }
+  }
+}
+
 export default function StudentHome() {
   const { profile, loading: authLoading, error: authError, refreshProfile } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
@@ -34,6 +44,7 @@ export default function StudentHome() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Book | null>(null)
+  const streakCount = profile ? readStreak(profile.uid).count : 0
 
   useEffect(() => {
     if (authLoading || authError || !profile) return
@@ -140,7 +151,15 @@ export default function StudentHome() {
         <h2 className="text-3xl font-bold text-[#1A1D23]">
           Hello, {profile?.displayName}!
         </h2>
-        <p className="text-[#4B5563] text-lg mt-1">Happy reading!</p>
+        <div className="flex items-center gap-3 mt-1">
+          <p className="text-[#4B5563] text-lg">Happy reading!</p>
+          {streakCount >= 2 && (
+            <span className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-sm font-bold px-3 py-1 rounded-full">
+              <Flame size={15} className="text-orange-500" />
+              {streakCount}-day streak
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Action row */}
@@ -659,12 +678,17 @@ function BookCard({
           {progress && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-[11px] font-semibold text-[#6B7280] mb-1">
-                <span>{progress.completed ? 'Complete' : `Page ${progress.lastReadPage}`}</span>
+                <span>{progress.completed ? '✓ Complete' : `Page ${progress.lastReadPage} of ${progress.totalPages}`}</span>
                 <span>{progress.completionPercent}%</span>
               </div>
               <div className="h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
                 <div className="h-full bg-[#5BB974] rounded-full" style={{ width: `${progress.completionPercent}%` }} />
               </div>
+              {!progress.completed && progress.lastReadPage > 1 && (
+                <p className="text-xs font-bold text-[#4A90D9] mt-2">
+                  Continue on p.{progress.lastReadPage} →
+                </p>
+              )}
             </div>
           )}
         </div>

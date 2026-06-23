@@ -77,6 +77,19 @@ export default function ReadingPage() {
       setReadingProgress(progress)
       if (progress?.lastReadPage) setCurrentPage(Math.max(1, progress.lastReadPage))
       setLoadingBook(false)
+      // Mark reading streak for today
+      const today = new Date().toISOString().slice(0, 10)
+      const streakKey = `ea:streak:${profile.uid}`
+      try {
+        const raw = localStorage.getItem(streakKey)
+        const saved = raw ? (JSON.parse(raw) as { count: number; lastDate: string }) : { count: 0, lastDate: '' }
+        if (saved.lastDate === today) return
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+        const newCount = saved.lastDate === yesterday ? saved.count + 1 : 1
+        localStorage.setItem(streakKey, JSON.stringify({ count: newCount, lastDate: today }))
+      } catch {
+        // localStorage may be unavailable — not critical
+      }
     }).catch((err: unknown) => {
       console.error('Failed to open book:', err)
       setReaderError(err instanceof Error ? err.message : 'Could not open this book. Please try again.')
@@ -267,6 +280,7 @@ export default function ReadingPage() {
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [showSpeedControl])
+
 
   async function handleMarkComplete() {
     setMarkingComplete(true)
@@ -482,6 +496,29 @@ export default function ReadingPage() {
       window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
     }
   }, [currentPage, pdfDocument, book, docxPages, speechRate])
+
+  // Keyboard shortcuts: ←/→ for page nav, Space to toggle read-aloud
+  useEffect(() => {
+    if (!numPages) return
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as Element)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (annotationPanel.open) return
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        setCurrentPage((p) => Math.min(numPages, p + 1))
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        setCurrentPage((p) => Math.max(1, p - 1))
+      } else if (e.key === ' ') {
+        e.preventDefault()
+        if (isSpeaking) stopSpeaking()
+        else void speakPage()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [numPages, annotationPanel.open, isSpeaking, speakPage])
 
   if (!bookId) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
