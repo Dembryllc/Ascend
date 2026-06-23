@@ -249,8 +249,14 @@ export default function MyAnnotationsPage() {
       {/* Edit modal */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setEditing(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-xl text-[#1A1D23] mb-4">Edit Annotation</h3>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-modal-title"
+            className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="edit-modal-title" className="font-bold text-xl text-[#1A1D23] mb-4">Edit Annotation</h3>
             <div className="grid grid-cols-5 gap-2 mb-4">
               {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
                 <button

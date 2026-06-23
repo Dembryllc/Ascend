@@ -37,9 +37,23 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold mb-3">2. Educational use</h2>
+            <h2 className="text-xl font-bold mb-3">2. Educational use and acceptable use policy</h2>
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              Easy Annotate is designed for educational use. You may use the service to read assigned books, leave reading annotations, and review student engagement in a classroom setting.
+            </p>
+            <p className="text-[#4B5563] font-semibold mb-2">You may not use the service to:</p>
+            <ul className="list-disc pl-5 space-y-1.5 text-[#4B5563] mb-3">
+              <li>Post or share content that is harassing, threatening, sexually explicit, or harmful to any person.</li>
+              <li>Access, view, or attempt to view another user's annotations, profile, or data without authorization.</li>
+              <li>Circumvent or attempt to circumvent security controls, authentication, or access restrictions.</li>
+              <li>Upload malicious files, scripts, or content other than PDF documents for the purpose of annotation.</li>
+              <li>Use the service for any commercial purpose outside an authorized school or district relationship.</li>
+            </ul>
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              <strong>Teacher responsibilities:</strong> Teachers who use Easy Annotate for a classroom are responsible for monitoring their students' use of the platform, reporting misuse to us, and ensuring their students comply with this acceptable use policy.
+            </p>
             <p className="text-[#4B5563] leading-relaxed">
-              Easy Annotate is designed for educational use. You may use the service to read assigned books, leave reading annotations, and review student engagement in a classroom setting. You may not use the service for any purpose that is unlawful, harmful, or outside the educational context it is intended for.
+              We reserve the right to suspend or terminate any account that violates this policy without prior notice.
             </p>
           </section>
 
@@ -86,9 +100,25 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold mb-3">9. Contact</h2>
+            <h2 className="text-xl font-bold mb-3">9. Third-party services</h2>
             <p className="text-[#4B5563] leading-relaxed">
-              For questions about these terms, contact us at{' '}
+              Easy Annotate relies on the following third-party services to operate: Google Firebase (authentication, database, file storage) and Stripe (payment processing for Pro subscriptions). By using Easy Annotate, you acknowledge that your data is processed by these services subject to their respective privacy policies. Student education records are never shared with Stripe. See our{' '}
+              <Link to="/privacy" className="text-[#4A90D9] hover:underline">Privacy Policy</Link>{' '}
+              for details on data handling by each vendor.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold mb-3">10. Districts and data processing agreements</h2>
+            <p className="text-[#4B5563] leading-relaxed">
+              Schools and districts may request a Data Processing Addendum (DPA) or custom terms amendment by contacting us at the address below. A signed DPA supersedes the data-handling provisions in these Terms for the contracting institution and governs how we process student education records on their behalf.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold mb-3">11. Contact</h2>
+            <p className="text-[#4B5563] leading-relaxed">
+              For questions about these terms, DPA inquiries, or to report a violation, contact us at{' '}
               <a href="mailto:dembryllc@gmail.com" className="text-[#4A90D9] hover:underline">dembryllc@gmail.com</a>.
             </p>
           </section>

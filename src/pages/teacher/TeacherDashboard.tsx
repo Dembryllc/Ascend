@@ -124,10 +124,10 @@ export default function TeacherDashboard() {
                 className="text-2xl font-bold text-[#1A1D23] border-b-2 border-[#4A90D9] bg-transparent focus:outline-none w-full max-w-xs"
                 aria-label="Edit your display name"
               />
-              <button onClick={saveDisplayName} disabled={nameSaving} aria-label="Save name" className="p-1 text-[#5BB974] hover:text-[#4AA863] disabled:opacity-50">
+              <button onClick={saveDisplayName} disabled={nameSaving} aria-label="Save name" className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-[#5BB974] hover:text-[#4AA863] disabled:opacity-50">
                 <Check size={20} />
               </button>
-              <button onClick={() => setEditingName(false)} aria-label="Cancel edit" className="p-1 text-[#9CA3AF] hover:text-[#4B5563]">
+              <button onClick={() => setEditingName(false)} aria-label="Cancel edit" className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-[#9CA3AF] hover:text-[#4B5563]">
                 <X size={20} />
               </button>
             </div>
@@ -136,7 +136,7 @@ export default function TeacherDashboard() {
         ) : (
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-2xl font-bold text-[#1A1D23]">Hello, {profile?.displayName} 🍎</h2>
-            <button onClick={startEditingName} aria-label="Edit display name" className="p-1 text-[#9CA3AF] hover:text-[#4A90D9] transition-colors mt-0.5">
+            <button onClick={startEditingName} aria-label="Edit display name" className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-[#9CA3AF] hover:text-[#4A90D9] transition-colors">
               <Pencil size={16} />
             </button>
           </div>

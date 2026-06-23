@@ -307,10 +307,13 @@ export default function StudentHome() {
           onClick={() => setConfirmDelete(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
             className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-bold text-xl text-[#1A1D23] mb-2">Delete this book?</h3>
+            <h3 id="delete-modal-title" className="font-bold text-xl text-[#1A1D23] mb-2">Delete this book?</h3>
             <p className="text-[#4B5563] mb-1 font-semibold">{confirmDelete.title}</p>
             <p className="text-sm text-[#4B5563] mb-6">
               This will permanently delete the book and all your annotations for it. This cannot be undone.

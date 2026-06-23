@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
 import { homeForRole } from '@/types'
@@ -12,6 +13,7 @@ interface Props {
 export default function ProtectedRoute({ children, requiredRole }: Props) {
   const { user, profile, loading } = useAuth()
   const navigate = useNavigate()
+  const [logoutError, setLogoutError] = useState('')
 
   if (loading) {
     return (
@@ -41,11 +43,17 @@ export default function ProtectedRoute({ children, requiredRole }: Props) {
             Your account was created but the profile could not be saved. Please sign out and register again.
           </p>
           <button
-            onClick={() => logoutUser().then(() => navigate('/login'))}
+            onClick={() => {
+              setLogoutError('')
+              logoutUser()
+                .then(() => navigate('/login'))
+                .catch(() => setLogoutError('Sign out failed. Please refresh the page.'))
+            }}
             className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
           >
             Sign out and try again
           </button>
+          {logoutError && <p className="text-sm text-red-600 mt-3">{logoutError}</p>}
         </div>
       </div>
     )

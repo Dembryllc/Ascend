@@ -95,23 +95,44 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-bold mb-3">Data retention and deletion</h2>
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              Account data is retained while the account is active. We will process deletion requests within 30 days of receipt:
+            </p>
+            <ul className="list-disc pl-5 space-y-2 text-[#4B5563]">
+              <li><strong>Student records:</strong> all Firestore documents (profile, annotations, reading progress) are permanently deleted within 30 days of a verified deletion request.</li>
+              <li><strong>Uploaded PDFs:</strong> files in Firebase Storage are deleted along with their associated Firestore metadata.</li>
+              <li><strong>Firebase Authentication:</strong> the Firebase Auth account is also deleted, removing the login credential and any email address held there.</li>
+              <li><strong>Backups:</strong> Firebase automated backups are retained for up to 7 days. Deleted records may persist in those backups until the backup window expires.</li>
+              <li><strong>Teachers</strong> may request deletion of all student records in their classroom by emailing us. Schools and districts may request deletion of all data associated with their institution.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold mb-3">Data breach notification</h2>
             <p className="text-[#4B5563] leading-relaxed">
-              Account data is retained while the account is active. Teachers may contact us to request deletion of their classroom data. Students may request deletion of their own account and annotations. We will process deletion requests within 30 days.
+              In the event of a security incident affecting student education records, we will notify affected schools and districts within 30 days of discovering the breach. Schools are responsible for notifying students, parents, and applicable state or federal agencies as required by FERPA and applicable law. Notification will be sent to the primary contact email on the affected teacher account.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-bold mb-3">Third-party services</h2>
-            <p className="text-[#4B5563] leading-relaxed">
-              We use Google Firebase for authentication, database, and file storage. Firebase's privacy policy is available at firebase.google.com. We do not use any other third-party services that process personal data.
+            <ul className="list-disc pl-5 space-y-2 text-[#4B5563]">
+              <li><strong>Google Firebase</strong> (Alphabet Inc.) — authentication, Firestore database, and file storage. Data is hosted in the United States. Firebase's privacy policy is available at firebase.google.com.</li>
+              <li><strong>Stripe</strong> — payment processing for Pro subscriptions. Stripe stores billing information directly; Easy Annotate does not store payment card data. Stripe's privacy policy is available at stripe.com/privacy. Student data is never shared with Stripe.</li>
+            </ul>
+            <p className="text-[#4B5563] leading-relaxed mt-3">
+              We do not use advertising networks, social media trackers, analytics SDKs, or any other third-party services that process user data beyond those listed above.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold mb-3">Contact</h2>
-            <p className="text-[#4B5563] leading-relaxed">
-              For privacy questions, data deletion requests, or FERPA inquiries, contact us at{' '}
+            <h2 className="text-xl font-bold mb-3">Contact and data processing agreements</h2>
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              For privacy questions, data deletion requests, FERPA inquiries, or to request a Data Processing Addendum (DPA) for your school or district, contact us at{' '}
               <a href="mailto:dembryllc@gmail.com" className="text-[#4A90D9] hover:underline">dembryllc@gmail.com</a>.
+            </p>
+            <p className="text-[#4B5563] leading-relaxed">
+              Districts and schools with specific compliance requirements may request a signed DPA or custom terms addendum via the same address.
             </p>
           </section>
 

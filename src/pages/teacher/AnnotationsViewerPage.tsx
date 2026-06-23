@@ -25,6 +25,7 @@ export default function AnnotationsViewerPage() {
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState('')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
@@ -41,7 +42,9 @@ export default function AnnotationsViewerPage() {
         setStudents(profs.filter(Boolean) as UserProfile[])
       }
       setLoading(false)
-    }).catch(() => {
+    }).catch((err: unknown) => {
+      console.error('Failed to load annotations viewer:', err)
+      setLoadError('Could not load classroom data. Check your connection and try again.')
       setLoading(false)
     })
   }, [profile])
@@ -82,6 +85,15 @@ export default function AnnotationsViewerPage() {
     if (!selectedStudentProfile || !selectedBookData) return
     exportAnnotationsPDF(selectedStudentProfile.displayName, selectedBookData.title, annotations)
   }
+
+  if (loadError) return (
+    <AppShell title="Annotations">
+      <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
+        <p className="text-red-600 font-semibold mb-2">Something went wrong</p>
+        <p className="text-[#4B5563] text-sm">{loadError}</p>
+      </div>
+    </AppShell>
+  )
 
   if (loading) return (
     <AppShell title="Annotations">

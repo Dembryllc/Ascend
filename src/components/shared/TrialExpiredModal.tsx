@@ -18,6 +18,9 @@ export default function TrialExpiredModal({ onClose }: Props) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="trial-expired-modal-title"
         className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -28,13 +31,13 @@ export default function TrialExpiredModal({ onClose }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="text-[#9CA3AF] hover:text-[#1A1D23] transition-colors"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[#9CA3AF] hover:text-[#1A1D23] hover:bg-[#F3F4F6] transition-colors -mr-2 -mt-1"
           >
             <X size={20} />
           </button>
         </div>
 
-        <h3 className="text-lg font-bold text-[#1A1D23] mb-2">
+        <h3 id="trial-expired-modal-title" className="text-lg font-bold text-[#1A1D23] mb-2">
           Your free trial has ended
         </h3>
         <p className="text-sm text-[#4B5563] mb-1">

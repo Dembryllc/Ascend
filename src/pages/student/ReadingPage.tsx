@@ -808,7 +808,7 @@ export default function ReadingPage() {
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { setCapturedSelection(''); setFloatingBar(null); window.getSelection()?.removeAllRanges() }}
             aria-label="Dismiss"
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#9CA3AF] hover:bg-[#F3F4F6] transition-colors ml-0.5 text-base"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-[#9CA3AF] hover:bg-[#F3F4F6] transition-colors ml-0.5 text-base"
           >
             ✕
           </button>
