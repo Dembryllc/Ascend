@@ -132,9 +132,12 @@ export default function PricingPage() {
                 </a>
               </div>
             ) : (
-              <div className="w-full text-center py-3 rounded-xl bg-white/10 text-sm text-white/60">
-                Upgrade coming soon
-              </div>
+              <Link
+                to="/register?role=teacher"
+                className="block w-full text-center py-3 rounded-xl bg-[#F5C842] text-[#1A1D23] font-bold hover:bg-[#E6B93A] transition-colors"
+              >
+                Start your free trial →
+              </Link>
             )}
           </div>
         </div>
