@@ -54,6 +54,12 @@ export default function ReadingPage() {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [docxPages, setDocxPages] = useState<string[]>([])
   const [loadingDocx, setLoadingDocx] = useState(false)
+  const [speechRate, setSpeechRate] = useState<number>(() => {
+    const saved = localStorage.getItem('ea:speechRate')
+    const parsed = saved ? parseFloat(saved) : NaN
+    return isNaN(parsed) ? 1.0 : Math.min(2.0, Math.max(0.5, parsed))
+  })
+  const [showSpeedControl, setShowSpeedControl] = useState(false)
 
   useEffect(() => {
     if (!bookId) return
@@ -251,6 +257,16 @@ export default function ReadingPage() {
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [annotationPanel.open])
+
+  useEffect(() => {
+    if (!showSpeedControl) return
+    function onClickOutside(e: MouseEvent) {
+      const target = e.target as Element
+      if (!target.closest('[data-speed-panel]')) setShowSpeedControl(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [showSpeedControl])
 
   async function handleMarkComplete() {
     setMarkingComplete(true)
@@ -450,7 +466,7 @@ export default function ReadingPage() {
       const utt = new SpeechSynthesisUtterance(text)
       const voice = pickVoice()
       if (voice) utt.voice = voice
-      utt.rate = 0.92
+      utt.rate = speechRate
       utt.pitch = 1.0
       utt.volume = 1.0
       utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
@@ -465,7 +481,7 @@ export default function ReadingPage() {
     } else {
       window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
     }
-  }, [currentPage, pdfDocument, book, docxPages])
+  }, [currentPage, pdfDocument, book, docxPages, speechRate])
 
   if (!bookId) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
@@ -530,7 +546,7 @@ export default function ReadingPage() {
             <p className="font-bold text-[#1A1D23] text-sm truncate">{book.title}</p>
             <p className="text-xs text-[#4B5563]">{book.author}</p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 relative" data-speed-panel>
             {isSpeaking ? (
               <button
                 onClick={stopSpeaking}
@@ -549,6 +565,48 @@ export default function ReadingPage() {
                 <Volume2 size={20} />
                 <span className="hidden sm:inline">Read aloud</span>
               </button>
+            )}
+            <button
+              onClick={() => setShowSpeedControl((v) => !v)}
+              aria-label="Reading speed"
+              className="min-w-[44px] min-h-[44px] px-2 py-2 rounded-xl text-[#4B5563] hover:bg-[#F3F4F6] transition-colors text-xs font-bold"
+            >
+              {speechRate.toFixed(1)}×
+            </button>
+            {showSpeedControl && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-[#E5E7EB] rounded-2xl shadow-lg p-4 z-50 w-52">
+                <p className="text-xs font-bold text-[#1A1D23] mb-3">Reading speed</p>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={2.0}
+                  step={0.25}
+                  value={speechRate}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value)
+                    setSpeechRate(v)
+                    localStorage.setItem('ea:speechRate', String(v))
+                  }}
+                  className="w-full accent-[#4A90D9]"
+                  aria-label="Reading speed slider"
+                />
+                <div className="flex justify-between text-xs text-[#9CA3AF] mt-1">
+                  <span>0.5×</span>
+                  <span className="font-bold text-[#1A1D23]">{speechRate.toFixed(2)}×</span>
+                  <span>2.0×</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1 mt-3">
+                  {[0.75, 1.0, 1.25, 1.5].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => { setSpeechRate(rate); localStorage.setItem('ea:speechRate', String(rate)); setShowSpeedControl(false) }}
+                      className={`py-1.5 rounded-lg text-xs font-semibold transition-colors ${speechRate === rate ? 'bg-[#4A90D9] text-white' : 'bg-[#F3F4F6] text-[#4B5563] hover:bg-[#E5E7EB]'}`}
+                    >
+                      {rate}×
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
