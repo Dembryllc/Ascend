@@ -68,7 +68,12 @@ export default function AnnotationsViewerPage() {
   }
 
   useEffect(() => {
-    if (selectedStudent && selectedBook) fetchAnnotations()
+    // fetchAnnotations is an async function that calls setFetching(true) at the
+    // start of its async body. The lint rule fires because the call is made
+    // synchronously from the effect; the setState itself is intentional here —
+    // it triggers the loading spinner before the network request starts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (selectedStudent && selectedBook) void fetchAnnotations()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent, selectedBook])
 

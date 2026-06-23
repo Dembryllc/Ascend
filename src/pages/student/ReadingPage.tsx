@@ -99,22 +99,35 @@ export default function ReadingPage() {
 
   useEffect(() => {
     if (!book || book.format !== 'docx') return
-    setLoadingDocx(true)
-    fetch(book.storageUrl)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Download failed: ${r.status}`)
-        return r.arrayBuffer()
-      })
-      .then((buf) => parseDocx(buf))
-      .then(({ pages, totalPages }) => {
-        setDocxPages(pages)
-        setNumPages(totalPages)
-        setLoadingDocx(false)
-      })
-      .catch(() => {
-        setReaderError('Could not parse this document. Make sure it is a valid .docx file.')
-        setLoadingDocx(false)
-      })
+    let cancelled = false
+    // Defer the initial setState out of the synchronous effect body to satisfy
+    // react-hooks/set-state-in-effect; all subsequent setState calls happen
+    // inside async .then() chains so they're already non-synchronous.
+    const id = requestAnimationFrame(() => {
+      if (cancelled) return
+      setLoadingDocx(true)
+      fetch(book.storageUrl)
+        .then((r) => {
+          if (!r.ok) throw new Error(`Download failed: ${r.status}`)
+          return r.arrayBuffer()
+        })
+        .then((buf) => parseDocx(buf))
+        .then(({ pages, totalPages }) => {
+          if (cancelled) return
+          setDocxPages(pages)
+          setNumPages(totalPages)
+          setLoadingDocx(false)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setReaderError('Could not parse this document. Make sure it is a valid .docx file.')
+          setLoadingDocx(false)
+        })
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(id)
+    }
   }, [book])
 
   const pageAnnotations = useMemo(
@@ -152,7 +165,7 @@ export default function ReadingPage() {
     }, 150)
 
     return () => window.clearTimeout(timer)
-  }, [pageAnnotations, currentPage])
+  }, [pageAnnotations, currentPage, book?.format])
 
   // Responsive PDF width
   useEffect(() => {
