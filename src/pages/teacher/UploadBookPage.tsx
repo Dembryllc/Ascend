@@ -15,6 +15,7 @@ export default function UploadBookPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [file, setFile] = useState<File | null>(null)
+  const [fileFormat, setFileFormat] = useState<'pdf' | 'docx'>('pdf')
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [readingLevel, setReadingLevel] = useState('')
@@ -34,8 +35,10 @@ export default function UploadBookPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.type !== 'application/pdf') {
-      setError('Please select a PDF file.')
+    const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    const isDocx = f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || f.name.toLowerCase().endsWith('.docx')
+    if (!isPdf && !isDocx) {
+      setError('Please select a PDF or Word (.docx) file.')
       return
     }
     if (f.size > 50 * 1024 * 1024) {
@@ -44,14 +47,15 @@ export default function UploadBookPage() {
     }
     setError('')
     setFile(f)
-    if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
+    setFileFormat(isDocx ? 'docx' : 'pdf')
+    if (!title) setTitle(f.name.replace(/\.(pdf|docx)$/i, ''))
     if (!author) setAuthor('Unknown author')
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!file || !profile) {
-      setError('Please sign in and choose a PDF before uploading.')
+      setError('Please sign in and choose a file before uploading.')
       return
     }
     setError('')
@@ -59,13 +63,14 @@ export default function UploadBookPage() {
     try {
       await uploadBook(
         file,
-        title || file.name.replace(/\.pdf$/i, ''),
+        title || file.name.replace(/\.(pdf|docx)$/i, ''),
         author || 'Unknown author',
         readingLevel,
         assignmentPrompt,
         successCriteria,
         profile.uid,
         setProgress,
+        fileFormat,
       )
       setDone(true)
     } catch (err: unknown) {
@@ -124,7 +129,7 @@ export default function UploadBookPage() {
           <CheckCircle size={56} className="text-[#5BB974] mb-4" />
           <h2 className="text-2xl font-bold text-[#1A1D23] mb-2">Book uploaded!</h2>
           <p className="text-[#4B5563] mb-2">
-            Your PDF is ready. Now assign it to your students so they can start reading.
+            Your book is ready. Now assign it to your students so they can start reading.
           </p>
           <p className="text-sm text-[#9CA3AF] mb-8">
             Students won't see this book until you assign it from your classroom.
@@ -152,12 +157,12 @@ export default function UploadBookPage() {
     <AppShell title="Upload Book">
       <div className="max-w-lg mx-auto">
         <h2 className="text-2xl font-bold text-[#1A1D23] mb-1">Upload a Book</h2>
-        <p className="text-[#4B5563] mb-6">Add a PDF to your library and assign it to students.</p>
+        <p className="text-[#4B5563] mb-6">Add a PDF or Word document to your library and assign it to students.</p>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-6 space-y-5">
           {/* PDF drop zone */}
           <div>
-            <label className="block text-sm font-semibold text-[#1A1D23] mb-2">PDF File *</label>
+            <label className="block text-sm font-semibold text-[#1A1D23] mb-2">Book File *</label>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -173,12 +178,12 @@ export default function UploadBookPage() {
               ) : (
                 <>
                   <Upload size={28} className="mx-auto text-[#9CA3AF] mb-2" />
-                  <p className="text-sm text-[#4B5563]">Click to select a PDF</p>
-                  <p className="text-xs text-[#9CA3AF] mt-1">PDF files only · max 50 MB</p>
+                  <p className="text-sm text-[#4B5563]">Click to select a PDF or Word document</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">PDF or .docx · max 50 MB</p>
                 </>
               )}
             </button>
-            <input ref={fileRef} type="file" accept=".pdf,application/pdf" onChange={handleFileChange} className="hidden" />
+            <input ref={fileRef} type="file" accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileChange} className="hidden" />
           </div>
 
           <Field label="Book Title *" value={title} onChange={setTitle} placeholder="e.g. Charlotte's Web" required />

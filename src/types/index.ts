@@ -45,6 +45,7 @@ export interface Book {
   id: string
   title: string
   author: string
+  format?: 'pdf' | 'docx' | 'epub'
   readingLevel?: string
   assignmentPrompt?: string
   successCriteria?: string

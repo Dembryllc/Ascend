@@ -7,6 +7,7 @@ import { useAuth } from '@/context/auth-context'
 import { getBook } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
+import { parseDocx, extractTextFromHtml } from '@/lib/docxParser'
 import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target } from 'lucide-react'
@@ -51,6 +52,8 @@ export default function ReadingPage() {
   const [capturedSelection, setCapturedSelection] = useState('')
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [docxPages, setDocxPages] = useState<string[]>([])
+  const [loadingDocx, setLoadingDocx] = useState(false)
 
   useEffect(() => {
     if (!bookId) return
@@ -75,12 +78,33 @@ export default function ReadingPage() {
     })
   }, [bookId, profile])
 
+  useEffect(() => {
+    if (!book || book.format !== 'docx') return
+    setLoadingDocx(true)
+    fetch(book.storageUrl)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Download failed: ${r.status}`)
+        return r.arrayBuffer()
+      })
+      .then((buf) => parseDocx(buf))
+      .then(({ pages, totalPages }) => {
+        setDocxPages(pages)
+        setNumPages(totalPages)
+        setLoadingDocx(false)
+      })
+      .catch(() => {
+        setReaderError('Could not parse this document. Make sure it is a valid .docx file.')
+        setLoadingDocx(false)
+      })
+  }, [book])
+
   const pageAnnotations = useMemo(
     () => annotations.filter((a) => a.pageNumber === currentPage),
     [annotations, currentPage],
   )
 
   useEffect(() => {
+    if (book?.format === 'docx') return
     const timer = window.setTimeout(() => {
       const spans = Array.from(document.querySelectorAll<HTMLElement>('.react-pdf__Page__textContent span'))
       spans.forEach((span) => {
@@ -349,41 +373,52 @@ export default function ReadingPage() {
       setReadAloudStatus('Read aloud is not available in this browser.')
       return
     }
-    if (!pdfDocument) {
-      setReadAloudStatus('The page is still loading. Try again in a moment.')
-      return
-    }
 
     window.speechSynthesis.cancel()
     setIsSpeaking(false)
     setReadAloudStatus('Loading…')
 
-    let page: Awaited<ReturnType<PdfDocument['getPage']>>
-    try {
-      page = await pdfDocument.getPage(currentPage)
-    } catch {
-      setReadAloudStatus('Could not load this page for reading. Try navigating away and back.')
-      return
-    }
+    let text: string
 
-    let content: Awaited<ReturnType<typeof page.getTextContent>>
-    try {
-      content = await page.getTextContent()
-    } catch {
-      setReadAloudStatus('Could not extract text from this page.')
-      return
-    }
-    const rawText = content.items
-      .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
-      .join(' ')
+    if (book?.format === 'docx') {
+      const pageHtml = docxPages[currentPage - 1]
+      if (!pageHtml) {
+        setReadAloudStatus('No text found on this page.')
+        return
+      }
+      text = extractTextFromHtml(pageHtml)
+    } else {
+      if (!pdfDocument) {
+        setReadAloudStatus('The page is still loading. Try again in a moment.')
+        return
+      }
 
-    // Clean up common PDF extraction artifacts before speaking
-    const text = rawText
-      .replace(/(\w)-\s+(\w)/g, '$1$2')        // rejoin hyphenated line-breaks: "nat- ural" → "natural"
-      .replace(/\s+/g, ' ')                      // collapse whitespace
-      .replace(/\b(\d{1,3})\b(?=\s|$)/g, '')   // strip bare page numbers
-      .replace(/[ \t]{2,}/g, ' ')               // remove extra spaces
-      .trim()
+      let page: Awaited<ReturnType<PdfDocument['getPage']>>
+      try {
+        page = await pdfDocument.getPage(currentPage)
+      } catch {
+        setReadAloudStatus('Could not load this page for reading. Try navigating away and back.')
+        return
+      }
+
+      let content: Awaited<ReturnType<typeof page.getTextContent>>
+      try {
+        content = await page.getTextContent()
+      } catch {
+        setReadAloudStatus('Could not extract text from this page.')
+        return
+      }
+      const rawText = content.items
+        .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
+        .join(' ')
+
+      text = rawText
+        .replace(/(\w)-\s+(\w)/g, '$1$2')
+        .replace(/\s+/g, ' ')
+        .replace(/\b(\d{1,3})\b(?=\s|$)/g, '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim()
+    }
 
     if (!text) {
       setReadAloudStatus('No readable text was found on this page.')
@@ -430,7 +465,7 @@ export default function ReadingPage() {
     } else {
       window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
     }
-  }, [currentPage, pdfDocument])
+  }, [currentPage, pdfDocument, book, docxPages])
 
   if (!bookId) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
@@ -585,9 +620,22 @@ export default function ReadingPage() {
               </div>
             </section>
 
-            {/* PDF */}
+            {/* Document render — PDF or DOCX */}
             <div className="flex-1 w-full flex justify-center">
-              <Document
+              {book.format === 'docx' ? (
+                loadingDocx ? (
+                  <div className="flex justify-center py-20">
+                    <div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div
+                    className="w-full bg-white rounded-2xl border border-[#F3F4F6] shadow-sm p-6 sm:p-8 prose prose-sm sm:prose max-w-none"
+                    style={{ userSelect: 'text' }}
+                    dangerouslySetInnerHTML={{ __html: docxPages[currentPage - 1] ?? '<p>No content on this page.</p>' }}
+                  />
+                )
+              ) : (
+                <Document
                   file={book.storageUrl}
                   onLoadSuccess={onDocumentLoaded}
                   onLoadError={onDocumentLoadError}
@@ -605,6 +653,7 @@ export default function ReadingPage() {
                     renderAnnotationLayer={false}
                   />
                 </Document>
+              )}
             </div>
 
             {/* Page navigation */}

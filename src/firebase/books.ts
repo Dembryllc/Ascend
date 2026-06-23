@@ -24,6 +24,7 @@ export async function uploadBook(
   successCriteria: string,
   teacherId: string,
   onProgress?: (pct: number) => void,
+  format: 'pdf' | 'docx' = 'pdf',
 ): Promise<Book> {
   const cleanAssignmentPrompt = assignmentPrompt.trim()
   const cleanSuccessCriteria = successCriteria.trim()
@@ -44,6 +45,7 @@ export async function uploadBook(
     docRef = await addDoc(collection(db, 'books'), {
       title,
       author,
+      format,
       readingLevel: readingLevel || null,
       assignmentPrompt: cleanAssignmentPrompt || null,
       successCriteria: cleanSuccessCriteria || null,
@@ -61,6 +63,7 @@ export async function uploadBook(
     id: docRef.id,
     title,
     author,
+    format,
     readingLevel,
     assignmentPrompt: cleanAssignmentPrompt,
     successCriteria: cleanSuccessCriteria,
@@ -127,6 +130,7 @@ export async function uploadStudentBook(
   readingLevel: string,
   studentId: string,
   onProgress?: (pct: number) => void,
+  format: 'pdf' | 'docx' = 'pdf',
 ): Promise<Book> {
   const storageRef = ref(storage, `student-books/${studentId}/${Date.now()}_${file.name}`)
   const task = uploadBytesResumable(storageRef, file)
@@ -145,6 +149,7 @@ export async function uploadStudentBook(
     docRef = await addDoc(collection(db, 'books'), {
       title,
       author,
+      format,
       readingLevel: readingLevel || null,
       storageUrl,
       uploadedBy: studentId,
@@ -161,6 +166,7 @@ export async function uploadStudentBook(
     id: docRef.id,
     title,
     author,
+    format,
     readingLevel,
     storageUrl,
     uploadedBy: studentId,
