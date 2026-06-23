@@ -204,7 +204,7 @@ export default function StudentHome() {
           <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
             <BookOpen size={48} className="mx-auto text-[#D1D5DB] mb-4" />
             <h3 className="text-xl font-bold text-[#1A1D23] mb-2">Your bookshelf is empty</h3>
-            <p className="text-[#4B5563] mb-6">Join a classroom to see assigned books, or upload your own PDF to get started.</p>
+            <p className="text-[#4B5563] mb-6">{profile?.role === 'individual' ? 'Upload a PDF to start reading and annotating.' : 'Join a classroom to see assigned books, or upload your own PDF to get started.'}</p>
             <Link
               to="/student/upload"
               className="inline-flex items-center gap-2 bg-[#4A90D9] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
@@ -540,8 +540,9 @@ function StudentOnboardingChecklist({
   return (
     <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-5 mb-8" role="region" aria-label="Getting started checklist">
       <h3 className="font-bold text-[#1A1D23] mb-0.5">Get started with Easy Annotate</h3>
-      <p className="text-sm text-[#4B5563] mb-4">Three steps to your first annotation.</p>
+      <p className="text-sm text-[#4B5563] mb-4">{isIndividual ? 'Two steps to your first annotation.' : 'Three steps to your first annotation.'}</p>
       <ol className="space-y-4">
+        {!isIndividual && (
         <li className="flex items-start gap-3">
           <span className="mt-0.5 shrink-0" aria-hidden="true">
             {step1Done ? <CheckCircle2 size={20} className="text-[#5BB974]" /> : <Circle size={20} className="text-[#4A90D9]" />}
@@ -580,6 +581,7 @@ function StudentOnboardingChecklist({
             )}
           </div>
         </li>
+        )}
 
         <li className="flex items-start gap-3">
           <span className="mt-0.5 shrink-0" aria-hidden="true">
@@ -587,7 +589,7 @@ function StudentOnboardingChecklist({
           </span>
           <div className="flex-1 min-w-0">
             <span className={`block text-sm font-semibold ${step2Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
-              2. Open your first book
+              {isIndividual ? '1. Open your first book' : '2. Open your first book'}
             </span>
             {!step2Done && (
               <span className="block text-xs text-[#4B5563] mt-0.5">Start reading any book in your shelf.</span>
@@ -606,7 +608,7 @@ function StudentOnboardingChecklist({
           </span>
           <div className="flex-1 min-w-0">
             <span className={`block text-sm font-semibold ${step3Done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
-              3. Leave your first annotation
+              {isIndividual ? '2. Leave your first annotation' : '3. Leave your first annotation'}
             </span>
             {!step3Done && (
               <span className="block text-xs text-[#4B5563] mt-0.5">Select text in a book and tap an emoji to react.</span>
