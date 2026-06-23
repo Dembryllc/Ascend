@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
-import { getClassroomByTeacher, createClassroom } from '@/firebase/classrooms'
+import { getClassroomByTeacher, createClassroom, clearClassroomRoster } from '@/firebase/classrooms'
 import { getUserProfile } from '@/firebase/auth'
 import { getBooksByTeacher } from '@/firebase/books'
 import { assignBookToStudent, assignBookToClass } from '@/firebase/books'
 import type { Classroom, Book, UserProfile } from '@/types'
-import { Users, Copy, CheckCheck, CheckCircle2, Plus } from 'lucide-react'
+import { Users, Copy, CheckCheck, CheckCircle2, Plus, AlertTriangle } from 'lucide-react'
 
 export default function ClassroomPage() {
   const { profile } = useAuth()
@@ -22,6 +22,10 @@ export default function ClassroomPage() {
   const [assignError, setAssignError] = useState('')
   const [assignSelects, setAssignSelects] = useState<Record<string, string>>({})
   const [assignedAll, setAssignedAll] = useState<Record<string, boolean>>({})
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState('')
+  const [resetDone, setResetDone] = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -74,6 +78,24 @@ export default function ClassroomPage() {
       setAssignSelects((prev) => ({ ...prev, [studentId]: '' }))
     } catch {
       setAssignError('Could not assign book. Please try again.')
+    }
+  }
+
+  async function handleReset() {
+    if (!profile || !classroom) return
+    setResetting(true)
+    setResetError('')
+    try {
+      await clearClassroomRoster(classroom.id, profile.uid)
+      setStudents([])
+      setBooks((prev) => prev.map((b) => ({ ...b, assignedStudentIds: [] })))
+      setClassroom((prev) => prev ? { ...prev, studentIds: [] } : prev)
+      setResetDone(true)
+      setShowResetConfirm(false)
+    } catch (err: unknown) {
+      setResetError(err instanceof Error ? err.message : 'Could not reset the classroom. Please try again.')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -274,6 +296,55 @@ export default function ClassroomPage() {
               </div>
             </div>
           )}
+
+          {/* End-of-year roster reset */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-red-100">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle size={18} className="text-red-500 shrink-0" />
+              <h3 className="font-bold text-lg text-[#1A1D23]">End of Year Reset</h3>
+            </div>
+            <p className="text-sm text-[#4B5563] mb-4">
+              Remove all students from the classroom roster and unassign all books. Use this at the end of a semester or school year to start fresh.
+              Student annotations and reading progress are preserved in their own accounts.
+            </p>
+            {resetDone ? (
+              <div className="flex items-center gap-2 text-[#5BB974] font-semibold text-sm">
+                <CheckCircle2 size={18} />
+                Classroom roster cleared. Students can rejoin with the same code when the new semester begins.
+              </div>
+            ) : showResetConfirm ? (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-red-800 mb-3">
+                  Are you sure? This will remove {students.length} student{students.length !== 1 ? 's' : ''} and unassign all books. This cannot be undone.
+                </p>
+                {resetError && <p className="text-xs text-red-700 mb-2">{resetError}</p>}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setShowResetConfirm(false); setResetError('') }}
+                    disabled={resetting}
+                    className="flex-1 border border-[#D1D5DB] rounded-xl py-2.5 text-sm font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    disabled={resetting}
+                    className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-xl py-2.5 text-sm font-bold transition-colors"
+                  >
+                    {resetting ? 'Clearing…' : 'Yes, clear roster'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                disabled={students.length === 0}
+                className="border border-red-300 text-red-600 font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Clear classroom roster
+              </button>
+            )}
+          </div>
         </div>
       )}
     </AppShell>

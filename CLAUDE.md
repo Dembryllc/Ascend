@@ -49,17 +49,21 @@ Build must be clean (zero TypeScript errors) before pushing. `tsc -b` runs befor
 
 ### Roles
 
-Two roles defined in Firestore `users/{uid}.role`:
-- `student` — reads books, annotates, views own annotations
+Three roles defined in Firestore `users/{uid}.role`:
+- `student` — reads books, annotates, views own annotations; belongs to a classroom (optional)
 - `teacher` — uploads books, manages classrooms, views all annotations
+- `individual` — standalone user (college student, self-learner); no classroom; shares `/student/*` routes with students
 
-Role is set at registration and never changes. `ProtectedRoute` enforces role per route.
+`homeForRole(role)` in `src/types/index.ts`: teacher → `/teacher`, student/individual → `/student`.
+`ProtectedRoute` accepts `requiredRole?: UserRole | UserRole[]` — student routes pass `['student', 'individual']`.
+
+Role is set at registration and never changes.
 
 ### Firebase collections
 
 | Collection | Purpose |
 |---|---|
-| `users` | Auth profile (uid, role, displayName, classroomId, subscriptionStatus, trialEndsAt?). **Teachers** include `email`. **Students** do not — email stays in Firebase Auth only (FERPA PII minimization). |
+| `users` | Auth profile (uid, role, displayName, classroomId, subscriptionStatus, trialEndsAt?). **Teachers and individuals** include `email`. **Students** do not — email stays in Firebase Auth only (FERPA PII minimization). |
 | `classrooms` | Teacher-owned, students join via 6-char code |
 | `books` | PDFs in Storage, metadata in Firestore; `assignedStudentIds[]` controls access |
 | `annotations` | Per-student per-book per-page reactions + notes |
@@ -309,3 +313,70 @@ VITE_STRIPE_PRO_ANNUAL_URL    # Stripe payment link for annual Pro plan
 ```
 
 For local dev, put these in a `.env` file (gitignored). In CI, they are hardcoded in the workflow YAML. Firebase API keys are safe to expose in client bundles — security is enforced by Firestore and Storage rules.
+
+---
+
+## Individual role — key facts
+
+Added in session 2026-06-23. Individuals are standalone users (college students, self-learners) with no classroom.
+
+- **Registration**: 3-way role toggle on RegisterPage (Student / Teacher / Individual)
+- **Trial**: individuals get 14-day Pro trial (same as teachers)
+- **Email storage**: individual email IS stored in Firestore (not FERPA-regulated, adults)
+- **Stripe URLs**: `prefilled_email` is populated for individuals (email in Firestore)
+- **Routes**: share `/student/*` routes with students; `ProtectedRoute` accepts `['student', 'individual']`
+- **Onboarding**: "Join your classroom" step is hidden (not just struck-through) for individuals; 2-step checklist
+- **Trial banner**: shows for individuals with active trial (`profile.role === 'individual'` condition in AppShell)
+- **TrialExpiredModal**: not shown for individuals accessing teacher-gated features (they can't — `/teacher` routes require `teacher` role)
+- **Annotations query**: uses `getAnnotationsByStudent(uid)` with no classroomId filter — works with `classroomId: null`
+
+---
+
+## Stripe checkout
+
+Wired in session 2026-06-23. All upgrade touch points use direct Stripe payment links.
+
+- `src/utils/stripe.ts` — shared URL builder: appends `client_reference_id=uid` and `prefilled_email=email` to both monthly and annual base URLs from env vars
+- `VITE_STRIPE_PRO_MONTHLY_URL` and `VITE_STRIPE_PRO_ANNUAL_URL` — set in GitHub Actions secrets and `.env` for local dev
+- If env vars are absent (local dev without .env), all modals fall back to `/pricing` link — no crash
+- Touch points: UpgradeModal (free-tier), TrialExpiredModal (expired trial), TrialBanner (active trial), PricingPage
+
+---
+
+## Classroom end-of-year reset
+
+Added in session 2026-06-23. Teachers can clear the classroom roster at end of semester/year.
+
+- **Function**: `clearClassroomRoster(classroomId, teacherId)` in `src/firebase/classrooms.ts`
+  - Sets `classroom.studentIds = []`
+  - Sets `assignedStudentIds = []` on all teacher's books (batch write)
+- **UI**: "End of Year Reset" section in ClassroomPage with two-step confirmation
+- **What it preserves**: student annotations and reading progress (owned by students, not deletable by teacher)
+- **What it does NOT do**: update student profiles' `classroomId` (requires student's own write permission)
+- **Disabled when**: classroom already has 0 students
+
+---
+
+## Known district readiness gaps (as of 2026-06-23)
+
+Items that block district-level sales (not yet implemented):
+
+1. **No Data Processing Agreement (DPA) template** — link to DPA needed on PricingPage and PrivacyPage
+2. **No admin role** — IT coordinators can't manage multiple teachers or bulk-delete data
+3. **No audit log collection** — no Firestore record of who accessed/deleted what
+4. **No `organizationId` isolation** — Firestore data not scoped by district (fine for single-school pilots)
+5. **Storage rules**: any authenticated user can read any PDF if they know the storage path (paths use UUIDs so low-risk; signing URLs would require backend changes)
+
+These are architectural decisions that need explicit product prioritization before implementation.
+
+---
+
+## Known bugs fixed (do not reintroduce)
+
+- **Google sign-up race condition**: `onAuthStateChanged` fires before `writeGoogleProfile` completes → profile is null → ProtectedRoute blocks. Fixed: `RegisterPage.handleGoogleSignUp` calls `await refreshProfile()` after `loginWithGoogle()` and before `navigate()`. `LoginPage.handleGoogleSignIn` already had this pattern.
+- **Annotation panel persisting across pages**: page-change useEffect now calls `setAnnotationPanel({ open: false })` and `setSaveError('')`.
+- **Shared saving flag**: `handleReflectionSave` uses separate `savingReflection` state; `handleSave` uses `saving`.
+- **Individual onboarding**: "Join your classroom" `<li>` wrapped in `{!isIndividual && (...)}` — fully hidden, not struck-through.
+- **Streak midnight reset**: streak starts from yesterday when today has no annotation, preventing midnight reset.
+- **AnnotationsViewerPage silent load error**: initial classroom/books load failure now sets `loadError` state and shows an error card.
+- **ProtectedRoute logout rejection**: `.catch()` added; shows error message rather than silent failure.

@@ -4,6 +4,7 @@ import {
   addDoc,
   getDoc,
   getDocs,
+  updateDoc,
   writeBatch,
   arrayUnion,
   query,
@@ -75,4 +76,29 @@ export async function joinClassroomByCode(studentId: string, joinCode: string): 
   }
 
   return classroomId
+}
+
+/**
+ * End-of-year classroom reset:
+ * 1. Clears all studentIds from the classroom document.
+ * 2. Unassigns all students from every book uploaded by the teacher.
+ *
+ * Student user profiles (classroomId field) are NOT updated — that requires
+ * each student's own write permission. Students will still see themselves as
+ * joined until they re-load, at which point the classroom will accept them if
+ * they re-join with the same code.
+ *
+ * Annotations and reading progress are preserved (students retain their own records).
+ */
+export async function clearClassroomRoster(classroomId: string, teacherId: string): Promise<void> {
+  await updateDoc(doc(db, 'classrooms', classroomId), { studentIds: [] })
+
+  const booksSnap = await getDocs(query(collection(db, 'books'), where('uploadedBy', '==', teacherId)))
+  if (!booksSnap.empty) {
+    const batch = writeBatch(db)
+    booksSnap.docs.forEach((bookDoc) => {
+      batch.update(bookDoc.ref, { assignedStudentIds: [] })
+    })
+    await batch.commit()
+  }
 }
