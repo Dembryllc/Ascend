@@ -22,12 +22,11 @@ export default function StudentUploadPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    const allowedTypes = ['application/pdf', 'application/epub+zip', 'text/xml', 'application/xml', 'application/x-dtbbook+xml'];
-    if (!allowedTypes.includes(f.type) && !f.name.match(/\.(pdf|epub|xml)$/i)) { setError('Please select a PDF or DAISY file.'); return }
+    if (f.type !== 'application/pdf' && !f.name.match(/\.pdf$/i)) { setError('Please select a PDF file.'); return }
     if (f.size > 50 * 1024 * 1024) { setError('File is too large. Maximum size is 50 MB.'); return }
     setError('')
     setFile(f)
-    if (!title) setTitle(f.name.replace(/\.(pdf|epub|xml)$/i, ''))
+    if (!title) setTitle(f.name.replace(/\.pdf$/i, ''))
     if (!author) setAuthor('Unknown author')
   }
 
@@ -65,7 +64,7 @@ export default function StudentUploadPage() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-6 space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-[#1A1D23] mb-2">PDF File *</label>
+            <label className="block text-sm font-semibold text-[#1A1D23] mb-2">PDF *</label>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -81,12 +80,12 @@ export default function StudentUploadPage() {
               ) : (
                 <>
                   <Upload size={28} className="mx-auto text-[#9CA3AF] mb-2" />
-                  <p className="text-sm text-[#4B5563]">Click to select a PDF or DAISY file</p>
-                  <p className="text-xs text-[#9CA3AF] mt-1">PDF and DAISY formats · max 50 MB</p>
+                  <p className="text-sm text-[#4B5563]">Click to select a PDF</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">PDF files only · max 50 MB</p>
                 </>
               )}
             </button>
-            <input ref={fileRef} type="file" accept=".pdf,.epub,.xml,application/pdf,application/epub+zip,text/xml,application/xml" onChange={handleFileChange} className="hidden" />
+            <input ref={fileRef} type="file" accept=".pdf,application/pdf" onChange={handleFileChange} className="hidden" />
           </div>
 
           <div>

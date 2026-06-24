@@ -34,6 +34,7 @@ export default function StudentHome() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Book | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     if (authLoading || authError || !profile) return
@@ -66,12 +67,15 @@ export default function StudentHome() {
 
   async function handleDelete(book: Book) {
     setDeleting(book.id)
+    setDeleteError('')
     try {
       await deleteStudentBook(book.id, book.storageUrl)
       setBooks((prev) => prev.filter((b) => b.id !== book.id))
+      setConfirmDelete(null)
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this book. Check your connection and try again.')
     } finally {
       setDeleting(null)
-      setConfirmDelete(null)
     }
   }
 
@@ -304,7 +308,7 @@ export default function StudentHome() {
       {confirmDelete && (
         <div
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-          onClick={() => setConfirmDelete(null)}
+          onClick={() => { setConfirmDelete(null); setDeleteError('') }}
         >
           <div
             className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
@@ -315,9 +319,12 @@ export default function StudentHome() {
             <p className="text-sm text-[#4B5563] mb-6">
               This will permanently delete the book and all your annotations for it. This cannot be undone.
             </p>
+            {deleteError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-4">{deleteError}</p>
+            )}
             <div className="flex gap-3">
               <button
-                onClick={() => setConfirmDelete(null)}
+                onClick={() => { setConfirmDelete(null); setDeleteError('') }}
                 className="flex-1 border border-[#D1D5DB] rounded-xl py-3 font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors"
               >
                 Cancel

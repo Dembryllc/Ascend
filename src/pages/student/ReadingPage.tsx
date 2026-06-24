@@ -461,7 +461,6 @@ export default function ReadingPage() {
       <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
         <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
         <p className="text-[#4B5563] text-sm mb-6 break-all">{readerError || 'The book was not found.'}</p>
-        {book && <p className="text-xs text-[#9CA3AF] mb-4 break-all">URL: {book.storageUrl?.slice(0, 80)}…</p>}
         <button
           onClick={() => navigate('/student')}
           className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
