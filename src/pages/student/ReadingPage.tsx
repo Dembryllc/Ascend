@@ -48,6 +48,7 @@ export default function ReadingPage() {
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [markingComplete, setMarkingComplete] = useState(false)
   const lastProgressTickRef = useRef(0)
+  const highlightedSpanRef = useRef<HTMLElement | null>(null)
   const [capturedSelection, setCapturedSelection] = useState('')
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -215,6 +216,7 @@ export default function ReadingPage() {
       setAnnotationPanel({ open: false })
       setSaveError('')
       if (speaking) setIsSpeaking(false)
+      clearReadAloudHighlight()
     })
     return () => cancelAnimationFrame(id)
   }, [currentPage])
@@ -338,8 +340,17 @@ export default function ReadingPage() {
     }
   }
 
+  function clearReadAloudHighlight() {
+    if (highlightedSpanRef.current) {
+      highlightedSpanRef.current.style.backgroundColor = ''
+      highlightedSpanRef.current.style.borderRadius = ''
+      highlightedSpanRef.current = null
+    }
+  }
+
   function stopSpeaking() {
     window.speechSynthesis?.cancel()
+    clearReadAloudHighlight()
     setIsSpeaking(false)
     setReadAloudStatus('')
   }
@@ -419,8 +430,37 @@ export default function ReadingPage() {
       utt.pitch = 1.0
       utt.volume = 1.0
       utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
-      utt.onend = () => { setIsSpeaking(false); setReadAloudStatus('') }
-      utt.onerror = () => { setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.') }
+      utt.onend = () => { clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('') }
+      utt.onerror = () => { clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.') }
+
+      // Word-by-word highlight using the SpeechSynthesisEvent boundary event.
+      // Fires reliably in Chrome/Edge; degrades gracefully (no highlight) in Firefox/iOS Safari.
+      const ttsSpans = Array.from(
+        document.querySelectorAll<HTMLElement>('.react-pdf__Page__textContent span')
+      )
+      let spanIdx = 0
+      utt.addEventListener('boundary', (e: SpeechSynthesisEvent) => {
+        if (e.name !== 'word') return
+        const charLen = e.charLength ?? 0
+        const raw = charLen > 0 ? text.slice(e.charIndex, e.charIndex + charLen) : text.slice(e.charIndex).split(/\s/)[0]
+        const word = raw.replace(/\W/g, '').toLowerCase()
+        if (word.length < 2) return
+        if (highlightedSpanRef.current) {
+          highlightedSpanRef.current.style.backgroundColor = ''
+          highlightedSpanRef.current.style.borderRadius = ''
+        }
+        for (let i = spanIdx; i < ttsSpans.length; i++) {
+          const spanWord = (ttsSpans[i].textContent ?? '').replace(/\W/g, '').toLowerCase()
+          if (spanWord && spanWord.includes(word)) {
+            ttsSpans[i].style.backgroundColor = 'rgba(74, 144, 217, 0.3)'
+            ttsSpans[i].style.borderRadius = '2px'
+            highlightedSpanRef.current = ttsSpans[i]
+            spanIdx = i + 1
+            break
+          }
+        }
+      })
+
       window.speechSynthesis.speak(utt)
     }
 
