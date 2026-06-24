@@ -69,8 +69,10 @@ export default function StudentHome() {
     setDeleting(book.id)
     setDeleteError('')
     try {
-      await deleteStudentBook(book.id, book.storageUrl)
+      await deleteStudentBook(book.id, book.storageUrl, profile!.uid)
       setBooks((prev) => prev.filter((b) => b.id !== book.id))
+      setAnnotations((prev) => prev.filter((a) => a.bookId !== book.id))
+      setReadingProgress((prev) => prev.filter((r) => r.bookId !== book.id))
       setConfirmDelete(null)
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : 'Could not delete this book. Check your connection and try again.')

@@ -6,6 +6,7 @@ import {
   getDocs,
   updateDoc,
   deleteDoc,
+  writeBatch,
   arrayUnion,
   query,
   where,
@@ -169,7 +170,7 @@ export async function uploadStudentBook(
   }
 }
 
-export async function deleteStudentBook(bookId: string, storageUrl: string): Promise<void> {
+export async function deleteStudentBook(bookId: string, storageUrl: string, studentId: string): Promise<void> {
   await deleteDoc(doc(db, 'books', bookId))
   try {
     const fileRef = ref(storage, storageUrl)
@@ -177,4 +178,16 @@ export async function deleteStudentBook(bookId: string, storageUrl: string): Pro
   } catch {
     // Storage object may already be gone — Firestore doc deletion is the source of truth
   }
+  // Cascade: remove annotations and reading progress for this student+book
+  const annSnap = await getDocs(query(
+    collection(db, 'annotations'),
+    where('studentId', '==', studentId),
+    where('bookId', '==', bookId),
+  ))
+  if (!annSnap.empty) {
+    const batch = writeBatch(db)
+    annSnap.docs.forEach((d) => batch.delete(d.ref))
+    await batch.commit()
+  }
+  await deleteDoc(doc(db, 'readingProgress', `${studentId}_${bookId}`)).catch(() => {})
 }
