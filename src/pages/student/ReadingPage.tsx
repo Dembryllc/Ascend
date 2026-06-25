@@ -9,7 +9,8 @@ import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, delet
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
 import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
-import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target, LayoutGrid } from 'lucide-react'
+import OrganizerModal from '@/components/student/OrganizerModal'
 
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs'
 
@@ -52,6 +53,7 @@ export default function ReadingPage() {
   const [capturedSelection, setCapturedSelection] = useState('')
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [organizerOpen, setOrganizerOpen] = useState(false)
 
   useEffect(() => {
     if (!bookId) return
@@ -535,6 +537,16 @@ export default function ReadingPage() {
             <p className="text-xs text-[#4B5563]">{book.author}</p>
           </div>
           <div className="flex items-center gap-1">
+            {(book.organizerTemplateId || profile?.role === 'individual') && (
+              <button
+                onClick={() => setOrganizerOpen(true)}
+                aria-label="Open graphic organizer"
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#5BB974] hover:bg-green-50 transition-colors font-semibold text-sm"
+              >
+                <LayoutGrid size={20} />
+                <span className="hidden sm:inline">Organizer</span>
+              </button>
+            )}
             {isSpeaking ? (
               <button
                 onClick={stopSpeaking}
@@ -945,6 +957,14 @@ export default function ReadingPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {organizerOpen && book && profile && (
+        <OrganizerModal
+          book={book}
+          profile={profile}
+          onClose={() => setOrganizerOpen(false)}
+        />
       )}
     </div>
   )

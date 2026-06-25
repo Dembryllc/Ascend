@@ -6,6 +6,7 @@ import { uploadBook, getBooksByTeacher } from '@/firebase/books'
 import { isPro } from '@/types'
 import { ArrowRight, Lock, Upload, FileText, CheckCircle } from 'lucide-react'
 import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
+import { ORGANIZER_TEMPLATES, TEMPLATE_ORDER } from '@/data/organizerTemplates'
 
 const FREE_BOOK_LIMIT = 5
 
@@ -20,6 +21,10 @@ export default function UploadBookPage() {
   const [readingLevel, setReadingLevel] = useState('')
   const [assignmentPrompt, setAssignmentPrompt] = useState('')
   const [successCriteria, setSuccessCriteria] = useState('')
+  const [organizerEnabled, setOrganizerEnabled] = useState(false)
+  const [organizerTemplateId, setOrganizerTemplateId] = useState(TEMPLATE_ORDER[0])
+  const [organizerScaffoldDefault, setOrganizerScaffoldDefault] = useState<'guided' | 'independent'>('guided')
+  const [organizerStudentCanSwitch, setOrganizerStudentCanSwitch] = useState(true)
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
@@ -66,6 +71,9 @@ export default function UploadBookPage() {
         successCriteria,
         profile.uid,
         setProgress,
+        organizerEnabled ? organizerTemplateId : undefined,
+        organizerEnabled ? organizerScaffoldDefault : undefined,
+        organizerEnabled ? organizerStudentCanSwitch : undefined,
       )
       setDone(true)
     } catch (err: unknown) {
@@ -196,6 +204,78 @@ export default function UploadBookPage() {
             onChange={setSuccessCriteria}
             placeholder="e.g. Save at least 4 annotations and finish with a short reflection."
           />
+
+          {/* Graphic Organizer assignment */}
+          <div className={`border rounded-xl p-4 transition-colors ${organizerEnabled ? 'border-[#5BB974] bg-green-50/40' : 'border-[#E5E7EB]'}`}>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={organizerEnabled}
+                onChange={(e) => {
+                  if (!isPro(profile)) return
+                  setOrganizerEnabled(e.target.checked)
+                }}
+                className="w-4 h-4 accent-[#5BB974]"
+              />
+              <span className="text-sm font-semibold text-[#1A1D23]">
+                Include Graphic Organizer
+                {!isPro(profile) && (
+                  <span className="ml-2 text-xs font-bold text-[#E6A817] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Pro</span>
+                )}
+              </span>
+            </label>
+
+            {organizerEnabled && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Template</label>
+                  <select
+                    value={organizerTemplateId}
+                    onChange={(e) => setOrganizerTemplateId(e.target.value)}
+                    className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5BB974]"
+                  >
+                    {TEMPLATE_ORDER.map((id) => (
+                      <option key={id} value={id}>
+                        {ORGANIZER_TEMPLATES[id].name} · {ORGANIZER_TEMPLATES[id].gradeRange}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-[#6B7280] mt-1">{ORGANIZER_TEMPLATES[organizerTemplateId]?.description}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#1A1D23] mb-2">Default scaffold level</label>
+                  <div className="flex rounded-xl overflow-hidden border border-[#D1D5DB]">
+                    {(['guided', 'independent'] as const).map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setOrganizerScaffoldDefault(level)}
+                        className={`flex-1 py-2.5 text-sm font-semibold capitalize transition-colors ${organizerScaffoldDefault === level ? 'bg-[#5BB974] text-white' : 'bg-white text-[#4B5563] hover:bg-[#F3F4F6]'}`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-[#6B7280] mt-1">
+                    {organizerScaffoldDefault === 'guided'
+                      ? 'Students see sentence starters and guiding questions in each field.'
+                      : 'Students see field labels only — no sentence starters.'}
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={organizerStudentCanSwitch}
+                    onChange={(e) => setOrganizerStudentCanSwitch(e.target.checked)}
+                    className="w-4 h-4 accent-[#5BB974]"
+                  />
+                  <span className="text-sm text-[#4B5563]">Allow students to switch scaffold level</span>
+                </label>
+              </div>
+            )}
+          </div>
 
           {uploading && (
             <div>

@@ -135,6 +135,24 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isOwner(resource.data.studentId);
     }
 
+    // ── organizers ───────────────────────────────────────────────────────
+    // Students own their organizer responses; teachers read responses for
+    // students in their classroom.
+    match /organizers/{organizerId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || (
+          resource.data.keys().hasAll(['classroomId'])
+          && resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        )
+      );
+      allow create: if isSignedIn()
+                    && request.resource.data.studentId == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(resource.data.studentId);
+      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+    }
+
     // ── reading progress ─────────────────────────────────────────────────
     // Students update their own reading progress. Teachers can read progress
     // only for students in a classroom they own.

@@ -25,6 +25,9 @@ export async function uploadBook(
   successCriteria: string,
   teacherId: string,
   onProgress?: (pct: number) => void,
+  organizerTemplateId?: string,
+  organizerScaffoldDefault?: 'guided' | 'independent',
+  organizerStudentCanSwitch?: boolean,
 ): Promise<Book> {
   const cleanAssignmentPrompt = assignmentPrompt.trim()
   const cleanSuccessCriteria = successCriteria.trim()
@@ -52,6 +55,11 @@ export async function uploadBook(
       uploadedBy: teacherId,
       assignedStudentIds: [],
       createdAt: serverTimestamp(),
+      ...(organizerTemplateId ? {
+        organizerTemplateId,
+        organizerScaffoldDefault: organizerScaffoldDefault ?? 'guided',
+        organizerStudentCanSwitch: organizerStudentCanSwitch ?? true,
+      } : {}),
     })
   } catch (err) {
     await deleteObject(storageRef).catch(() => undefined)
@@ -69,6 +77,9 @@ export async function uploadBook(
     uploadedBy: teacherId,
     assignedStudentIds: [],
     createdAt: new Date(),
+    organizerTemplateId,
+    organizerScaffoldDefault,
+    organizerStudentCanSwitch,
   }
 }
 

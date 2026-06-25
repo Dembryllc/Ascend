@@ -6,12 +6,15 @@ import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook } from '@/firebase/annotations'
 import { getReadingProgress } from '@/firebase/readingProgress'
+import { getOrganizerResponse } from '@/firebase/organizers'
 import { getUserProfile } from '@/firebase/auth'
-import type { Annotation, Book, ReadingProgress, UserProfile } from '@/types'
+import type { Annotation, Book, OrganizerResponse, ReadingProgress, UserProfile } from '@/types'
 import { isPro, REACTIONS } from '@/types'
 import { exportAnnotationsPDF } from '@/utils/exportPDF'
+import { exportOrganizerPDF } from '@/utils/exportOrganizerPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
-import { BarChart3, FileDown, Lightbulb, Lock } from 'lucide-react'
+import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
+import { BarChart3, FileDown, Lightbulb, Lock, LayoutGrid } from 'lucide-react'
 import UpgradeModal from '@/components/shared/UpgradeModal'
 import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
 
@@ -22,8 +25,10 @@ export default function AnnotationsViewerPage() {
   const [books, setBooks] = useState<Book[]>([])
   const [selectedStudent, setSelectedStudent] = useState(searchParams.get('student') ?? '')
   const [selectedBook, setSelectedBook] = useState('')
+  const [activeTab, setActiveTab] = useState<'annotations' | 'organizer'>('annotations')
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
+  const [organizerResponse, setOrganizerResponse] = useState<OrganizerResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState('')
@@ -51,12 +56,14 @@ export default function AnnotationsViewerPage() {
     setFetching(true)
     setFetchError('')
     try {
-      const [ann, progress] = await Promise.all([
+      const [ann, progress, organizer] = await Promise.all([
         getAnnotationsByStudentAndBook(selectedStudent, selectedBook),
         getReadingProgress(selectedStudent, selectedBook),
+        getOrganizerResponse(selectedStudent, selectedBook),
       ])
       setAnnotations(ann)
       setReadingProgress(progress)
+      setOrganizerResponse(organizer)
     } catch {
       setFetchError('Could not load annotations. Check your connection and try again.')
     } finally {
@@ -65,7 +72,12 @@ export default function AnnotationsViewerPage() {
   }
 
   useEffect(() => {
-    if (selectedStudent && selectedBook) fetchAnnotations()
+    if (selectedStudent && selectedBook) {
+      setAnnotations([])
+      setReadingProgress(null)
+      setOrganizerResponse(null)
+      fetchAnnotations()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent, selectedBook])
 
@@ -145,7 +157,7 @@ export default function AnnotationsViewerPage() {
             </select>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={fetchAnnotations}
             disabled={!selectedStudent || !selectedBook || fetching}
@@ -160,7 +172,7 @@ export default function AnnotationsViewerPage() {
                 className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
               >
                 <FileDown size={18} />
-                Export PDF
+                Export Annotations PDF
               </button>
             ) : (
               <button
@@ -173,11 +185,50 @@ export default function AnnotationsViewerPage() {
               </button>
             )
           )}
+          {organizerResponse && isPro(profile) && selectedStudentProfile && selectedBookData && (
+            <button
+              onClick={() => exportOrganizerPDF(selectedStudentProfile.displayName, selectedBookData.title, organizerResponse!)}
+              className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
+            >
+              <LayoutGrid size={18} />
+              Export Organizer PDF
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Tab switcher */}
+      {(annotations.length > 0 || organizerResponse) && (
+        <div className="flex rounded-xl overflow-hidden border border-[#E5E7EB] mb-4 w-fit">
+          <button
+            onClick={() => setActiveTab('annotations')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === 'annotations' ? 'bg-[#4A90D9] text-white' : 'bg-white text-[#4B5563] hover:bg-[#F3F4F6]'}`}
+          >
+            <BarChart3 size={16} /> Annotations
+          </button>
+          <button
+            onClick={() => setActiveTab('organizer')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === 'organizer' ? 'bg-[#4A90D9] text-white' : 'bg-white text-[#4B5563] hover:bg-[#F3F4F6]'}`}
+          >
+            <LayoutGrid size={16} /> Organizer
+            {organizerResponse && <span className="ml-1 text-xs bg-[#5BB974] text-white px-1.5 py-0.5 rounded-full font-bold">✓</span>}
+          </button>
+        </div>
+      )}
+
+      {/* Organizer view */}
+      {activeTab === 'organizer' && (
+        organizerResponse ? (
+          <OrganizerView response={organizerResponse} />
+        ) : selectedStudent && selectedBook && !fetching ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-[#F3F4F6]">
+            <p className="text-[#4B5563]">No graphic organizer submitted for this student and book.</p>
+          </div>
+        ) : null
+      )}
+
       {/* Annotations list */}
-      {(annotations.length > 0 || readingProgress) ? (
+      {activeTab === 'annotations' && (annotations.length > 0 || readingProgress) ? (
         <div className="space-y-4">
           {readingProgress && (
             <section className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6]">
@@ -251,12 +302,12 @@ export default function AnnotationsViewerPage() {
             )
           })}
         </div>
-      ) : fetchError ? (
+      ) : activeTab === 'annotations' && fetchError ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-red-100">
           <p className="text-red-600 font-semibold mb-1">Could not load annotations</p>
           <p className="text-[#4B5563] text-sm">{fetchError}</p>
         </div>
-      ) : selectedStudent && selectedBook && !fetching ? (
+      ) : activeTab === 'annotations' && selectedStudent && selectedBook && !fetching ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-[#F3F4F6]">
           <p className="text-[#4B5563]">No annotations found for this student and book.</p>
         </div>
@@ -274,6 +325,36 @@ export default function AnnotationsViewerPage() {
         )
       )}
     </AppShell>
+  )
+}
+
+function OrganizerView({ response }: { response: OrganizerResponse }) {
+  const template = ORGANIZER_TEMPLATES[response.templateId]
+  if (!template) return <p className="text-[#4B5563] text-sm">Unknown organizer type.</p>
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3F4F6] space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <LayoutGrid size={18} className="text-[#5BB974]" />
+          <h3 className="font-bold text-lg text-[#1A1D23]">{template.name}</h3>
+          <span className="text-xs text-[#6B7280] bg-[#F3F4F6] px-2 py-0.5 rounded-full">{response.scaffoldLevel}</span>
+        </div>
+        {response.completed && (
+          <span className="text-xs font-bold text-[#5BB974] bg-green-50 border border-green-200 px-2 py-1 rounded-full">✓ Complete</span>
+        )}
+      </div>
+      {template.fields.map((field) => {
+        const text = response.fields[field.id]?.trim()
+        return (
+          <div key={field.id}>
+            <p className="text-xs font-bold text-[#6B7280] uppercase tracking-wide mb-1">{field.icon} {field.label}</p>
+            <div className="bg-[#F8F9FC] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#1A1D23] min-h-[44px]">
+              {text || <span className="text-[#9CA3AF] italic">No response</span>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

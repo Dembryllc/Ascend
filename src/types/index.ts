@@ -53,6 +53,24 @@ export interface Book {
   assignedStudentIds: string[]
   coverUrl?: string
   createdAt: Date
+  organizerTemplateId?: string
+  organizerScaffoldDefault?: 'guided' | 'independent'
+  organizerStudentCanSwitch?: boolean
+}
+
+export type ScaffoldLevel = 'guided' | 'independent'
+
+export interface OrganizerResponse {
+  id: string
+  studentId: string
+  bookId: string
+  classroomId: string | null
+  templateId: string
+  scaffoldLevel: ScaffoldLevel
+  fields: Record<string, string>
+  completed: boolean
+  createdAt: Date
+  updatedAt: Date
 }
 
 export type ReactionType = 'surprise' | 'think' | 'love' | 'important' | 'question'
