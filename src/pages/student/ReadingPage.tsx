@@ -433,7 +433,11 @@ export default function ReadingPage() {
       utt.volume = 1.0
       utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
       utt.onend = () => { clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('') }
-      utt.onerror = () => { clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.') }
+      utt.onerror = (e) => {
+        // Chrome sometimes fires 'interrupted' on cancel() — treat as normal stop
+        if (e.error === 'interrupted') return
+        clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.')
+      }
 
       // Word-by-word highlight using the SpeechSynthesisEvent boundary event.
       // Fires reliably in Chrome/Edge; degrades gracefully (no highlight) in Firefox/iOS Safari.
@@ -463,12 +467,15 @@ export default function ReadingPage() {
         }
       })
 
+      // Chrome bug: synthesis can stall if paused; resume() before speak() fixes it
+      window.speechSynthesis.resume()
       window.speechSynthesis.speak(utt)
     }
 
     // Voices may not be populated yet on first call — wait for voiceschanged
+    // 50ms delay gives Chrome time to settle after cancel()
     if (window.speechSynthesis.getVoices().length > 0) {
-      trySpeak()
+      setTimeout(trySpeak, 50)
     } else {
       window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
     }
@@ -597,6 +604,28 @@ export default function ReadingPage() {
                     <p className="text-xs text-[#6B7280] mt-1">{completedTaskCount} of {taskCount} reading actions complete</p>
                   </div>
                 </div>
+              </section>
+            )}
+
+            {(book.organizerTemplateId || profile?.role === 'individual') && (
+              <section className="w-full mb-4 bg-green-50 rounded-2xl border border-green-200 p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="bg-green-100 text-[#5BB974] p-2 rounded-xl shrink-0">
+                    <LayoutGrid size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-[#1A1D23] text-sm">Writing Task</p>
+                    <p className="text-xs text-[#4B5563] truncate">
+                      {book.organizerTemplateId ? 'Your teacher assigned a graphic organizer for this book.' : 'Use a graphic organizer to organize your reading.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setOrganizerOpen(true)}
+                  className="shrink-0 bg-[#5BB974] text-white font-bold px-4 py-2 rounded-xl hover:bg-[#4AA863] transition-colors text-sm"
+                >
+                  Open
+                </button>
               </section>
             )}
 

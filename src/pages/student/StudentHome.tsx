@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Circle,
   Flame,
+  LayoutGrid,
   MessageSquare,
   Plus,
   Sparkles,
@@ -654,11 +655,18 @@ function BookCard({
         <div className="p-3">
           <h4 className="font-bold text-[#1A1D23] text-sm leading-tight line-clamp-2">{book.title}</h4>
           <p className="text-xs text-[#4B5563] mt-1">{book.author}</p>
-          {book.readingLevel && (
-            <span className="inline-block mt-1.5 text-xs bg-blue-50 text-[#4A90D9] font-semibold px-2 py-0.5 rounded-full">
-              {book.readingLevel}
-            </span>
-          )}
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {book.readingLevel && (
+              <span className="text-xs bg-blue-50 text-[#4A90D9] font-semibold px-2 py-0.5 rounded-full">
+                {book.readingLevel}
+              </span>
+            )}
+            {book.organizerTemplateId && (
+              <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-[#5BB974] font-semibold px-2 py-0.5 rounded-full">
+                <LayoutGrid size={10} /> Writing task
+              </span>
+            )}
+          </div>
           {book.assignmentPrompt && (
             <p className="text-xs text-[#4B5563] mt-2 line-clamp-2">{book.assignmentPrompt}</p>
           )}

@@ -64,6 +64,7 @@ Role is set at registration and never changes. `ProtectedRoute` enforces role pe
 | `books` | PDFs in Storage, metadata in Firestore; `assignedStudentIds[]` controls access |
 | `annotations` | Per-student per-book per-page reactions + notes |
 | `readingProgress` | Last page, total time, completion % per student+book |
+| `organizers` | Graphic organizer responses — studentId, bookId, classroomId, templateId, scaffoldLevel, fields (Record<string,string>), completed |
 
 ### Firestore security rules summary
 
@@ -78,6 +79,7 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 - `annotations`: `studentId ASC → bookId ASC → pageNumber ASC`
 - `annotations`: `studentId ASC → timestamp DESC`
 - `annotations`: `bookId ASC → studentId ASC → pageNumber ASC`
+- `organizers`: `studentId ASC → bookId ASC` (required for `getOrganizersByBook` teacher view)
 
 ---
 
@@ -95,6 +97,10 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 | `src/firebase/auth.ts` | `registerUser` (sets `trialEndsAt` for teachers, writes `subscriptionStatus: 'free'` for all users, does NOT write student email to Firestore), `loginUser`, `logoutUser`, `sendPasswordReset`, `getUserProfile` (deserializes `trialEndsAt` from Firestore Timestamp). |
 | `src/firebase/books.ts` | `uploadBook` (teacher), `uploadStudentBook` (student), both ≤50 MB, both wrap Firestore `addDoc` in try/catch with Storage rollback on failure. |
 | `src/firebase/readingProgress.ts` | Upserts progress; never allows `totalSecondsRead` or `highestPageRead` to decrease. |
+| `src/data/organizerTemplates.ts` | Static definitions for 4 P0 graphic organizer templates (Paragraph Builder, Main Idea+Details, Compare&Contrast T-Chart, Story Map). Each field has label, guidedHint (sentence starter), placeholder, icon, rows. |
+| `src/firebase/organizers.ts` | `getOrganizerResponse(studentId, bookId)`, `getOrganizersByBook(bookId)`, `saveOrganizerResponse(...)` — addDoc on first save, updateDoc on subsequent saves. |
+| `src/utils/exportOrganizerPDF.ts` | jsPDF export for organizer responses. Same pattern as `exportAnnotationsPDF`. |
+| `src/components/student/OrganizerModal.tsx` | Full-screen modal for student organizer. Template picker (individual users), guided/independent scaffold toggle, auto-save (1s debounce), PDF export, upgrade gate for free individual users. |
 | `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. `isPro()` and `getTrialDaysRemaining()` helpers. `UserProfile.email` is optional (`email?: string`) — students have no email in Firestore. |
 | `src/components/layout/AppShell.tsx` | App chrome. Contains `TrialBanner` component (teachers only, dismissible per session via `sessionStorage`). |
 | `src/components/shared/TrialExpiredModal.tsx` | Modal shown when a teacher's trial has ended and they hit a Pro gate. Distinct from `UpgradeModal`. |
@@ -247,6 +253,8 @@ Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
 3. Firebase CLI deploy via `GOOGLE_APPLICATION_CREDENTIALS` pointing to the service account JSON stored in GitHub secret `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE`
 
 The deploy targets Firebase Hosting only (`--only hosting`). Firestore rules and indexes are **not** deployed by CI — apply them manually from the Firebase Console.
+
+**CI is currently broken (as of 2026-06-25):** The `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` GitHub secret contains an expired service account key. Build succeeds but deploy fails with `Failed to authenticate`. **Workaround:** run `firebase deploy --only hosting --project ascend-annotate` locally after `npm run build`. **Fix:** generate a new JSON key in GCP Console → IAM → Service Accounts, update the GitHub secret via `gh secret set FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE < key.json`.
 
 ### Stripe webhook (Cloud Function)
 
