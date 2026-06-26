@@ -31,18 +31,29 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
   const isGated = profile.role === 'individual' && !isPro(profile)
 
   useEffect(() => {
-    if (isGated || !templateId) { setLoading(false); return }
-    getOrganizerResponse(profile.uid, book.id)
-      .then((existing) => {
-        if (existing) {
+    let cancelled = false
+    const id = window.setTimeout(() => {
+      if (isGated || !templateId) {
+        if (!cancelled) setLoading(false)
+        return
+      }
+      getOrganizerResponse(profile.uid, book.id)
+        .then((existing) => {
+          if (cancelled || !existing) return
           setResponseId(existing.id)
           setFields(existing.fields)
           setScaffoldLevel(existing.scaffoldLevel)
           if (existing.templateId !== templateId) setTemplateId(existing.templateId)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(id)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

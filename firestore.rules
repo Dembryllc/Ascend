@@ -50,6 +50,57 @@ service cloud.firestore {
         && data.completionPercent <= 100
         && data.totalSecondsRead >= 0;
     }
+    function validAnnotationData(data) {
+      return data.keys().hasOnly([
+          'studentId',
+          'bookId',
+          'classroomId',
+          'pageNumber',
+          'reactionType',
+          'noteText',
+          'selectedText',
+          'annotationKind',
+          'timestamp'
+        ])
+        && data.keys().hasAll([
+          'studentId',
+          'bookId',
+          'classroomId',
+          'pageNumber',
+          'reactionType',
+          'noteText',
+          'selectedText',
+          'annotationKind',
+          'timestamp'
+        ])
+        && data.studentId is string
+        && data.bookId is string
+        && (data.classroomId == null || data.classroomId is string)
+        && data.pageNumber is int
+        && data.pageNumber >= 1
+        && data.reactionType in ['surprise', 'think', 'love', 'important', 'question']
+        && data.noteText is string
+        && data.selectedText is string
+        && data.annotationKind in ['annotation', 'reflection']
+        && (
+          (data.annotationKind == 'annotation' && data.noteText.size() <= 500)
+          || (data.annotationKind == 'reflection' && data.noteText.size() <= 600)
+        )
+        && data.timestamp is timestamp;
+    }
+    function validAnnotationClassroomLink(data) {
+      return data.classroomId == null
+        || (
+          exists(/databases/$(database)/documents/classrooms/$(data.classroomId))
+          && request.auth.uid in get(/databases/$(database)/documents/classrooms/$(data.classroomId)).data.studentIds
+        );
+    }
+    function isBookTeacherForAnnotation(data) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/books/$(data.bookId))
+        && get(/databases/$(database)/documents/books/$(data.bookId)).data.uploadedBy == request.auth.uid
+        && data.studentId in get(/databases/$(database)/documents/books/$(data.bookId)).data.assignedStudentIds;
+    }
 
     // ── users ─────────────────────────────────────────────────────────────
     // Users read their own profile, or any authenticated user can read
@@ -128,10 +179,21 @@ service cloud.firestore {
           && resource.data.classroomId is string
           && isClassTeacher(resource.data.classroomId)
         )
+        || isBookTeacherForAnnotation(resource.data)
       );
       allow create: if isSignedIn()
-                    && request.resource.data.studentId == request.auth.uid;
-      allow update: if isSignedIn() && isOwner(resource.data.studentId);
+                    && validAnnotationData(request.resource.data)
+                    && request.resource.data.studentId == request.auth.uid
+                    && canReadBook(request.resource.data.bookId, request.auth.uid)
+                    && validAnnotationClassroomLink(request.resource.data);
+      allow update: if isSignedIn()
+                    && isOwner(resource.data.studentId)
+                    && validAnnotationData(request.resource.data)
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.bookId == resource.data.bookId
+                    && request.resource.data.classroomId == resource.data.classroomId
+                    && request.resource.data.pageNumber == resource.data.pageNumber
+                    && request.resource.data.annotationKind == resource.data.annotationKind;
       allow delete: if isSignedIn() && isOwner(resource.data.studentId);
     }
 
