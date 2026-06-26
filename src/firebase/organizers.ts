@@ -21,6 +21,7 @@ function toResponse(id: string, data: Record<string, unknown>): OrganizerRespons
     scaffoldLevel: (data.scaffoldLevel as ScaffoldLevel) ?? 'guided',
     fields:       (data.fields as Record<string, string>) ?? {},
     completed:    Boolean(data.completed),
+    isTeacherExample: data.isTeacherExample === true,
     createdAt:    (data.createdAt as { toDate(): Date })?.toDate() ?? new Date(),
     updatedAt:    (data.updatedAt as { toDate(): Date })?.toDate() ?? new Date(),
   }
@@ -57,6 +58,7 @@ export async function saveOrganizerResponse(
   scaffoldLevel: ScaffoldLevel,
   fields: Record<string, string>,
   completed: boolean,
+  isTeacherExample = false,
 ): Promise<string> {
   if (responseId) {
     await updateDoc(doc(db, 'organizers', responseId), {
@@ -75,8 +77,32 @@ export async function saveOrganizerResponse(
     scaffoldLevel,
     fields,
     completed,
+    ...(isTeacherExample ? { isTeacherExample: true } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
   return ref.id
+}
+
+export async function getTeacherOrganizerExample(bookId: string): Promise<OrganizerResponse | null> {
+  const snap = await getDocs(query(
+    collection(db, 'organizers'),
+    where('bookId', '==', bookId),
+    where('isTeacherExample', '==', true),
+  ))
+  if (snap.empty) return null
+  const d = snap.docs[0]
+  return toResponse(d.id, d.data())
+}
+
+export async function getTeacherOrganizerExampleById(teacherId: string, bookId: string): Promise<OrganizerResponse | null> {
+  const snap = await getDocs(query(
+    collection(db, 'organizers'),
+    where('studentId', '==', teacherId),
+    where('bookId', '==', bookId),
+    where('isTeacherExample', '==', true),
+  ))
+  if (snap.empty) return null
+  const d = snap.docs[0]
+  return toResponse(d.id, d.data())
 }
