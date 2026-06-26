@@ -118,8 +118,8 @@ service cloud.firestore {
     // ── annotations ───────────────────────────────────────────────────────
     // Students own their annotations; teachers can read any annotation
     // (needed for the annotations viewer dashboard).
-    // We avoid a role lookup by letting any signed-in user read — the app
-    // only ever queries annotations scoped to a specific studentId or bookId.
+    // Teacher prompt annotations (isTeacherPrompt == true) are readable by
+    // any user who has access to the book (assigned students + the teacher).
     match /annotations/{annotationId} {
       allow read: if isSignedIn() && (
         isOwner(resource.data.studentId)
@@ -127,6 +127,10 @@ service cloud.firestore {
           resource.data.keys().hasAll(['classroomId'])
           && resource.data.classroomId is string
           && isClassTeacher(resource.data.classroomId)
+        )
+        || (
+          resource.data.isTeacherPrompt == true
+          && canReadBook(resource.data.bookId, request.auth.uid)
         )
       );
       allow create: if isSignedIn()
@@ -138,6 +142,8 @@ service cloud.firestore {
     // ── organizers ───────────────────────────────────────────────────────
     // Students own their organizer responses; teachers read responses for
     // students in their classroom.
+    // Teacher example organizer responses (isTeacherExample == true) are
+    // readable by any user who has access to the book.
     match /organizers/{organizerId} {
       allow read: if isSignedIn() && (
         isOwner(resource.data.studentId)
@@ -145,6 +151,10 @@ service cloud.firestore {
           resource.data.keys().hasAll(['classroomId'])
           && resource.data.classroomId is string
           && isClassTeacher(resource.data.classroomId)
+        )
+        || (
+          resource.data.isTeacherExample == true
+          && canReadBook(resource.data.bookId, request.auth.uid)
         )
       );
       allow create: if isSignedIn()

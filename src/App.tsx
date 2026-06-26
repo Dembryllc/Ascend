@@ -20,6 +20,7 @@ import UploadBookPage from '@/pages/teacher/UploadBookPage'
 import ClassroomPage from '@/pages/teacher/ClassroomPage'
 import AnnotationsViewerPage from '@/pages/teacher/AnnotationsViewerPage'
 import ProgressDashboardPage from '@/pages/teacher/ProgressDashboardPage'
+import TeacherReadingPage from '@/pages/teacher/TeacherReadingPage'
 
 // Student
 import StudentHome from '@/pages/student/StudentHome'
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/teacher/classroom" element={<ProtectedRoute requiredRole="teacher"><ClassroomPage /></ProtectedRoute>} />
           <Route path="/teacher/annotations" element={<ProtectedRoute requiredRole="teacher"><AnnotationsViewerPage /></ProtectedRoute>} />
           <Route path="/teacher/progress" element={<ProtectedRoute requiredRole="teacher"><ProgressDashboardPage /></ProtectedRoute>} />
+          <Route path="/teacher/read/:bookId" element={<ProtectedRoute requiredRole="teacher"><TeacherReadingPage /></ProtectedRoute>} />
 
           {/* Student + Individual — shared shelf/reading/annotation routes */}
           <Route path="/student" element={<ProtectedRoute requiredRole={['student', 'individual']}><StudentHome /></ProtectedRoute>} />

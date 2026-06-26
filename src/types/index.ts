@@ -56,6 +56,7 @@ export interface Book {
   organizerTemplateId?: string
   organizerScaffoldDefault?: 'guided' | 'independent'
   organizerStudentCanSwitch?: boolean
+  teacherPromptsEnabled?: boolean
 }
 
 export type ScaffoldLevel = 'guided' | 'independent'
@@ -69,6 +70,7 @@ export interface OrganizerResponse {
   scaffoldLevel: ScaffoldLevel
   fields: Record<string, string>
   completed: boolean
+  isTeacherExample?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -85,6 +87,7 @@ export interface Annotation {
   noteText: string
   selectedText?: string
   annotationKind?: 'annotation' | 'reflection'
+  isTeacherPrompt?: boolean
   timestamp: Date
 }
 

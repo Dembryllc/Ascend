@@ -33,6 +33,31 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "bookId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "annotations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bookId", "order": "ASCENDING" },
+        { "fieldPath": "isTeacherPrompt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bookId", "order": "ASCENDING" },
+        { "fieldPath": "isTeacherExample", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "bookId", "order": "ASCENDING" },
+        { "fieldPath": "isTeacherExample", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

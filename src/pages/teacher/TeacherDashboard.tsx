@@ -6,7 +6,7 @@ import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BarChart3, BookOpen, CheckCircle2, Circle, Copy, CopyCheck, Users, Upload, Eye, Pencil, X, Check } from 'lucide-react'
+import { BarChart3, BookOpen, CheckCircle2, Circle, Copy, CopyCheck, Users, Upload, Eye, Pencil, X, Check, PenLine } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile, refreshProfile } = useAuth()
@@ -250,12 +250,27 @@ function BookCard({ book }: { book: Book }) {
           {book.readingLevel}
         </span>
       )}
+      {book.teacherPromptsEnabled && (
+        <span className="inline-block mt-2 ml-1 text-xs bg-purple-50 text-[#9B7FD4] font-semibold px-2 py-0.5 rounded-full">
+          Prompts shared
+        </span>
+      )}
       {book.assignmentPrompt && (
         <p className="text-xs text-[#4B5563] mt-2 line-clamp-2">{book.assignmentPrompt}</p>
       )}
-      <p className="text-xs text-[#9CA3AF] mt-2">
-        {book.assignedStudentIds.length} student{book.assignedStudentIds.length !== 1 ? 's' : ''} assigned
-      </p>
+      <div className="flex items-center justify-between mt-3">
+        <p className="text-xs text-[#9CA3AF]">
+          {book.assignedStudentIds.length} student{book.assignedStudentIds.length !== 1 ? 's' : ''} assigned
+        </p>
+        <Link
+          to={`/teacher/read/${book.id}`}
+          className="flex items-center gap-1 text-xs font-semibold text-[#9B7FD4] hover:text-[#8A6EC3] transition-colors"
+          aria-label={`Annotate ${book.title} as reading prompt`}
+        >
+          <PenLine size={14} />
+          Annotate
+        </Link>
+      </div>
     </div>
   )
 }

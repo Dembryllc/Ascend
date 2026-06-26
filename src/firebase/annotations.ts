@@ -23,6 +23,7 @@ function toAnnotation(id: string, data: Record<string, unknown>): Annotation {
     noteText:     typeof data.noteText === 'string' ? data.noteText : '',
     selectedText: typeof data.selectedText === 'string' ? data.selectedText : '',
     annotationKind: data.annotationKind === 'reflection' ? 'reflection' : 'annotation',
+    isTeacherPrompt: data.isTeacherPrompt === true,
     timestamp:    (data.timestamp as { toDate(): Date })?.toDate() ?? new Date(),
   }
 }
@@ -114,6 +115,53 @@ export async function getAnnotationsByClassAndBook(
   const allowedStudentIds = new Set(studentIds)
   return snap.docs
     .map((d) => toAnnotation(d.id, d.data()))
-    .filter((ann) => allowedStudentIds.has(ann.studentId))
+    .filter((ann) => allowedStudentIds.has(ann.studentId) && !ann.isTeacherPrompt)
+    .sort((a, b) => a.pageNumber - b.pageNumber)
+}
+
+export async function saveTeacherAnnotation(
+  teacherId: string,
+  bookId: string,
+  pageNumber: number,
+  reactionType: ReactionType,
+  noteText: string,
+  selectedText = '',
+): Promise<Annotation> {
+  const ref = await addDoc(collection(db, 'annotations'), {
+    studentId: teacherId,
+    bookId,
+    classroomId: null,
+    pageNumber,
+    reactionType,
+    noteText,
+    selectedText,
+    annotationKind: 'annotation',
+    isTeacherPrompt: true,
+    timestamp: serverTimestamp(),
+  })
+  return {
+    id: ref.id,
+    studentId: teacherId,
+    bookId,
+    classroomId: null,
+    pageNumber,
+    reactionType,
+    noteText,
+    selectedText,
+    annotationKind: 'annotation',
+    isTeacherPrompt: true,
+    timestamp: new Date(),
+  }
+}
+
+export async function getTeacherPromptAnnotations(bookId: string): Promise<Annotation[]> {
+  const q = query(
+    collection(db, 'annotations'),
+    where('bookId', '==', bookId),
+    where('isTeacherPrompt', '==', true),
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map((d) => toAnnotation(d.id, d.data()))
     .sort((a, b) => a.pageNumber - b.pageNumber)
 }

@@ -5,7 +5,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { useAuth } from '@/context/auth-context'
 import { getBook } from '@/firebase/books'
-import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
+import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation, getTeacherPromptAnnotations } from '@/firebase/annotations'
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
 import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
@@ -54,6 +54,7 @@ export default function ReadingPage() {
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [organizerOpen, setOrganizerOpen] = useState(false)
+  const [teacherPrompts, setTeacherPrompts] = useState<Annotation[]>([])
 
   useEffect(() => {
     if (!bookId) return
@@ -71,6 +72,9 @@ export default function ReadingPage() {
       setReadingProgress(progress)
       if (progress?.lastReadPage) setCurrentPage(Math.max(1, progress.lastReadPage))
       setLoadingBook(false)
+      if (b?.teacherPromptsEnabled) {
+        getTeacherPromptAnnotations(bookId).then(setTeacherPrompts).catch(() => undefined)
+      }
     }).catch((err: unknown) => {
       console.error('Failed to open book:', err)
       setReaderError(err instanceof Error ? err.message : 'Could not open this book. Please try again.')
@@ -81,6 +85,11 @@ export default function ReadingPage() {
   const pageAnnotations = useMemo(
     () => annotations.filter((a) => a.pageNumber === currentPage),
     [annotations, currentPage],
+  )
+
+  const pageTeacherPrompts = useMemo(
+    () => teacherPrompts.filter((a) => a.pageNumber === currentPage),
+    [teacherPrompts, currentPage],
   )
 
   useEffect(() => {
@@ -719,6 +728,32 @@ export default function ReadingPage() {
               <p className="w-full mt-2 text-center text-xs font-semibold text-[#4B5563]">{readAloudStatus}</p>
             )}
 
+            {/* Teacher prompt annotations for this page */}
+            {pageTeacherPrompts.length > 0 && (
+              <div className="w-full mt-4 bg-purple-50 rounded-2xl border border-purple-200 p-4">
+                <p className="text-xs font-bold text-[#9B7FD4] uppercase tracking-wide mb-2">Teacher&apos;s Model — Page {currentPage}</p>
+                <div className="space-y-2">
+                  {pageTeacherPrompts.map((ann) => {
+                    const r = REACTIONS[ann.reactionType]
+                    return (
+                      <div key={ann.id} className="flex items-start gap-2 bg-white rounded-xl p-3 border border-purple-100">
+                        <span className="text-xl">{r.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-[#9B7FD4]">{r.label}</p>
+                          {ann.selectedText && (
+                            <p className="text-sm text-[#1A1D23] mt-1 bg-purple-50 border-l-4 border-purple-300 rounded-r-lg px-3 py-2">
+                              &quot;{ann.selectedText}&quot;
+                            </p>
+                          )}
+                          {ann.noteText && <p className="text-sm text-[#1A1D23] mt-1">{ann.noteText}</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Annotation toolbar */}
             <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
           <p className="text-sm font-bold text-[#1A1D23] mb-3">How does this page make you feel?</p>
@@ -751,7 +786,7 @@ export default function ReadingPage() {
                         <p className="text-xs font-semibold text-[#4B5563]">{r.label}</p>
                         {ann.selectedText && (
                           <p className="text-sm text-[#1A1D23] mt-1 bg-yellow-50 border-l-4 border-yellow-300 rounded-r-lg px-3 py-2">
-                            “{ann.selectedText}”
+                            "{ann.selectedText}"
                           </p>
                         )}
                         {ann.noteText
@@ -775,6 +810,40 @@ export default function ReadingPage() {
           </main>
 
           <aside className="lg:sticky lg:top-20 space-y-4">
+            {/* Teacher prompts sidebar panel */}
+            {teacherPrompts.length > 0 && (
+              <section className="bg-purple-50 rounded-2xl shadow-sm border border-purple-200 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">🍎</span>
+                  <h3 className="font-bold text-[#9B7FD4]">Teacher&apos;s Model</h3>
+                </div>
+                <div className="space-y-2 max-h-[36vh] overflow-y-auto pr-1">
+                  {teacherPrompts
+                    .slice()
+                    .sort((a, b) => a.pageNumber - b.pageNumber)
+                    .map((ann) => {
+                      const r = REACTIONS[ann.reactionType]
+                      return (
+                        <button
+                          key={ann.id}
+                          onClick={() => setCurrentPage(Math.max(1, ann.pageNumber))}
+                          className="w-full text-left bg-white hover:bg-purple-100 border border-purple-100 rounded-xl p-3 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-[#1A1D23]">{r.emoji} Page {ann.pageNumber}</span>
+                            <span className="text-[11px] text-[#9B7FD4]">{r.label}</span>
+                          </div>
+                          {ann.selectedText && (
+                            <p className="text-xs text-[#4B5563] mt-1 line-clamp-2">&quot;{ann.selectedText}&quot;</p>
+                          )}
+                          {ann.noteText && <p className="text-xs text-[#1A1D23] mt-1 line-clamp-2">{ann.noteText}</p>}
+                        </button>
+                      )
+                    })}
+                </div>
+              </section>
+            )}
+
             <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
               <div className="flex items-center gap-2 mb-3">
                 <MessageSquare size={18} className="text-[#9B7FD4]" />
@@ -811,7 +880,7 @@ export default function ReadingPage() {
                             <p className="text-xs font-semibold text-[#5BB974] mt-1">Reflection</p>
                           )}
                           {ann.selectedText && ann.annotationKind !== 'reflection' && (
-                            <p className="text-xs text-[#4B5563] mt-1 line-clamp-2">“{ann.selectedText}”</p>
+                            <p className="text-xs text-[#4B5563] mt-1 line-clamp-2">"{ann.selectedText}"</p>
                           )}
                           {ann.noteText
                           ? <p className="text-xs text-[#1A1D23] mt-1 line-clamp-2">{ann.noteText}</p>
@@ -935,7 +1004,7 @@ export default function ReadingPage() {
               </label>
               {selectedText ? (
                 <div className="bg-yellow-50 border-l-4 border-yellow-300 rounded-r-xl px-4 py-3 text-sm text-[#1A1D23] max-h-32 overflow-y-auto">
-                  “{selectedText}”
+                  "{selectedText}"
                 </div>
               ) : (
                 <div className="bg-[#F8F9FC] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#6B7280]">

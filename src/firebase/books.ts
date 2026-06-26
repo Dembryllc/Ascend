@@ -132,6 +132,10 @@ export async function assignBookToClass(bookId: string, studentIds: string[]): P
   await updateDoc(doc(db, 'books', bookId), { assignedStudentIds: arrayUnion(...studentIds) })
 }
 
+export async function setTeacherPromptsEnabled(bookId: string, enabled: boolean): Promise<void> {
+  await updateDoc(doc(db, 'books', bookId), { teacherPromptsEnabled: enabled })
+}
+
 export async function uploadStudentBook(
   file: File,
   title: string,
