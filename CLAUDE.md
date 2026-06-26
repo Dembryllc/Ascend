@@ -61,16 +61,17 @@ Role is set at registration and never changes. `ProtectedRoute` enforces role pe
 |---|---|
 | `users` | Auth profile (uid, role, displayName, classroomId, subscriptionStatus, trialEndsAt?). **Teachers** include `email`. **Students** do not — email stays in Firebase Auth only (FERPA PII minimization). |
 | `classrooms` | Teacher-owned, students join via 6-char code |
-| `books` | PDFs in Storage, metadata in Firestore; `assignedStudentIds[]` controls access |
-| `annotations` | Per-student per-book per-page reactions + notes |
+| `books` | PDFs in Storage, metadata in Firestore; `assignedStudentIds[]` controls access; `teacherPromptsEnabled` gates student visibility of teacher prompt annotations |
+| `annotations` | Per-student per-book per-page reactions + notes. Teacher prompt annotations have `isTeacherPrompt: true` and the teacher's uid as `studentId`. |
 | `readingProgress` | Last page, total time, completion % per student+book |
-| `organizers` | Graphic organizer responses — studentId, bookId, classroomId, templateId, scaffoldLevel, fields (Record<string,string>), completed |
+| `organizers` | Graphic organizer responses — studentId, bookId, classroomId, templateId, scaffoldLevel, fields (Record<string,string>), completed. Teacher example organizers have `isTeacherExample: true` and the teacher's uid as `studentId`. |
 
 ### Firestore security rules summary
 
 - Users read their own profile; any signed-in user reads classrooms (join-code lookup).
 - Books readable only if `uid ∈ assignedStudentIds` or `uploadedBy == uid`.
-- Annotations: students own theirs; teachers read any annotation in their classroom.
+- Annotations: students own theirs; teachers read any annotation in their classroom; `isTeacherPrompt == true` annotations are readable by anyone `canReadBook` returns true for (assigned students + the teacher who uploaded it).
+- Organizers: same pattern — `isTeacherExample == true` organizers readable by anyone `canReadBook` returns true for.
 - Reading progress: students write their own; progress `totalSecondsRead` and `highestPageRead` can only increase (enforced in rules).
 
 ### Composite Firestore indexes required
@@ -79,7 +80,15 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 - `annotations`: `studentId ASC → bookId ASC → pageNumber ASC`
 - `annotations`: `studentId ASC → timestamp DESC`
 - `annotations`: `bookId ASC → studentId ASC → pageNumber ASC`
+- `annotations`: `bookId ASC → isTeacherPrompt ASC` (required for `getTeacherPromptAnnotations`)
 - `organizers`: `studentId ASC → bookId ASC` (required for `getOrganizersByBook` teacher view)
+- `organizers`: `bookId ASC → isTeacherExample ASC` (required for `getTeacherOrganizerExample`)
+- `organizers`: `studentId ASC → bookId ASC → isTeacherExample ASC` (required for `getTeacherOrganizerExampleById`)
+
+**These indexes must be deployed manually** — CI only deploys Firebase Hosting. Run:
+```
+firebase deploy --only firestore:rules,firestore:indexes --project ascend-annotate
+```
 
 ---
 
@@ -87,27 +96,56 @@ Defined in `firestore.indexes.json`. Without them annotation queries fail silent
 
 | File | Notes |
 |---|---|
-| `src/pages/student/ReadingPage.tsx` | Main reader. PDF viewer, annotation toolbar, floating emoji bar, speech, progress tracking. Most complexity lives here. |
+| `src/pages/student/ReadingPage.tsx` | Main reader. PDF viewer, annotation toolbar, floating emoji bar, speech, progress tracking. Renders teacher prompt annotations (purple `bg-purple-50` block) when `book.teacherPromptsEnabled`. Most complexity lives here. |
 | `src/pages/student/MyAnnotationsPage.tsx` | All annotations across books, filter by book/reaction, edit modal. |
 | `src/pages/student/StudentProgressPage.tsx` | Student's own reading stats: minutes, annotations, books completed, streak, per-book progress bars with reaction breakdowns, weekly goal meter. Route: `/student/progress`. |
+| `src/pages/teacher/TeacherReadingPage.tsx` | Teacher PDF reader at `/teacher/read/:bookId`. Purple annotation mode — teacher creates model prompt annotations (`isTeacherPrompt: true`), toggles sharing on/off via `teacherPromptsEnabled`. Opens `OrganizerModal` with `isTeacherMode={true}` when book has a template. |
 | `src/pages/teacher/AnnotationsViewerPage.tsx` | Teacher view of student annotations, PDF export. Shows `TrialExpiredModal` when trial is expired and teacher hits PDF export gate. Contains FERPA notice. |
 | `src/pages/teacher/ProgressDashboardPage.tsx` | Reading time + completion tracking per student. Contains FERPA notice. |
 | `src/pages/teacher/UploadBookPage.tsx` | Book upload form. Shows `TrialExpiredModal` when trial is expired and teacher hits the 5-book free limit. |
-| `src/firebase/annotations.ts` | `saveAnnotation`, `updateAnnotation`, `deleteAnnotation`, `getAnnotationsByStudentAndBook`, `getAnnotationsByStudent`, `getAnnotationsByClassAndBook` |
+| `src/firebase/annotations.ts` | `saveAnnotation`, `updateAnnotation`, `deleteAnnotation`, `getAnnotationsByStudentAndBook`, `getAnnotationsByStudent`, `getAnnotationsByClassAndBook`. Also: `saveTeacherAnnotation(teacherId, bookId, page, reaction, note, text)` — writes `isTeacherPrompt: true`; `getTeacherPromptAnnotations(bookId)` — fetches all teacher prompts for a book. |
 | `src/firebase/auth.ts` | `registerUser` (sets `trialEndsAt` for teachers, writes `subscriptionStatus: 'free'` for all users, does NOT write student email to Firestore), `loginUser`, `logoutUser`, `sendPasswordReset`, `getUserProfile` (deserializes `trialEndsAt` from Firestore Timestamp). |
-| `src/firebase/books.ts` | `uploadBook` (teacher), `uploadStudentBook` (student), both ≤50 MB, both wrap Firestore `addDoc` in try/catch with Storage rollback on failure. |
+| `src/firebase/books.ts` | `uploadBook` (teacher), `uploadStudentBook` (student), both ≤50 MB, both wrap Firestore `addDoc` in try/catch with Storage rollback on failure. Also: `setTeacherPromptsEnabled(bookId, enabled)` — toggles `teacherPromptsEnabled` on the book doc. |
 | `src/firebase/readingProgress.ts` | Upserts progress; never allows `totalSecondsRead` or `highestPageRead` to decrease. |
 | `src/data/organizerTemplates.ts` | Static definitions for 4 P0 graphic organizer templates (Paragraph Builder, Main Idea+Details, Compare&Contrast T-Chart, Story Map). Each field has label, guidedHint (sentence starter), placeholder, icon, rows. |
-| `src/firebase/organizers.ts` | `getOrganizerResponse(studentId, bookId)`, `getOrganizersByBook(bookId)`, `saveOrganizerResponse(...)` — addDoc on first save, updateDoc on subsequent saves. |
+| `src/firebase/organizers.ts` | `getOrganizerResponse(studentId, bookId)`, `getOrganizersByBook(bookId)`, `saveOrganizerResponse(..., isTeacherExample?)` — addDoc on first save, updateDoc on subsequent saves. Also: `getTeacherOrganizerExample(bookId)` — fetches teacher example by bookId; `getTeacherOrganizerExampleById(teacherId, bookId)` — used by teacher to load their own example. |
 | `src/utils/exportOrganizerPDF.ts` | jsPDF export for organizer responses. Same pattern as `exportAnnotationsPDF`. |
-| `src/components/student/OrganizerModal.tsx` | Full-screen modal for student organizer. Template picker (individual users), guided/independent scaffold toggle, auto-save (1s debounce), PDF export, upgrade gate for free individual users. |
-| `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. `isPro()` and `getTrialDaysRemaining()` helpers. `UserProfile.email` is optional (`email?: string`) — students have no email in Firestore. |
+| `src/components/student/OrganizerModal.tsx` | Organizer modal for students and teachers. Props: `book`, `profile`, `onClose`, `isTeacherMode?`. In teacher mode: purple ring, loads/saves with `isTeacherExample: true`, "Save as example" footer. In student mode: loads own response + teacher example in parallel; Eye icon toggle shows teacher's example read-only. `OrganizerForm` accepts `readOnly` prop. |
+| `src/types/index.ts` | All shared types. `ReactionType`, `Annotation`, `Book`, `ReadingProgress`, `REACTIONS` map. `isPro()` and `getTrialDaysRemaining()` helpers. `UserProfile.email` is optional (`email?: string`) — students have no email in Firestore. `Book.teacherPromptsEnabled?: boolean`, `Annotation.isTeacherPrompt?: boolean`, `OrganizerResponse.isTeacherExample?: boolean`. |
 | `src/components/layout/AppShell.tsx` | App chrome. Contains `TrialBanner` component (teachers only, dismissible per session via `sessionStorage`). |
 | `src/components/shared/TrialExpiredModal.tsx` | Modal shown when a teacher's trial has ended and they hit a Pro gate. Distinct from `UpgradeModal`. |
 | `src/components/shared/UpgradeModal.tsx` | Generic upgrade prompt for free-tier teachers (no trial). Keep as-is. |
 | `vite.config.ts` | Contains `pdfWorkerPlugin` — copies `pdf.worker.mjs` to `dist/` at build time. |
 | `functions/src/index.ts` | Stripe webhook Cloud Function (firebase-functions v2). Handles `checkout.session.completed` (→ `subscriptionStatus: 'pro'`), `customer.subscription.deleted/updated` (→ free/pro). Deployed to `us-central1`. Secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. |
 | `.github/workflows/firebase-deploy.yml` | CI/CD pipeline. Node 22, `npm ci --legacy-peer-deps`, Vite build, Firebase CLI deploy. Includes `VITE_STRIPE_PRO_MONTHLY_URL` and `VITE_STRIPE_PRO_ANNUAL_URL`. |
+
+---
+
+## Teacher model content — how sharing works
+
+Two features share the same underlying pattern: teacher content stored in the same Firestore collections as student content, distinguished by a boolean flag, and gated by `canReadBook`.
+
+### Feature A — Teacher annotation prompts
+
+1. Teacher reads a book at `/teacher/read/:bookId` (`TeacherReadingPage`).
+2. Annotations are saved via `saveTeacherAnnotation(...)` with `isTeacherPrompt: true` and the teacher's uid as `studentId`.
+3. Teacher toggles **Share** → calls `setTeacherPromptsEnabled(bookId, true)` → sets `teacherPromptsEnabled` on the Book doc.
+4. When a student opens the same book, `ReadingPage` checks `b.teacherPromptsEnabled` and, if true, fetches `getTeacherPromptAnnotations(bookId)`.
+5. Teacher prompt cards render in a purple `bg-purple-50` section above the annotation toolbar; they also appear in the sidebar. Both are read-only for students.
+
+### Feature B — Teacher organizer examples
+
+1. Teacher opens `OrganizerModal` with `isTeacherMode={true}` (via the Organizer button in `TeacherReadingPage` header, only visible when `book.organizerTemplateId` is set).
+2. Teacher fills out the organizer; `saveOrganizerResponse(..., isTeacherExample: true)` saves it with the teacher's uid as `studentId`.
+3. When a student opens the organizer, `OrganizerModal` fetches both `getOrganizerResponse(studentId, bookId)` and `getTeacherOrganizerExample(bookId)` in parallel.
+4. If a teacher example exists, a purple Eye icon button appears in the header. Clicking it renders the teacher's organizer read-only using `OrganizerForm readOnly={true}`.
+
+### Key invariants — do not break
+
+- Teacher content uses the teacher's own uid as `studentId`. The Firestore create rule (`studentId == request.auth.uid`) already allows this.
+- The flag (`isTeacherPrompt` / `isTeacherExample`) is only set on create (`addDoc`), never on update (`updateDoc`). This prevents teachers accidentally stripping the flag when editing.
+- `canReadBook(bookId, uid)` in `firestore.rules` is the single source of truth for who can read teacher content — it covers both the teacher and all assigned students.
+- There is **one** teacher prompt per book (last `isTeacherPrompt` query result wins); similarly **one** teacher organizer example per book.
 
 ---
 
@@ -242,6 +280,8 @@ Uses `window.speechSynthesis` (Web Speech API — no third-party SDK).
 - **Do not write student email to Firestore** — student emails belong in Firebase Auth only. This is a deliberate FERPA PII minimization decision. Teachers still get their email stored.
 - **Do not make `UserProfile.email` required** — it is `email?: string` because student profiles never have it. Any code reading `profile.email` must handle undefined.
 - **Do not remove the FERPA notices** from `AnnotationsViewerPage` and `ProgressDashboardPage` — they are visible signals to teachers that student data is handled compliantly.
+- **Do not strip `isTeacherPrompt` or `isTeacherExample` flags on update** — these flags are set on `addDoc` only and must not be included in `updateDoc` payloads (they would be removed by the merge). The current `saveOrganizerResponse` and `updateAnnotation` implementations already omit them on update; keep it that way.
+- **Do not deploy Firestore rules/indexes via CI** — the GitHub Actions workflow deploys hosting only. Always apply rules and indexes manually: `firebase deploy --only firestore:rules,firestore:indexes --project ascend-annotate`.
 
 ---
 
