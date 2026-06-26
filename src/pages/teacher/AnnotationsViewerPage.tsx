@@ -31,6 +31,7 @@ export default function AnnotationsViewerPage() {
   const [organizerResponse, setOrganizerResponse] = useState<OrganizerResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [fetchError, setFetchError] = useState('')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
@@ -46,7 +47,9 @@ export default function AnnotationsViewerPage() {
         setStudents(profs.filter(Boolean) as UserProfile[])
       }
       setLoading(false)
-    }).catch(() => {
+    }).catch((err: unknown) => {
+      console.error('Failed to load teacher annotation setup:', err)
+      setLoadError('Could not load your classroom or books. Refresh the page and try again.')
       setLoading(false)
     })
   }, [profile])
@@ -55,6 +58,9 @@ export default function AnnotationsViewerPage() {
     if (!selectedStudent || !selectedBook) return
     setFetching(true)
     setFetchError('')
+    setAnnotations([])
+    setReadingProgress(null)
+    setOrganizerResponse(null)
     try {
       const [ann, progress, organizer] = await Promise.all([
         getAnnotationsByStudentAndBook(selectedStudent, selectedBook),
@@ -64,7 +70,8 @@ export default function AnnotationsViewerPage() {
       setAnnotations(ann)
       setReadingProgress(progress)
       setOrganizerResponse(organizer)
-    } catch {
+    } catch (err: unknown) {
+      console.error('Failed to load annotations:', err)
       setFetchError('Could not load annotations. Check your connection and try again.')
     } finally {
       setFetching(false)
@@ -73,10 +80,10 @@ export default function AnnotationsViewerPage() {
 
   useEffect(() => {
     if (selectedStudent && selectedBook) {
-      setAnnotations([])
-      setReadingProgress(null)
-      setOrganizerResponse(null)
-      fetchAnnotations()
+      const id = window.setTimeout(() => {
+        void fetchAnnotations()
+      }, 0)
+      return () => window.clearTimeout(id)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent, selectedBook])
@@ -121,6 +128,12 @@ export default function AnnotationsViewerPage() {
         <p className="text-xs text-[#9CA3AF] mt-1">Student data is protected under FERPA and used solely for educational purposes.</p>
       </div>
 
+      {loadError && (
+        <div className="bg-red-50 border border-red-100 text-red-700 rounded-xl px-4 py-3 mb-6 text-sm font-semibold">
+          {loadError}
+        </div>
+      )}
+
       {/* Selector */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -133,6 +146,8 @@ export default function AnnotationsViewerPage() {
                 setSelectedStudent(e.target.value)
                 setAnnotations([])
                 setReadingProgress(null)
+                setOrganizerResponse(null)
+                setFetchError('')
               }}
               className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
             >
@@ -149,6 +164,8 @@ export default function AnnotationsViewerPage() {
                 setSelectedBook(e.target.value)
                 setAnnotations([])
                 setReadingProgress(null)
+                setOrganizerResponse(null)
+                setFetchError('')
               }}
               className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
             >
