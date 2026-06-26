@@ -40,9 +40,21 @@ jobs:
         env:
           SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}
         run: |
-          echo "$SA_JSON" > /tmp/sa.json
+          printf '%s' "$SA_JSON" > /tmp/sa.json
+          trap 'rm -f /tmp/sa.json /tmp/firebase-deploy.log' EXIT
           npm install -g firebase-tools
+          set +e
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
             --only hosting \
-            --project ascend-annotate
-          rm -f /tmp/sa.json
+            --project ascend-annotate 2>&1 | tee /tmp/firebase-deploy.log
+          deploy_status=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$deploy_status" -ne 0 ]; then
+            if grep -Fq "supplied version" /tmp/firebase-deploy.log \
+              && grep -Fq "current active version" /tmp/firebase-deploy.log; then
+              echo "Firebase Hosting already has this version live; treating deploy as successful."
+            else
+              exit "$deploy_status"
+            fi
+          fi
