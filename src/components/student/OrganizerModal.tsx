@@ -17,18 +17,17 @@ interface Props {
 export default function OrganizerModal({ book, profile, onClose }: Props) {
   const needsPicker = !book.organizerTemplateId && profile.role !== 'student'
   const canSwitch = book.organizerStudentCanSwitch !== false
+  const initialTemplateId = book.organizerTemplateId ?? null
+  const isGated = profile.role === 'individual' && !isPro(profile)
 
-  const [templateId, setTemplateId] = useState<string | null>(book.organizerTemplateId ?? null)
+  const [templateId, setTemplateId] = useState<string | null>(initialTemplateId)
   const [scaffoldLevel, setScaffoldLevel] = useState<ScaffoldLevel>(book.organizerScaffoldDefault ?? 'guided')
   const [fields, setFields] = useState<Record<string, string>>({})
   const [responseId, setResponseId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isGated && Boolean(initialTemplateId))
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showUpgrade, setShowUpgrade] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Gate: individual users must be Pro
-  const isGated = profile.role === 'individual' && !isPro(profile)
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +64,12 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
     saveTimer.current = setTimeout(() => persistSave(next), 1000)
   }
 
+  function clearPendingSave() {
+    if (!saveTimer.current) return
+    clearTimeout(saveTimer.current)
+    saveTimer.current = null
+  }
+
   async function persistSave(currentFields: Record<string, string>, markComplete = false) {
     if (!templateId) return
     setSaveStatus('saving')
@@ -84,6 +89,11 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
     } catch {
       setSaveStatus('error')
     }
+  }
+
+  function handleMarkComplete() {
+    clearPendingSave()
+    void persistSave(fields, true)
   }
 
   function handleExport() {
@@ -111,6 +121,8 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => () => clearPendingSave(), [])
 
   if (showUpgrade) {
     return (
@@ -222,7 +234,7 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
               {saveStatus === 'idle' && 'Auto-saves as you type'}
             </span>
             <button
-              onClick={() => persistSave(fields, true)}
+              onClick={handleMarkComplete}
               className="text-xs font-bold text-[#5BB974] hover:underline"
             >
               Mark complete

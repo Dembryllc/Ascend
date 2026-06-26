@@ -210,8 +210,13 @@ service cloud.firestore {
         )
       );
       allow create: if isSignedIn()
-                    && request.resource.data.studentId == request.auth.uid;
-      allow update: if isSignedIn() && isOwner(resource.data.studentId);
+                    && request.resource.data.studentId == request.auth.uid
+                    && canReadBook(request.resource.data.bookId, request.auth.uid);
+      allow update: if isSignedIn()
+                    && isOwner(resource.data.studentId)
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.bookId == resource.data.bookId
+                    && request.resource.data.classroomId == resource.data.classroomId;
       allow delete: if isSignedIn() && isOwner(resource.data.studentId);
     }
 
@@ -237,6 +242,7 @@ service cloud.firestore {
                     && validProgressData(request.resource.data)
                     && request.resource.data.studentId == resource.data.studentId
                     && request.resource.data.bookId == resource.data.bookId
+                    && request.resource.data.classroomId == resource.data.classroomId
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.totalSecondsRead >= resource.data.totalSecondsRead
                     && request.resource.data.highestPageRead >= resource.data.highestPageRead

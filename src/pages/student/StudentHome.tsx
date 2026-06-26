@@ -9,6 +9,7 @@ import { getReadingProgressByStudent } from '@/firebase/readingProgress'
 import { joinClassroomByCode } from '@/firebase/classrooms'
 import type { Annotation, Book, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
+import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
 import {
   AlertCircle,
@@ -140,6 +141,7 @@ export default function StudentHome() {
   const progress = buildStudentProgressSummary(books, annotations, readingProgress)
   const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
   const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
+  const writingTaskBooks = books.filter((book) => book.organizerTemplateId)
 
   return (
     <AppShell>
@@ -188,6 +190,13 @@ export default function StudentHome() {
         onJoined={refreshProfile}
         role={profile!.role}
       />
+
+      {writingTaskBooks.length > 0 && (
+        <WritingTasksSection
+          books={writingTaskBooks}
+          progressByBookId={progressByBookId}
+        />
+      )}
 
       {books.length === 0 ? (
         profile?.classroomId ? (
@@ -497,6 +506,63 @@ function RecentActivityCard({
         </div>
       )}
     </div>
+  )
+}
+
+function WritingTasksSection({
+  books,
+  progressByBookId,
+}: {
+  books: Book[]
+  progressByBookId: Map<string, ReadingProgress>
+}) {
+  return (
+    <section className="mb-8" aria-labelledby="writing-tasks-heading">
+      <div className="flex items-end justify-between gap-3 mb-4">
+        <div>
+          <h3 id="writing-tasks-heading" className="text-lg font-bold text-[#1A1D23]">Writing Tasks</h3>
+          <p className="text-sm text-[#4B5563]">Open the organizer your teacher assigned for each book.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {books.map((book) => {
+          const template = book.organizerTemplateId ? ORGANIZER_TEMPLATES[book.organizerTemplateId] : null
+          const progress = progressByBookId.get(book.id)
+          const levelLabel = book.organizerScaffoldDefault === 'independent' ? 'Independent' : 'Guided'
+          return (
+            <Link
+              key={book.id}
+              to={`/student/read/${book.id}?writingTask=1`}
+              className="bg-green-50 border border-green-200 rounded-2xl p-4 hover:border-[#5BB974] hover:shadow-sm transition-all"
+            >
+              <div className="flex items-start gap-3">
+                <div className="bg-green-100 text-[#5BB974] p-2.5 rounded-xl shrink-0">
+                  <LayoutGrid size={22} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="text-xs font-bold uppercase tracking-wide text-[#5BB974]">Writing Task</span>
+                    <span className="text-[11px] font-bold text-[#4B5563] bg-white border border-green-200 px-2 py-0.5 rounded-full">{levelLabel}</span>
+                  </div>
+                  <h4 className="font-bold text-[#1A1D23] line-clamp-1">{book.title}</h4>
+                  <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
+                    {template ? `${template.name}: ${template.description}` : 'Complete the assigned organizer for this book.'}
+                  </p>
+                  <div className="flex items-center justify-between gap-3 mt-3">
+                    <span className="text-xs text-[#6B7280]">
+                      {progress?.completionPercent ? `${progress.completionPercent}% read` : 'Start from your organizer'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-sm font-bold text-[#5BB974]">
+                      Open task <ArrowRight size={15} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

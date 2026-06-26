@@ -18,8 +18,17 @@ function generateJoinCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+async function generateUniqueJoinCode(): Promise<string> {
+  for (let i = 0; i < 8; i += 1) {
+    const joinCode = generateJoinCode()
+    const existing = await getDocs(query(collection(db, 'classrooms'), where('joinCode', '==', joinCode)))
+    if (existing.empty) return joinCode
+  }
+  throw new Error('Could not create a unique join code. Please try again.')
+}
+
 export async function createClassroom(name: string, teacherId: string): Promise<Classroom> {
-  const joinCode = generateJoinCode()
+  const joinCode = await generateUniqueJoinCode()
   const ref = await addDoc(collection(db, 'classrooms'), {
     name,
     teacherId,

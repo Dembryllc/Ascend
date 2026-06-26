@@ -34,6 +34,22 @@ export default defineConfig({
     react(),
     pdfWorkerPlugin(),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-router-dom/')) return 'vendor-react'
+          if (id.includes('/firebase/') || id.includes('/@firebase/')) return 'vendor-firebase'
+          if (id.includes('/react-pdf/') || id.includes('/pdfjs-dist/')) return 'vendor-pdf'
+          if (id.includes('/jspdf/')) return 'vendor-jspdf'
+          if (id.includes('/html2canvas/')) return 'vendor-html2canvas'
+          if (id.includes('/dompurify/')) return 'vendor-dompurify'
+          if (id.includes('/lucide-react/')) return 'vendor-icons'
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

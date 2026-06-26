@@ -129,6 +129,7 @@ export async function assignBookToStudent(bookId: string, studentId: string): Pr
 }
 
 export async function assignBookToClass(bookId: string, studentIds: string[]): Promise<void> {
+  if (studentIds.length === 0) return
   await updateDoc(doc(db, 'books', bookId), { assignedStudentIds: arrayUnion(...studentIds) })
 }
 

@@ -88,7 +88,7 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-[#9CA3AF] mt-3 text-center">← actual student annotations, rendered live for the teacher</p>
+          <p className="text-xs text-[#9CA3AF] mt-3 text-center">Example student annotations, rendered live for the teacher</p>
         </div>
       </section>
 
@@ -141,7 +141,7 @@ export default function LandingPage() {
             { icon: <TrendingUp size={22} />, title: 'Reading progress', desc: 'Track time spent, pages reached, and completion % per student per book. No guessing who finished.', color: 'bg-green-50 text-[#5BB974]' },
             { icon: <Users size={22} />, title: 'Classroom join codes', desc: 'Students join with a 6-letter code. Assign books to individual students or the whole class at once.', color: 'bg-yellow-50 text-[#E6A817]' },
             { icon: <BookOpen size={22} />, title: 'Any PDF, any reading', desc: 'Upload novels, articles, textbook chapters — anything in PDF format up to 50 MB.', color: 'bg-pink-50 text-[#EC4899]' },
-            { icon: <CheckCircle2 size={22} />, title: 'FERPA compliant', desc: 'Student data is never sold or used for advertising. Firestore security rules enforce per-student data isolation.', color: 'bg-teal-50 text-[#14B8A6]' },
+            { icon: <CheckCircle2 size={22} />, title: 'Designed for student privacy', desc: 'Student data is never sold or used for advertising. Firestore security rules enforce per-student data isolation.', color: 'bg-teal-50 text-[#14B8A6]' },
           ].map(({ icon, title, desc, color }) => (
             <div key={title} className="bg-white rounded-2xl p-6 border border-[#F3F4F6] shadow-sm">
               <div className={`inline-flex p-2 rounded-xl mb-3 ${color}`}>{icon}</div>

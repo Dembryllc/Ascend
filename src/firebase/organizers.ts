@@ -1,10 +1,10 @@
 import {
   collection,
   doc,
-  addDoc,
   updateDoc,
   getDocs,
   query,
+  setDoc,
   where,
   serverTimestamp,
 } from 'firebase/firestore'
@@ -58,16 +58,17 @@ export async function saveOrganizerResponse(
   fields: Record<string, string>,
   completed: boolean,
 ): Promise<string> {
+  const id = responseId ?? `${studentId}_${bookId}`
   if (responseId) {
-    await updateDoc(doc(db, 'organizers', responseId), {
+    await updateDoc(doc(db, 'organizers', id), {
       scaffoldLevel,
       fields,
       completed,
       updatedAt: serverTimestamp(),
     })
-    return responseId
+    return id
   }
-  const ref = await addDoc(collection(db, 'organizers'), {
+  await setDoc(doc(db, 'organizers', id), {
     studentId,
     bookId,
     classroomId,
@@ -78,5 +79,5 @@ export async function saveOrganizerResponse(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
-  return ref.id
+  return id
 }

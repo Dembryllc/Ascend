@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
-import { uploadBook, getBooksByTeacher } from '@/firebase/books'
+import { uploadBook, getBooksByTeacher, assignBookToClass } from '@/firebase/books'
+import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { isPro } from '@/types'
 import { ArrowRight, Lock, Upload, FileText, CheckCircle } from 'lucide-react'
 import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
@@ -27,13 +28,28 @@ export default function UploadBookPage() {
   const [organizerStudentCanSwitch, setOrganizerStudentCanSwitch] = useState(true)
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<{
+    assignedCount: number
+    assignAttempted: boolean
+    assignFailed: boolean
+  } | null>(null)
   const [error, setError] = useState('')
   const [bookCount, setBookCount] = useState<number | null>(null)
+  const [classStudentIds, setClassStudentIds] = useState<string[]>([])
+  const [assignAfterUpload, setAssignAfterUpload] = useState(true)
 
   useEffect(() => {
     if (!profile) return
-    getBooksByTeacher(profile.uid).then((books) => setBookCount(books.length)).catch(() => setBookCount(0))
+    Promise.all([
+      getBooksByTeacher(profile.uid),
+      getClassroomByTeacher(profile.uid),
+    ]).then(([books, classroom]) => {
+      setBookCount(books.length)
+      setClassStudentIds(classroom?.studentIds ?? [])
+    }).catch(() => {
+      setBookCount(0)
+      setClassStudentIds([])
+    })
   }, [profile])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -62,7 +78,7 @@ export default function UploadBookPage() {
     setError('')
     setUploading(true)
     try {
-      await uploadBook(
+      const uploadedBook = await uploadBook(
         file,
         title || file.name.replace(/\.pdf$/i, ''),
         author || 'Unknown author',
@@ -75,7 +91,16 @@ export default function UploadBookPage() {
         organizerEnabled ? organizerScaffoldDefault : undefined,
         organizerEnabled ? organizerStudentCanSwitch : undefined,
       )
-      setDone(true)
+      if (assignAfterUpload && classStudentIds.length > 0) {
+        try {
+          await assignBookToClass(uploadedBook.id, classStudentIds)
+          setDone({ assignedCount: classStudentIds.length, assignAttempted: true, assignFailed: false })
+        } catch {
+          setDone({ assignedCount: 0, assignAttempted: true, assignFailed: true })
+        }
+      } else {
+        setDone({ assignedCount: 0, assignAttempted: false, assignFailed: false })
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
@@ -130,19 +155,38 @@ export default function UploadBookPage() {
       <AppShell title="Upload Book">
         <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
           <CheckCircle size={56} className="text-[#5BB974] mb-4" />
-          <h2 className="text-2xl font-bold text-[#1A1D23] mb-2">Book uploaded!</h2>
-          <p className="text-[#4B5563] mb-2">
-            Your PDF is ready. Now assign it to your students so they can start reading.
-          </p>
-          <p className="text-sm text-[#9CA3AF] mb-8">
-            Students won't see this book until you assign it from your classroom.
-          </p>
+          <h2 className="text-2xl font-bold text-[#1A1D23] mb-2">
+            {done.assignedCount > 0 ? 'Book uploaded and assigned!' : 'Book uploaded!'}
+          </h2>
+          {done.assignedCount > 0 ? (
+            <p className="text-[#4B5563] mb-8">
+              Your PDF is ready and visible to {done.assignedCount} student{done.assignedCount === 1 ? '' : 's'}.
+            </p>
+          ) : done.assignFailed ? (
+            <>
+              <p className="text-[#4B5563] mb-2">
+                Your PDF uploaded, but we could not assign it to your class automatically.
+              </p>
+              <p className="text-sm text-[#9CA3AF] mb-8">
+                Assign it from your classroom when your connection is stable.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-[#4B5563] mb-2">
+                Your PDF is ready. Now assign it to your students so they can start reading.
+              </p>
+              <p className="text-sm text-[#9CA3AF] mb-8">
+                Students won't see this book until you assign it from your classroom.
+              </p>
+            </>
+          )}
           <div className="flex flex-col sm:flex-row gap-3 w-full">
             <Link
               to="/teacher/classroom"
               className="flex-1 flex items-center justify-center gap-2 bg-[#4A90D9] hover:bg-[#357ABD] text-white font-bold py-3 rounded-xl transition-colors"
             >
-              Assign to My Class <ArrowRight size={18} />
+              {done.assignedCount > 0 ? 'View Classroom' : 'Assign to My Class'} <ArrowRight size={18} />
             </Link>
             <Link
               to="/teacher"
@@ -205,7 +249,33 @@ export default function UploadBookPage() {
             placeholder="e.g. Save at least 4 annotations and finish with a short reflection."
           />
 
-          {/* Graphic Organizer assignment */}
+          <div className="border border-[#E5E7EB] rounded-xl p-4">
+            {classStudentIds.length > 0 ? (
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={assignAfterUpload}
+                  onChange={(e) => setAssignAfterUpload(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 accent-[#4A90D9]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-[#1A1D23]">Assign to whole class after upload</span>
+                  <span className="block text-xs text-[#6B7280] mt-0.5">
+                    {classStudentIds.length} student{classStudentIds.length === 1 ? '' : 's'} will see this PDF immediately.
+                  </span>
+                </span>
+              </label>
+            ) : (
+              <div>
+                <p className="text-sm font-semibold text-[#1A1D23]">Assignment happens after upload</p>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Students will see this PDF after they join your classroom and you assign it.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Writing Task assignment */}
           <div className={`border rounded-xl p-4 transition-colors ${organizerEnabled ? 'border-[#5BB974] bg-green-50/40' : 'border-[#E5E7EB]'}`}>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -218,17 +288,20 @@ export default function UploadBookPage() {
                 className="w-4 h-4 accent-[#5BB974]"
               />
               <span className="text-sm font-semibold text-[#1A1D23]">
-                Include Graphic Organizer
+                Assign a Writing Task
                 {!isPro(profile) && (
                   <span className="ml-2 text-xs font-bold text-[#E6A817] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Pro</span>
                 )}
               </span>
             </label>
+            <p className="text-xs text-[#6B7280] mt-2">
+              Choose the writing type and support level students see on their home screen and inside the book.
+            </p>
 
             {organizerEnabled && (
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Template</label>
+                  <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Writing task type</label>
                   <select
                     value={organizerTemplateId}
                     onChange={(e) => setOrganizerTemplateId(e.target.value)}
@@ -244,7 +317,7 @@ export default function UploadBookPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#1A1D23] mb-2">Default scaffold level</label>
+                  <label className="block text-sm font-semibold text-[#1A1D23] mb-2">Support level</label>
                   <div className="flex rounded-xl overflow-hidden border border-[#D1D5DB]">
                     {(['guided', 'independent'] as const).map((level) => (
                       <button
@@ -253,14 +326,14 @@ export default function UploadBookPage() {
                         onClick={() => setOrganizerScaffoldDefault(level)}
                         className={`flex-1 py-2.5 text-sm font-semibold capitalize transition-colors ${organizerScaffoldDefault === level ? 'bg-[#5BB974] text-white' : 'bg-white text-[#4B5563] hover:bg-[#F3F4F6]'}`}
                       >
-                        {level}
+                        {level === 'guided' ? 'Guided' : 'Independent'}
                       </button>
                     ))}
                   </div>
                   <p className="text-xs text-[#6B7280] mt-1">
                     {organizerScaffoldDefault === 'guided'
-                      ? 'Students see sentence starters and guiding questions in each field.'
-                      : 'Students see field labels only — no sentence starters.'}
+                      ? 'Guided: students see sentence starters and guiding questions in each field.'
+                      : 'Independent: students see field labels only — no sentence starters.'}
                   </p>
                 </div>
 
@@ -300,7 +373,7 @@ export default function UploadBookPage() {
             disabled={!file || uploading}
             className="w-full bg-[#4A90D9] hover:bg-[#357ABD] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-base transition-colors"
           >
-            {uploading ? 'Uploading…' : 'Upload Book'}
+            {uploading ? 'Uploading…' : assignAfterUpload && classStudentIds.length > 0 ? 'Upload and Assign' : 'Upload Book'}
           </button>
         </form>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -26,6 +26,7 @@ type PdfDocument = {
 export default function ReadingPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { profile } = useAuth()
 
   const [book, setBook] = useState<Book | null>(null)
@@ -54,6 +55,7 @@ export default function ReadingPage() {
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [organizerOpen, setOrganizerOpen] = useState(false)
+  const shouldOpenWritingTask = searchParams.get('writingTask') === '1'
 
   useEffect(() => {
     if (!bookId) return
@@ -70,13 +72,21 @@ export default function ReadingPage() {
       setAnnotations(ann)
       setReadingProgress(progress)
       if (progress?.lastReadPage) setCurrentPage(Math.max(1, progress.lastReadPage))
+      if (b && shouldOpenWritingTask && (b.organizerTemplateId || profile.role === 'individual')) {
+        setOrganizerOpen(true)
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('writingTask')
+          return next
+        }, { replace: true })
+      }
       setLoadingBook(false)
     }).catch((err: unknown) => {
       console.error('Failed to open book:', err)
       setReaderError(err instanceof Error ? err.message : 'Could not open this book. Please try again.')
       setLoadingBook(false)
     })
-  }, [bookId, profile])
+  }, [bookId, profile, shouldOpenWritingTask, setSearchParams])
 
   const pageAnnotations = useMemo(
     () => annotations.filter((a) => a.pageNumber === currentPage),
@@ -284,20 +294,26 @@ export default function ReadingPage() {
 
   async function handleSave() {
     if (!profile || !bookId) return
+    const cleanNote = noteText.trim()
+    const cleanSelectedText = selectedText.trim()
+    if (!cleanNote && !cleanSelectedText) {
+      setSaveError('Select text or write a short note before saving.')
+      return
+    }
     setSaving(true)
     setSaveError('')
     try {
       if (annotationPanel.editing) {
-        await updateAnnotation(annotationPanel.editing.id, selectedReaction, noteText, selectedText)
+        await updateAnnotation(annotationPanel.editing.id, selectedReaction, cleanNote, cleanSelectedText)
         setAnnotations((prev) =>
           prev.map((a) =>
             a.id === annotationPanel.editing!.id
-              ? { ...a, reactionType: selectedReaction, noteText, selectedText, timestamp: new Date() }
+              ? { ...a, reactionType: selectedReaction, noteText: cleanNote, selectedText: cleanSelectedText, timestamp: new Date() }
               : a
           )
         )
       } else {
-        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, noteText, selectedText, 'annotation', profile.classroomId)
+        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, cleanNote, cleanSelectedText, 'annotation', profile.classroomId)
         setAnnotations((prev) => [...prev, ann])
       }
       closePanel()
@@ -978,7 +994,7 @@ export default function ReadingPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || (!noteText.trim() && !selectedText.trim())}
                 className="flex-1 bg-[#4A90D9] text-white px-4 py-3 rounded-xl font-bold hover:bg-[#357ABD] disabled:opacity-60 transition-colors"
               >
                 {saving ? 'Saving…' : 'Save'}
