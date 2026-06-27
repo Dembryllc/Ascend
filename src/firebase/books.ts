@@ -28,9 +28,11 @@ export async function uploadBook(
   organizerTemplateId?: string,
   organizerScaffoldDefault?: 'guided' | 'independent',
   organizerStudentCanSwitch?: boolean,
+  organizerPrompt?: string,
 ): Promise<Book> {
   const cleanAssignmentPrompt = assignmentPrompt.trim()
   const cleanSuccessCriteria = successCriteria.trim()
+  const cleanOrganizerPrompt = organizerPrompt?.trim() ?? ''
   const storageRef = ref(storage, `books/${Date.now()}_${file.name}`)
   const task = uploadBytesResumable(storageRef, file)
 
@@ -59,6 +61,7 @@ export async function uploadBook(
         organizerTemplateId,
         organizerScaffoldDefault: organizerScaffoldDefault ?? 'guided',
         organizerStudentCanSwitch: organizerStudentCanSwitch ?? true,
+        organizerPrompt: cleanOrganizerPrompt || null,
       } : {}),
     })
   } catch (err) {
@@ -80,6 +83,7 @@ export async function uploadBook(
     organizerTemplateId,
     organizerScaffoldDefault,
     organizerStudentCanSwitch,
+    organizerPrompt: cleanOrganizerPrompt,
   }
 }
 

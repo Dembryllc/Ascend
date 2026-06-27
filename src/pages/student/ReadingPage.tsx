@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { useAuth } from '@/context/auth-context'
@@ -12,7 +13,7 @@ import { REACTIONS } from '@/types'
 import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target, LayoutGrid } from 'lucide-react'
 import OrganizerModal from '@/components/student/OrganizerModal'
 
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs'
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const HIGHLIGHT_STOP_WORDS = new Set(['and', 'are', 'for', 'not', 'that', 'the', 'this', 'was', 'with'])
 
@@ -526,6 +527,15 @@ export default function ReadingPage() {
       <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm max-w-md w-full p-6 text-center">
         <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
         <p className="text-[#4B5563] text-sm mb-6 break-all">{readerError || 'The book was not found.'}</p>
+        {book && profile && (book.organizerTemplateId || profile.role === 'individual') && (
+          <button
+            onClick={() => setOrganizerOpen(true)}
+            className="w-full mb-3 bg-[#5BB974] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#4AA863] transition-colors inline-flex items-center justify-center gap-2"
+          >
+            <LayoutGrid size={18} />
+            Open Writing Task
+          </button>
+        )}
         <button
           onClick={() => navigate('/student')}
           className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
@@ -533,6 +543,13 @@ export default function ReadingPage() {
           Back to Bookshelf
         </button>
       </div>
+      {organizerOpen && book && profile && (
+        <OrganizerModal
+          book={book}
+          profile={profile}
+          onClose={() => setOrganizerOpen(false)}
+        />
+      )}
     </div>
   )
 
@@ -631,9 +648,13 @@ export default function ReadingPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-[#1A1D23] text-sm">Writing Task</p>
-                    <p className="text-xs text-[#4B5563] truncate">
-                      {book.organizerTemplateId ? 'Your teacher assigned a graphic organizer for this book.' : 'Use a graphic organizer to organize your reading.'}
-                    </p>
+                    {book.organizerPrompt ? (
+                      <p className="text-xs text-[#4B5563] line-clamp-2">{book.organizerPrompt}</p>
+                    ) : (
+                      <p className="text-xs text-[#4B5563] truncate">
+                        {book.organizerTemplateId ? 'Your teacher assigned a graphic organizer for this book.' : 'Use a graphic organizer to organize your reading.'}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button

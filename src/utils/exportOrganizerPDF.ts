@@ -6,6 +6,7 @@ export function exportOrganizerPDF(
   studentName: string,
   bookTitle: string,
   response: OrganizerResponse,
+  writingPrompt?: string,
 ): void {
   const template = ORGANIZER_TEMPLATES[response.templateId]
   if (!template) return
@@ -38,6 +39,10 @@ export function exportOrganizerPDF(
   addText(`Student: ${studentName}`, 11, false, '#4B5563')
   addText(`Book: ${bookTitle}`, 11, false, '#4B5563')
   addText(`Scaffold: ${response.scaffoldLevel === 'guided' ? 'Guided' : 'Independent'} · ${new Date().toLocaleDateString()}`, 9, false, '#9CA3AF')
+  if (writingPrompt?.trim()) {
+    y += 2
+    addText(`Prompt: ${writingPrompt.trim()}`, 10, false, '#4B5563')
+  }
   y += 4
   doc.setDrawColor(200, 210, 230)
   doc.line(margin, y, pageW - margin, y)

@@ -1,4 +1,4 @@
-name: Deploy to Firebase Hosting
+name: Deploy to Firebase
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
           VITE_STRIPE_PRO_MONTHLY_URL: https://buy.stripe.com/test_8x2fZg86rbr1gk57V9a3u00
           VITE_STRIPE_PRO_ANNUAL_URL: https://buy.stripe.com/test_4gMbJ086rcv59VHdfta3u01
 
-      - name: Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting and Firestore config
         env:
           SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}
         run: |
@@ -45,7 +45,7 @@ jobs:
           npm install -g firebase-tools
           set +e
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
-            --only hosting \
+            --only hosting,firestore:rules,firestore:indexes \
             --project ascend-annotate 2>&1 | tee /tmp/firebase-deploy.log
           deploy_status=${PIPESTATUS[0]}
           set -e

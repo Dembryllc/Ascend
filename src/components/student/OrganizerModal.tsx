@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileDown, X } from 'lucide-react'
+import { FileDown, FileText, X } from 'lucide-react'
 import type { Book, OrganizerResponse, ScaffoldLevel, UserProfile } from '@/types'
 import type { OrganizerTemplate, OrganizerField } from '@/data/organizerTemplates'
 import { isPro } from '@/types'
@@ -14,6 +14,8 @@ interface Props {
   onClose: () => void
 }
 
+type OrganizerDocxExporter = typeof import('@/utils/exportOrganizerDocx')['exportOrganizerDocx']
+
 export default function OrganizerModal({ book, profile, onClose }: Props) {
   const needsPicker = !book.organizerTemplateId && profile.role !== 'student'
   const canSwitch = book.organizerStudentCanSwitch !== false
@@ -27,6 +29,8 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
   const [loading, setLoading] = useState(!isGated && Boolean(initialTemplateId))
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [docxExporter, setDocxExporter] = useState<OrganizerDocxExporter | null>(null)
+  const [docxStatus, setDocxStatus] = useState<'idle' | 'exporting' | 'exported' | 'error'>('idle')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -110,7 +114,30 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
       createdAt: new Date(),
       updatedAt: new Date(),
     }
-    exportOrganizerPDF(profile.displayName, book.title, response)
+    exportOrganizerPDF(profile.displayName, book.title, response, book.organizerPrompt)
+  }
+
+  async function handleExportDocx() {
+    if (!templateId || !book || !docxExporter) return
+    setDocxStatus('exporting')
+    const response: OrganizerResponse = {
+      id: responseId ?? '',
+      studentId: profile.uid,
+      bookId: book.id,
+      classroomId: profile.classroomId,
+      templateId,
+      scaffoldLevel,
+      fields,
+      completed: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    try {
+      await docxExporter(profile.displayName, book.title, response, book.organizerPrompt)
+      setDocxStatus('exported')
+    } catch {
+      setDocxStatus('error')
+    }
   }
 
   const template = templateId ? ORGANIZER_TEMPLATES[templateId] : null
@@ -123,6 +150,19 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
   }, [onClose])
 
   useEffect(() => () => clearPendingSave(), [])
+
+  useEffect(() => {
+    if (!templateId || isGated) return
+    let mounted = true
+    import('@/utils/exportOrganizerDocx')
+      .then((mod) => {
+        if (mounted) setDocxExporter(() => mod.exportOrganizerDocx)
+      })
+      .catch(() => {
+        if (mounted) setDocxExporter(null)
+      })
+    return () => { mounted = false }
+  }, [isGated, templateId])
 
   if (showUpgrade) {
     return (
@@ -143,29 +183,44 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Graphic Organizer"
-        className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[92vh]"
+        className="bg-white rounded-2xl w-full max-w-5xl shadow-xl flex flex-col max-h-[94vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F3F4F6] shrink-0">
-          <div>
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#F3F4F6] shrink-0">
+          <div className="min-w-0">
             <h2 className="font-bold text-lg text-[#1A1D23]">
-              {template ? template.name : 'Graphic Organizer'}
+              {template ? template.name : 'Writing Task'}
             </h2>
             {template && (
-              <p className="text-xs text-[#6B7280] mt-0.5">{template.gradeRange} · {book.title}</p>
+              <p className="text-xs text-[#6B7280] mt-0.5 truncate">{template.gradeRange} · {book.title}</p>
             )}
           </div>
           <div className="flex items-center gap-2">
             {template && (
-              <button
-                onClick={handleExport}
-                title="Export PDF"
-                className="flex items-center gap-1.5 text-sm font-semibold text-[#4A90D9] hover:bg-blue-50 px-3 py-2 rounded-xl transition-colors"
-              >
-                <FileDown size={16} />
-                <span className="hidden sm:inline">Export PDF</span>
-              </button>
+              <>
+                <button
+                  onClick={handleExportDocx}
+                  disabled={!docxExporter}
+                  title="Download as a Google Docs-compatible document"
+                  className="flex items-center gap-1.5 text-sm font-semibold text-[#5BB974] hover:bg-green-50 disabled:text-[#9CA3AF] disabled:hover:bg-transparent px-3 py-2 rounded-xl transition-colors"
+                >
+                  <FileText size={16} />
+                  <span className="hidden sm:inline">
+                    {!docxExporter && 'Preparing…'}
+                    {docxExporter && docxStatus === 'exporting' && 'Creating…'}
+                    {docxExporter && docxStatus !== 'exporting' && 'Google Doc'}
+                  </span>
+                </button>
+                <button
+                  onClick={handleExport}
+                  title="Export PDF"
+                  className="flex items-center gap-1.5 text-sm font-semibold text-[#4A90D9] hover:bg-blue-50 px-3 py-2 rounded-xl transition-colors"
+                >
+                  <FileDown size={16} />
+                  <span className="hidden sm:inline">PDF</span>
+                </button>
+              </>
             )}
             <button onClick={onClose} aria-label="Close" className="p-2 rounded-xl hover:bg-[#F3F4F6] transition-colors text-[#6B7280]">
               <X size={20} />
@@ -175,7 +230,7 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
 
         {/* Scaffold toggle (when template active) */}
         {template && canSwitch && (
-          <div className="px-5 py-2.5 border-b border-[#F3F4F6] shrink-0 flex items-center justify-between">
+          <div className="px-6 py-2.5 border-b border-[#F3F4F6] shrink-0 flex items-center justify-between">
             <span className="text-xs text-[#4B5563] font-medium">Scaffold level</span>
             <div className="flex rounded-lg overflow-hidden border border-[#E5E7EB] text-xs font-semibold">
               <button
@@ -195,7 +250,7 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
         )}
 
         {/* Body */}
-        <div className="overflow-y-auto flex-1 px-5 py-4">
+        <div className="overflow-y-auto flex-1 px-6 py-5">
           {isGated ? (
             <div className="text-center py-10">
               <p className="text-2xl mb-3">📝</p>
@@ -215,23 +270,28 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
           ) : needsPicker && !templateId ? (
             <TemplatePicker onSelect={setTemplateId} scaffoldLevel={scaffoldLevel} onScaffoldChange={setScaffoldLevel} />
           ) : template ? (
-            <OrganizerForm
-              template={template}
-              scaffoldLevel={scaffoldLevel}
-              fields={fields}
-              onChange={handleFieldChange}
-            />
+            <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
+              <WritingPromptPanel book={book} template={template} scaffoldLevel={scaffoldLevel} />
+              <OrganizerForm
+                template={template}
+                scaffoldLevel={scaffoldLevel}
+                fields={fields}
+                onChange={handleFieldChange}
+              />
+            </div>
           ) : null}
         </div>
 
         {/* Footer save status */}
         {template && (
-          <div className="px-5 pb-4 pt-2 shrink-0 border-t border-[#F3F4F6] flex items-center justify-between">
+          <div className="px-6 pb-4 pt-2 shrink-0 border-t border-[#F3F4F6] flex items-center justify-between">
             <span className="text-xs text-[#9CA3AF]">
               {saveStatus === 'saving' && 'Saving…'}
               {saveStatus === 'saved' && '✓ Saved'}
               {saveStatus === 'error' && 'Could not save — check your connection'}
               {saveStatus === 'idle' && 'Auto-saves as you type'}
+              {docxStatus === 'exported' && ' · Google Doc downloaded'}
+              {docxStatus === 'error' && ' · Could not create Google Doc'}
             </span>
             <button
               onClick={handleMarkComplete}
@@ -243,6 +303,36 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
         )}
       </div>
     </div>
+  )
+}
+
+function WritingPromptPanel({ book, template, scaffoldLevel }: {
+  book: Book
+  template: OrganizerTemplate
+  scaffoldLevel: ScaffoldLevel
+}) {
+  return (
+    <aside className="bg-green-50 border border-green-200 rounded-2xl p-4 xl:sticky xl:top-0">
+      <p className="text-xs font-bold uppercase tracking-wide text-[#5BB974] mb-2">Writing prompt</p>
+      <h3 className="font-bold text-[#1A1D23] text-base">{book.title}</h3>
+      <p className="text-sm text-[#4B5563] mt-2">
+        {book.organizerPrompt || `Use the ${template.name.toLowerCase()} to organize your thinking about this book.`}
+      </p>
+      <div className="mt-4 border-t border-green-200 pt-4 space-y-3">
+        <div>
+          <p className="text-xs font-bold text-[#1A1D23]">Task type</p>
+          <p className="text-sm text-[#4B5563]">{template.name}</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold text-[#1A1D23]">Support level</p>
+          <p className="text-sm text-[#4B5563]">
+            {scaffoldLevel === 'guided'
+              ? 'Guided: use each step, question, and sentence starter.'
+              : 'Independent: use the labels to organize your own response.'}
+          </p>
+        </div>
+      </div>
+    </aside>
   )
 }
 
@@ -293,27 +383,39 @@ function OrganizerForm({ template, scaffoldLevel, fields, onChange }: {
 }) {
   const guided = scaffoldLevel === 'guided'
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {template.fields.map((field: OrganizerField) => (
-        <div key={field.id}>
-          <label className={`block text-sm font-bold mb-1 ${guided ? 'text-[#1A1D23]' : 'text-[#4B5563]'}`}>
+        <div key={field.id} className={`rounded-2xl border p-4 ${guided ? 'border-[#C7D8F0] bg-blue-50/40' : 'border-[#E5E7EB] bg-white'}`}>
+          <label className={`block text-base font-bold mb-2 ${guided ? 'text-[#1A1D23]' : 'text-[#4B5563]'}`}>
             {guided && <span className="mr-1.5">{field.icon}</span>}
             {field.label}
           </label>
           {guided && (
-            <p className="text-xs text-[#9CA3AF] mb-1 italic">{field.guidedHint}</p>
+            <div className="mb-3 space-y-2">
+              <div className="bg-white/80 border border-[#DCEAFE] rounded-xl px-3 py-2">
+                <p className="text-xs font-bold text-[#4A90D9] uppercase tracking-wide mb-1">Try this sentence starter</p>
+                <p className="text-sm text-[#1A1D23] italic">{field.guidedHint}</p>
+              </div>
+              {!!field.guidedSteps?.length && (
+                <ol className="space-y-1 text-sm text-[#4B5563] list-decimal list-inside">
+                  {field.guidedSteps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              )}
+            </div>
           )}
           <textarea
             rows={field.rows}
-            maxLength={300}
+            maxLength={500}
             value={fields[field.id] ?? ''}
             onChange={(e) => onChange(field.id, e.target.value)}
             placeholder={guided ? field.guidedHint : field.placeholder}
-            className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none transition-colors ${
-              guided ? 'border-[#C7D8F0] bg-blue-50/30' : 'border-[#D1D5DB] bg-white'
+            className={`w-full border rounded-xl px-3 py-3 text-base leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-y min-h-[112px] transition-colors ${
+              guided ? 'border-[#C7D8F0] bg-white' : 'border-[#D1D5DB] bg-white'
             }`}
           />
-          <p className="text-right text-xs text-[#9CA3AF] mt-0.5">{(fields[field.id] ?? '').length}/300</p>
+          <p className="text-right text-xs text-[#9CA3AF] mt-1">{(fields[field.id] ?? '').length}/500</p>
         </div>
       ))}
     </div>

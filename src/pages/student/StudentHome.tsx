@@ -141,7 +141,7 @@ export default function StudentHome() {
   const progress = buildStudentProgressSummary(books, annotations, readingProgress)
   const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
   const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
-  const writingTaskBooks = books.filter((book) => book.organizerTemplateId)
+  const writingTaskBooks = books.filter((book) => book.organizerTemplateId || profile?.role === 'individual')
 
   return (
     <AppShell>
@@ -521,7 +521,7 @@ function WritingTasksSection({
       <div className="flex items-end justify-between gap-3 mb-4">
         <div>
           <h3 id="writing-tasks-heading" className="text-lg font-bold text-[#1A1D23]">Writing Tasks</h3>
-          <p className="text-sm text-[#4B5563]">Open the organizer your teacher assigned for each book.</p>
+          <p className="text-sm text-[#4B5563]">Open writing prompts and organizers your teacher assigned for each book.</p>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -545,9 +545,16 @@ function WritingTasksSection({
                     <span className="text-[11px] font-bold text-[#4B5563] bg-white border border-green-200 px-2 py-0.5 rounded-full">{levelLabel}</span>
                   </div>
                   <h4 className="font-bold text-[#1A1D23] line-clamp-1">{book.title}</h4>
-                  <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
-                    {template ? `${template.name}: ${template.description}` : 'Complete the assigned organizer for this book.'}
-                  </p>
+                  {book.organizerPrompt ? (
+                    <p className="text-sm text-[#1A1D23] mt-2 line-clamp-3">{book.organizerPrompt}</p>
+                  ) : (
+                    <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
+                      {template ? `${template.name}: ${template.description}` : 'Complete the assigned organizer for this book.'}
+                    </p>
+                  )}
+                  {book.organizerPrompt && template && (
+                    <p className="text-xs text-[#6B7280] mt-2 line-clamp-1">{template.name}: {template.description}</p>
+                  )}
                   <div className="flex items-center justify-between gap-3 mt-3">
                     <span className="text-xs text-[#6B7280]">
                       {progress?.completionPercent ? `${progress.completionPercent}% read` : 'Start from your organizer'}

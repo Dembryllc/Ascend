@@ -14,9 +14,11 @@ import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { exportOrganizerPDF } from '@/utils/exportOrganizerPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
 import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
-import { BarChart3, FileDown, Lightbulb, Lock, LayoutGrid } from 'lucide-react'
+import { BarChart3, FileDown, FileText, Lightbulb, Lock, LayoutGrid } from 'lucide-react'
 import UpgradeModal from '@/components/shared/UpgradeModal'
 import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
+
+type OrganizerDocxExporter = typeof import('@/utils/exportOrganizerDocx')['exportOrganizerDocx']
 
 export default function AnnotationsViewerPage() {
   const { profile } = useAuth()
@@ -34,6 +36,7 @@ export default function AnnotationsViewerPage() {
   const [loadError, setLoadError] = useState('')
   const [fetchError, setFetchError] = useState('')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [docxExporter, setDocxExporter] = useState<OrganizerDocxExporter | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -101,6 +104,29 @@ export default function AnnotationsViewerPage() {
     if (!selectedStudentProfile || !selectedBookData) return
     exportAnnotationsPDF(selectedStudentProfile.displayName, selectedBookData.title, annotations)
   }
+
+  async function handleOrganizerDocExport() {
+    if (!organizerResponse || !selectedStudentProfile || !selectedBookData || !docxExporter) return
+    await docxExporter(
+      selectedStudentProfile.displayName,
+      selectedBookData.title,
+      organizerResponse,
+      selectedBookData.organizerPrompt,
+    )
+  }
+
+  useEffect(() => {
+    if (!organizerResponse || !isPro(profile)) return
+    let mounted = true
+    import('@/utils/exportOrganizerDocx')
+      .then((mod) => {
+        if (mounted) setDocxExporter(() => mod.exportOrganizerDocx)
+      })
+      .catch(() => {
+        if (mounted) setDocxExporter(null)
+      })
+    return () => { mounted = false }
+  }, [organizerResponse, profile])
 
   if (loading) return (
     <AppShell title="Annotations">
@@ -203,13 +229,28 @@ export default function AnnotationsViewerPage() {
             )
           )}
           {organizerResponse && isPro(profile) && selectedStudentProfile && selectedBookData && (
-            <button
-              onClick={() => exportOrganizerPDF(selectedStudentProfile.displayName, selectedBookData.title, organizerResponse!)}
-              className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
-            >
-              <LayoutGrid size={18} />
-              Export Organizer PDF
-            </button>
+            <>
+              <button
+                onClick={handleOrganizerDocExport}
+                disabled={!docxExporter}
+                className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
+              >
+                <FileText size={18} />
+                {docxExporter ? 'Export Writing Doc' : 'Preparing Doc…'}
+              </button>
+              <button
+                onClick={() => exportOrganizerPDF(
+                  selectedStudentProfile.displayName,
+                  selectedBookData.title,
+                  organizerResponse!,
+                  selectedBookData.organizerPrompt,
+                )}
+                className="flex items-center gap-2 bg-[#5BB974] text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-[#4AA863] transition-colors"
+              >
+                <LayoutGrid size={18} />
+                Export Organizer PDF
+              </button>
+            </>
           )}
         </div>
       </div>

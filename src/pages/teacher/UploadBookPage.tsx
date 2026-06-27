@@ -26,6 +26,7 @@ export default function UploadBookPage() {
   const [organizerTemplateId, setOrganizerTemplateId] = useState(TEMPLATE_ORDER[0])
   const [organizerScaffoldDefault, setOrganizerScaffoldDefault] = useState<'guided' | 'independent'>('guided')
   const [organizerStudentCanSwitch, setOrganizerStudentCanSwitch] = useState(true)
+  const [organizerPrompt, setOrganizerPrompt] = useState('')
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState<{
@@ -90,6 +91,7 @@ export default function UploadBookPage() {
         organizerEnabled ? organizerTemplateId : undefined,
         organizerEnabled ? organizerScaffoldDefault : undefined,
         organizerEnabled ? organizerStudentCanSwitch : undefined,
+        organizerEnabled ? organizerPrompt : undefined,
       )
       if (assignAfterUpload && classStudentIds.length > 0) {
         try {
@@ -314,6 +316,24 @@ export default function UploadBookPage() {
                     ))}
                   </select>
                   <p className="text-xs text-[#6B7280] mt-1">{ORGANIZER_TEMPLATES[organizerTemplateId]?.description}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#1A1D23] mb-1">Teacher prompt students will see</label>
+                  <textarea
+                    value={organizerPrompt}
+                    onChange={(e) => setOrganizerPrompt(e.target.value.slice(0, 500))}
+                    rows={4}
+                    maxLength={500}
+                    placeholder="Example: After reading, explain how the character changed. Use two details from the text."
+                    className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5BB974] resize-none"
+                  />
+                  <div className="flex justify-between gap-3 mt-1">
+                    <p className="text-xs text-[#6B7280]">
+                      This prompt appears on the student home screen, inside the book, and at the top of the writing task.
+                    </p>
+                    <span className="text-xs text-[#9CA3AF] shrink-0">{organizerPrompt.length}/500</span>
+                  </div>
                 </div>
 
                 <div>

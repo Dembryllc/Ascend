@@ -56,6 +56,7 @@ export interface Book {
   organizerTemplateId?: string
   organizerScaffoldDefault?: 'guided' | 'independent'
   organizerStudentCanSwitch?: boolean
+  organizerPrompt?: string
 }
 
 export type ScaffoldLevel = 'guided' | 'independent'
