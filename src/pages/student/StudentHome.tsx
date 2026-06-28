@@ -551,9 +551,7 @@ function WritingTasksSection({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wide text-[#5BB974]">
-                      {template ? 'Assigned' : 'Write'}
-                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-[#5BB974]">Write</span>
                     {template && (
                       <span className="text-[11px] font-bold text-[#4B5563] bg-white border border-green-200 px-2 py-0.5 rounded-full">{levelLabel}</span>
                     )}
