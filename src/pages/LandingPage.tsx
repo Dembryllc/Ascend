@@ -32,7 +32,7 @@ const PERSONAS = [
     id: 'student',
     label: '🎒 Students',
     headline: 'Read smarter. Write better. Never lose your thoughts.',
-    sub: 'React to what you're reading with a tap. Write your ideas right on the page. Your teacher sees your thinking — and your writing comes out polished.',
+    sub: "React to what you're reading with a tap. Write your ideas right on the page. Your teacher sees your thinking — and your writing comes out polished.",
     bullets: [
       'Tap to react as you read — surprised, confused, love it, important',
       'Select any text and attach a written note without losing your place',
@@ -89,7 +89,7 @@ const FEATURES = [
   {
     icon: <Eye size={22} />,
     title: 'Teacher annotation dashboard',
-    desc: 'See every student's reactions and notes for any book. Filter by student, reaction type, or page. Deep-link straight to a student's work.',
+    desc: "See every student's reactions and notes for any book. Filter by student, reaction type, or page. Deep-link straight to a student's work.",
     color: 'bg-teal-50 text-[#14B8A6]',
   },
   {
@@ -119,7 +119,7 @@ const FEATURES = [
   {
     icon: <ShieldCheck size={22} />,
     title: 'Built for student privacy',
-    desc: 'FERPA-aware design. Student data is never sold or shared. Per-student Firestore rules ensure no student can see another's work.',
+    desc: "FERPA-aware design. Student data is never sold or shared. Per-student Firestore rules ensure no student can see another's work.",
     color: 'bg-slate-50 text-[#64748B]',
   },
 ]
