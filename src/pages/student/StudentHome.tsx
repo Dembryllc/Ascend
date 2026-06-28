@@ -141,7 +141,7 @@ export default function StudentHome() {
   const progress = buildStudentProgressSummary(books, annotations, readingProgress)
   const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
   const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
-  const writingTaskBooks = books.filter((book) => book.organizerTemplateId || profile?.role === 'individual')
+  const writingTaskBooks = books
 
   return (
     <AppShell>
@@ -528,11 +528,9 @@ function WritingTasksSection({
     <section className="mb-8" aria-labelledby="writing-tasks-heading">
       <div className="flex items-end justify-between gap-3 mb-4">
         <div>
-          <h3 id="writing-tasks-heading" className="text-lg font-bold text-[#1A1D23]">Writing Tasks</h3>
+          <h3 id="writing-tasks-heading" className="text-lg font-bold text-[#1A1D23]">Writing</h3>
           <p className="text-sm text-[#4B5563]">
-            {isIndividual
-              ? 'Open a graphic organizer to structure your thinking about any book.'
-              : 'Open writing prompts and organizers your teacher assigned for each book.'}
+            Open a graphic organizer and build structured writing for any book.
           </p>
         </div>
       </div>
@@ -553,8 +551,12 @@ function WritingTasksSection({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wide text-[#5BB974]">Writing Task</span>
-                    <span className="text-[11px] font-bold text-[#4B5563] bg-white border border-green-200 px-2 py-0.5 rounded-full">{levelLabel}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-[#5BB974]">
+                      {template ? 'Assigned' : 'Write'}
+                    </span>
+                    {template && (
+                      <span className="text-[11px] font-bold text-[#4B5563] bg-white border border-green-200 px-2 py-0.5 rounded-full">{levelLabel}</span>
+                    )}
                   </div>
                   <h4 className="font-bold text-[#1A1D23] line-clamp-1">{book.title}</h4>
                   {book.organizerPrompt ? (
