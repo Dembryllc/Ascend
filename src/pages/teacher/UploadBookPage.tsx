@@ -279,15 +279,13 @@ export default function UploadBookPage() {
 
           {/* Writing Task assignment */}
           <div className={`border rounded-xl p-4 transition-colors ${organizerEnabled ? 'border-[#5BB974] bg-green-50/40' : 'border-[#E5E7EB]'}`}>
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className={`flex items-center gap-3 ${isPro(profile) ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
               <input
                 type="checkbox"
                 checked={organizerEnabled}
-                onChange={(e) => {
-                  if (!isPro(profile)) return
-                  setOrganizerEnabled(e.target.checked)
-                }}
-                className="w-4 h-4 accent-[#5BB974]"
+                disabled={!isPro(profile)}
+                onChange={(e) => setOrganizerEnabled(e.target.checked)}
+                className="w-4 h-4 accent-[#5BB974] disabled:cursor-not-allowed"
               />
               <span className="text-sm font-semibold text-[#1A1D23]">
                 Assign a Writing Task

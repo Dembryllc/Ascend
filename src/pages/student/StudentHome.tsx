@@ -195,6 +195,7 @@ export default function StudentHome() {
         <WritingTasksSection
           books={writingTaskBooks}
           progressByBookId={progressByBookId}
+          isIndividual={profile?.role === 'individual'}
         />
       )}
 
@@ -329,7 +330,12 @@ export default function StudentHome() {
             <h3 className="font-bold text-xl text-[#1A1D23] mb-2">Delete this book?</h3>
             <p className="text-[#4B5563] mb-1 font-semibold">{confirmDelete.title}</p>
             <p className="text-sm text-[#4B5563] mb-6">
-              This will permanently delete the book and all your annotations for it. This cannot be undone.
+              {(() => {
+                const count = annotations.filter((a) => a.bookId === confirmDelete.id).length
+                return count > 0
+                  ? `This will permanently delete the book and your ${count} annotation${count === 1 ? '' : 's'} for it. This cannot be undone.`
+                  : 'This will permanently delete the book. This cannot be undone.'
+              })()}
             </p>
             {deleteError && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 mb-4">{deleteError}</p>
@@ -512,16 +518,22 @@ function RecentActivityCard({
 function WritingTasksSection({
   books,
   progressByBookId,
+  isIndividual,
 }: {
   books: Book[]
   progressByBookId: Map<string, ReadingProgress>
+  isIndividual?: boolean
 }) {
   return (
     <section className="mb-8" aria-labelledby="writing-tasks-heading">
       <div className="flex items-end justify-between gap-3 mb-4">
         <div>
           <h3 id="writing-tasks-heading" className="text-lg font-bold text-[#1A1D23]">Writing Tasks</h3>
-          <p className="text-sm text-[#4B5563]">Open writing prompts and organizers your teacher assigned for each book.</p>
+          <p className="text-sm text-[#4B5563]">
+            {isIndividual
+              ? 'Open a graphic organizer to structure your thinking about any book.'
+              : 'Open writing prompts and organizers your teacher assigned for each book.'}
+          </p>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -549,7 +561,7 @@ function WritingTasksSection({
                     <p className="text-sm text-[#1A1D23] mt-2 line-clamp-3">{book.organizerPrompt}</p>
                   ) : (
                     <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
-                      {template ? `${template.name}: ${template.description}` : 'Complete the assigned organizer for this book.'}
+                      {template ? `${template.name}: ${template.description}` : 'Choose a graphic organizer to structure your thoughts on this book.'}
                     </p>
                   )}
                   {book.organizerPrompt && template && (

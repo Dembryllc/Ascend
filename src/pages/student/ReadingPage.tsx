@@ -235,13 +235,18 @@ export default function ReadingPage() {
   }, [currentPage])
 
   useEffect(() => {
-    if (!annotationPanel.open) return
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') closePanel()
+      if (e.key === 'Escape' && annotationPanel.open) { closePanel(); return }
+      // Arrow key page navigation — skip if focused in a text field or panel open
+      if (annotationPanel.open || organizerOpen) return
+      const tag = (document.activeElement as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'ArrowRight' && numPages > 0) setCurrentPage((p) => Math.min(numPages, p + 1))
+      if (e.key === 'ArrowLeft' && numPages > 0) setCurrentPage((p) => Math.max(1, p - 1))
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [annotationPanel.open])
+  }, [annotationPanel.open, organizerOpen, numPages])
 
   async function handleMarkComplete() {
     setMarkingComplete(true)

@@ -115,18 +115,16 @@ export default function AnnotationsViewerPage() {
     )
   }
 
+  // Load DOCX exporter once on mount for Pro teachers — avoids "Preparing…" flicker on every student switch
   useEffect(() => {
-    if (!organizerResponse || !isPro(profile)) return
+    if (!isPro(profile)) return
     let mounted = true
     import('@/utils/exportOrganizerDocx')
-      .then((mod) => {
-        if (mounted) setDocxExporter(() => mod.exportOrganizerDocx)
-      })
-      .catch(() => {
-        if (mounted) setDocxExporter(null)
-      })
+      .then((mod) => { if (mounted) setDocxExporter(() => mod.exportOrganizerDocx) })
+      .catch(() => { if (mounted) setDocxExporter(null) })
     return () => { mounted = false }
-  }, [organizerResponse, profile])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (loading) return (
     <AppShell title="Annotations">
