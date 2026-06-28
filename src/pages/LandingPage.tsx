@@ -14,7 +14,7 @@ const PERSONAS = [
     id: 'teacher',
     label: '👩‍🏫 Teachers',
     headline: 'Know exactly where every student is — page by page.',
-    sub: 'Upload any PDF, assign a writing task, and watch annotations roll in. No more "did you read it?" — you'll see who reacted, who was confused, and who stopped on page 3.',
+    sub: "Upload any PDF, assign a writing task, and watch annotations roll in. No more 'did you read it?' — you'll see who reacted, who was confused, and who stopped on page 3.",
     bullets: [
       'Upload any PDF and assign to your whole class in one click',
       'See every emoji reaction and written note per student, per page',
@@ -242,7 +242,7 @@ export default function LandingPage() {
       {/* ── Persona tabs ────────────────────────────────────────────────────── */}
       <section className="bg-[#F8F9FC] py-20">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-[#1A1D23] mb-2 text-center">Who it's for</h2>
+          <h2 className="text-3xl font-bold text-[#1A1D23] mb-2 text-center">Who it&apos;s for</h2>
           <p className="text-[#4B5563] text-center mb-10">Built for every kind of reader and writer.</p>
 
           {/* Tabs */}
@@ -300,7 +300,7 @@ export default function LandingPage() {
             </span>
             <h2 className="text-3xl font-bold text-[#1A1D23] mb-4">From reading to writing — without leaving the book.</h2>
             <p className="text-[#4B5563] mb-6 leading-relaxed">
-              Teachers assign a writing task when they upload a book. Students see the task before they start reading and open the writing workspace directly from the page they're on.
+              Teachers assign a writing task when they upload a book. Students see the task before they start reading and open the writing workspace directly from the page they&apos;re on.
             </p>
             <ul className="space-y-3 mb-6">
               {[
@@ -410,7 +410,7 @@ export default function LandingPage() {
       {/* ── Pricing teaser ──────────────────────────────────────────────────── */}
       <section className="bg-[#1A1D23] py-20">
         <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">Free to start. Upgrade when you're ready.</h2>
+          <h2 className="text-3xl font-bold text-white mb-3">Free to start. Upgrade when you&apos;re ready.</h2>
           <p className="text-white/60 mb-6 leading-relaxed">
             The free plan includes 1 classroom, up to 30 students, and 5 books. Pro unlocks unlimited everything — classrooms, students, books, and PDF annotation export.
           </p>
