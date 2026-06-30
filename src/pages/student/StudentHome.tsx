@@ -195,7 +195,6 @@ export default function StudentHome() {
         <WritingTasksSection
           books={writingTaskBooks}
           progressByBookId={progressByBookId}
-          isIndividual={profile?.role === 'individual'}
         />
       )}
 
@@ -518,11 +517,9 @@ function RecentActivityCard({
 function WritingTasksSection({
   books,
   progressByBookId,
-  isIndividual,
 }: {
   books: Book[]
   progressByBookId: Map<string, ReadingProgress>
-  isIndividual?: boolean
 }) {
   return (
     <section className="mb-8" aria-labelledby="writing-tasks-heading">
