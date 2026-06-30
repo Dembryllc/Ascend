@@ -3,10 +3,9 @@
 > **Source of truth:** This repo's commit history is authoritative. If anything in this file conflicts with actual code in the repo, the code wins. Verify HEAD before acting on any status claim.
 
 ## CI/CD Status
-- **CI BROKEN** — `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` GitHub secret expired
-- Build succeeds; deploy fails with `Failed to authenticate`
-- Manual deploy until fixed: `npm run build && firebase deploy --only hosting --project ascend-annotate`
-- Fix: new JSON key from GCP Console → IAM → Service Accounts → update GitHub secret
+- ✅ **CI WORKING (verified 2026-06-30).** The latest `main` deploy (`firebase-deploy.yml`, run for PR #4 "Redesign landing page", 2026-06-30 00:39) ran green and deployed to Firebase Hosting. The `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` secret has been refreshed — auth no longer fails.
+- Build + deploy both succeed on push to `main`. Live at easy-annotate.com.
+- If auth breaks again: new JSON key from GCP Console → IAM → Service Accounts → update the `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` GitHub secret. Manual fallback: `npm run build && firebase deploy --only hosting --project ascend-annotate`.
 
 ## Stack
 - React 19 + TypeScript + Vite 8 + Tailwind CSS v4 (no tailwind.config.js — configured inline)
