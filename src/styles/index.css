@@ -10,6 +10,12 @@
   --color-surface-card: #FFFFFF;
   --color-text-primary: #1A1D23;
   --color-text-secondary: #4B5563;
+  /* Warm landing-page surface + hairline border (landing only) */
+  --color-paper: #FBF9F4;
+  --color-paper-2: #F4F0E7;
+  --color-border-warm: #ECE6D9;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
@@ -23,7 +29,18 @@ html {
 body {
   background-color: var(--color-surface);
   color: var(--color-text-primary);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reading-tool entrance — gentle, reduced-motion safe */
+@keyframes ea-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ea-rise { animation: ea-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ea-rise { animation: none; opacity: 1; transform: none; }
 }
 
 /* High contrast focus ring for accessibility */
