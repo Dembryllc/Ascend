@@ -54,13 +54,16 @@ export default function StudentHome() {
     if (authLoading || authError || !profile) return
 
     let cancelled = false
+    // Writing data is non-critical: if those queries fail (e.g. new Firestore
+    // rules not yet deployed), the writing section is simply empty — it must
+    // never take down the core reading dashboard.
     Promise.all([
       getBooksByStudent(profile.uid),
       getAnnotationsByStudent(profile.uid),
       getReadingProgressByStudent(profile.uid),
-      getWritingTasksForLearner(profile.uid, profile.classroomId),
-      getWritingResponsesByStudent(profile.uid),
-      getWritingFeedbackByStudent(profile.uid),
+      getWritingTasksForLearner(profile.uid, profile.classroomId).catch(() => [] as WritingTask[]),
+      getWritingResponsesByStudent(profile.uid).catch(() => [] as WritingResponse[]),
+      getWritingFeedbackByStudent(profile.uid).catch(() => [] as WritingFeedback[]),
     ])
       .then(([b, ann, progressRows, tasks, responses, fb]) => {
         if (cancelled) return

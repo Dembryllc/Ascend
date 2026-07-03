@@ -275,7 +275,10 @@ service cloud.firestore {
       );
       allow create: if isSignedIn()
                     && request.resource.data.studentId == request.auth.uid
-                    && canAccessWritingTask(request.resource.data.taskId);
+                    && canAccessWritingTask(request.resource.data.taskId)
+                    // classroomId must match the task's own scope — a student
+                    // can't hide assigned work (null) or misattribute it.
+                    && request.resource.data.classroomId == writingTaskData(request.resource.data.taskId).classroomId;
       allow update: if isSignedIn()
                     && isOwner(resource.data.studentId)
                     && request.resource.data.studentId == resource.data.studentId
