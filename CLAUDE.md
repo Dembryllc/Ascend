@@ -31,8 +31,11 @@
 - **`TrialExpiredModal` vs `UpgradeModal`** — expired trial teachers get `TrialExpiredModal`. Free-tier teachers (never had trial) get `UpgradeModal`. Not interchangeable.
 - **Text selection capture** — `capturedSelection` state is intentionally NOT cleared when live selection goes empty. This is required on mobile because tapping the emoji bar clears `window.getSelection()` before the click fires.
 
-## Firestore Indexes — Manual Deploy Required
-CI does NOT deploy Firestore rules or indexes. Apply manually from Firebase Console:
+## Firestore Rules & Indexes — Auto-Deployed by CI
+`firebase-deploy.yml` runs `firebase deploy --only hosting,firestore:rules,firestore:indexes` on
+push to `main` (rules from `firestore.rules`, indexes from `firestore.indexes.json`). Edit those
+files and merge to `main` and they publish automatically — no manual Console step. Composite indexes
+currently defined:
 - `annotations`: `studentId ASC → bookId ASC → pageNumber ASC`
 - `annotations`: `studentId ASC → timestamp DESC`
 - `annotations`: `bookId ASC → studentId ASC → pageNumber ASC`
@@ -60,11 +63,10 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
   `classroomId` is a string, by that classroom's teacher; feedback is written only by the class
   teacher and read by that teacher + the student it's about. Personal (null-classroom) writing stays
   private. Do not weaken this.
-- **⚠️ Deploy step:** `firestore.rules` gained `writingTasks`, `writingResponses`, `writingFeedback`
-  blocks and the `isClassStudent` / `canAccessWritingTask` helpers. CI does NOT deploy rules —
-  **publish `firestore.rules` manually** (Firebase Console → Firestore → Rules, or
-  `firebase deploy --only firestore:rules --project ascend-annotate`) or the feature fails with
-  permission-denied.
+- **Deploy:** `firestore.rules` gained `writingTasks`, `writingResponses`, `writingFeedback` blocks
+  and the `isClassStudent` / `canAccessWritingTask` helpers. These ship automatically — CI deploys
+  `firestore:rules` on push to `main` (see "Firestore Rules & Indexes" above). No new composite
+  indexes required.
 - **Rules tests:** `npm run test:rules` boots the Firestore emulator (needs Java) and runs
   `tests/rules/*.test.mjs` against `firestore.rules` — covers read/write scoping for all three
   writing collections, incl. the classroom-pinning edge cases. Dev-only deps: `firebase-tools`,
