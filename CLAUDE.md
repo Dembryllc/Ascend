@@ -37,6 +37,28 @@ CI does NOT deploy Firestore rules or indexes. Apply manually from Firebase Cons
 - `annotations`: `studentId ASC → timestamp DESC`
 - `annotations`: `bookId ASC → studentId ASC → pageNumber ASC`
 - Composite index for graphic organizer: `organizers` collection, `studentId ASC + bookId ASC`
+- Writing Tasks (`writingTasks`, `writingResponses`) need **no** composite indexes — tasks are
+  queried by single-field equality (`createdBy` / `classroomId`) and responses are fetched by
+  deterministic doc id `${studentId}_${taskId}` (see Writing Tasks section below).
+
+## Writing Tasks (book-free writing) — added 2026-07-03
+Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORGANIZER_TEMPLATES`.
+- **Collections:** `writingTasks` (the prompt/assignment) and `writingResponses` (a learner's answer,
+  doc id `${studentId}_${taskId}`). Types in `src/types/index.ts`; data layer in
+  `src/firebase/writingTasks.ts` + `src/firebase/writingResponses.ts`.
+- **Roles:** teachers create tasks assigned to their classroom (`classroomId` set) and can author a
+  **sample/exemplar** (`sampleFields`, gated by `sampleVisible`). Students **and** individuals open a
+  standalone `WritingTaskModal` from their home (`WritingSection` in `StudentHome.tsx`) and can also
+  self-start a **personal** task (`classroomId: null` → private, never shown to a teacher).
+- **Teacher UI:** `/teacher/writing` (`WritingTasksPage`) + dashboard quick action + nav item.
+- **FERPA scoping** mirrors `organizers`: a response is readable by its owner and, only when
+  `classroomId` is a string, by that classroom's teacher. Personal (null-classroom) writing stays
+  private. Do not weaken this.
+- **⚠️ Deploy step:** `firestore.rules` gained `writingTasks` + `writingResponses` blocks and the
+  `isClassStudent` / `canAccessWritingTask` helpers. CI does NOT deploy rules — **publish
+  `firestore.rules` manually** (Firebase Console → Firestore → Rules, or
+  `firebase deploy --only firestore:rules --project ascend-annotate`) or the feature fails with
+  permission-denied.
 
 ## Read Aloud (Chrome fixes — do not revert)
 - `window.speechSynthesis.resume()` before `speak()` — fixes Chrome stall bug

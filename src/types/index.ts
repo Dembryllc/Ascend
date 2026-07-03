@@ -74,6 +74,43 @@ export interface OrganizerResponse {
   updatedAt: Date
 }
 
+// ── Standalone writing (not tied to a book) ────────────────────────────────
+// A WritingTask is a book-free graphic-organizer prompt. Teachers create and
+// assign them to a classroom (classroomId set); students and individuals can
+// also self-start a personal task (classroomId null → private to the learner).
+export interface WritingTask {
+  id: string
+  title: string
+  prompt: string
+  templateId: string
+  scaffoldDefault: ScaffoldLevel
+  studentCanSwitch: boolean
+  createdBy: string
+  creatorRole: UserRole
+  classroomId: string | null
+  // Teacher exemplar. sampleVisible controls whether assigned students see it.
+  sampleFields: Record<string, string> | null
+  sampleVisible: boolean
+  createdAt: Date
+}
+
+// A learner's response to a WritingTask. Doc id is `${studentId}_${taskId}` so
+// it can be fetched by id without a composite index.
+export interface WritingResponse {
+  id: string
+  studentId: string
+  taskId: string
+  classroomId: string | null
+  templateId: string
+  scaffoldLevel: ScaffoldLevel
+  fields: Record<string, string>
+  completed: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type WritingTaskStatus = 'not-started' | 'in-progress' | 'complete'
+
 export type ReactionType = 'surprise' | 'think' | 'love' | 'important' | 'question'
 
 export interface Annotation {

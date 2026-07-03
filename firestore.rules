@@ -101,6 +101,24 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/books/$(data.bookId)).data.uploadedBy == request.auth.uid
         && data.studentId in get(/databases/$(database)/documents/books/$(data.bookId)).data.assignedStudentIds;
     }
+    function isClassStudent(classroomId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/classrooms/$(classroomId))
+        && request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.studentIds;
+    }
+    function writingTaskData(taskId) {
+      return get(/databases/$(database)/documents/writingTasks/$(taskId)).data;
+    }
+    function canAccessWritingTask(taskId) {
+      return exists(/databases/$(database)/documents/writingTasks/$(taskId))
+        && (
+          writingTaskData(taskId).createdBy == request.auth.uid
+          || (
+            writingTaskData(taskId).classroomId is string
+            && isClassStudent(writingTaskData(taskId).classroomId)
+          )
+        );
+    }
 
     // ── users ─────────────────────────────────────────────────────────────
     // Users read their own profile, or any authenticated user can read
@@ -216,6 +234,52 @@ service cloud.firestore {
                     && isOwner(resource.data.studentId)
                     && request.resource.data.studentId == resource.data.studentId
                     && request.resource.data.bookId == resource.data.bookId
+                    && request.resource.data.classroomId == resource.data.classroomId;
+      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+    }
+
+    // ── writing tasks (book-free) ─────────────────────────────────────────
+    // Read: the creator (teacher or a learner's personal task), plus the
+    //       students and teacher of the assigned classroom.
+    // Create: any signed-in user, writing their own createdBy.
+    // Update/delete: only the creator. classroomId + createdBy are immutable.
+    match /writingTasks/{taskId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.createdBy)
+        || (
+          resource.data.classroomId is string
+          && (isClassStudent(resource.data.classroomId) || isClassTeacher(resource.data.classroomId))
+        )
+      );
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.templateId is string
+                    && (request.resource.data.classroomId == null || request.resource.data.classroomId is string);
+      allow update: if isSignedIn()
+                    && isOwner(resource.data.createdBy)
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.classroomId == resource.data.classroomId;
+      allow delete: if isSignedIn() && isOwner(resource.data.createdBy);
+    }
+
+    // ── writing responses (book-free) ─────────────────────────────────────
+    // Students own their responses; the assigned classroom's teacher can read.
+    // Personal tasks carry classroomId == null, so only the owner can read them.
+    match /writingResponses/{responseId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || (
+          resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        )
+      );
+      allow create: if isSignedIn()
+                    && request.resource.data.studentId == request.auth.uid
+                    && canAccessWritingTask(request.resource.data.taskId);
+      allow update: if isSignedIn()
+                    && isOwner(resource.data.studentId)
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.taskId == resource.data.taskId
                     && request.resource.data.classroomId == resource.data.classroomId;
       allow delete: if isSignedIn() && isOwner(resource.data.studentId);
     }

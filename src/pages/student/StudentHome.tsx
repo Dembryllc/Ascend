@@ -7,16 +7,21 @@ import { getBooksByStudent, deleteStudentBook } from '@/firebase/books'
 import { getAnnotationsByStudent } from '@/firebase/annotations'
 import { getReadingProgressByStudent } from '@/firebase/readingProgress'
 import { joinClassroomByCode } from '@/firebase/classrooms'
-import type { Annotation, Book, ReadingProgress, ReactionType } from '@/types'
+import { getWritingTasksForLearner, deleteWritingTask } from '@/firebase/writingTasks'
+import { getWritingResponsesByStudent } from '@/firebase/writingResponses'
+import type { Annotation, Book, ReadingProgress, ReactionType, WritingTask, WritingResponse } from '@/types'
 import { REACTIONS } from '@/types'
 import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
+import WritingTaskModal from '@/components/writing/WritingTaskModal'
+import WritingStarterModal from '@/components/writing/WritingStarterModal'
 import {
   AlertCircle,
   ArrowRight,
   BookOpen,
   CheckCircle2,
   Circle,
+  Eye,
   Flame,
   LayoutGrid,
   MessageSquare,
@@ -25,6 +30,7 @@ import {
   Target,
   Trash2,
   TrendingUp,
+  UserCheck,
 } from 'lucide-react'
 
 export default function StudentHome() {
@@ -32,6 +38,10 @@ export default function StudentHome() {
   const [books, setBooks] = useState<Book[]>([])
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
+  const [writingTasks, setWritingTasks] = useState<WritingTask[]>([])
+  const [writingResponses, setWritingResponses] = useState<WritingResponse[]>([])
+  const [activeWritingTask, setActiveWritingTask] = useState<WritingTask | null>(null)
+  const [showWritingStarter, setShowWritingStarter] = useState(false)
   const [loadedStudentId, setLoadedStudentId] = useState('')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -46,12 +56,16 @@ export default function StudentHome() {
       getBooksByStudent(profile.uid),
       getAnnotationsByStudent(profile.uid),
       getReadingProgressByStudent(profile.uid),
+      getWritingTasksForLearner(profile.uid, profile.classroomId),
+      getWritingResponsesByStudent(profile.uid),
     ])
-      .then(([b, ann, progressRows]) => {
+      .then(([b, ann, progressRows, tasks, responses]) => {
         if (cancelled) return
         setBooks(b)
         setAnnotations(ann)
         setReadingProgress(progressRows)
+        setWritingTasks(tasks)
+        setWritingResponses(responses)
         setError('')
         setLoadedStudentId(profile.uid)
       })
@@ -141,7 +155,23 @@ export default function StudentHome() {
   const progress = buildStudentProgressSummary(books, annotations, readingProgress)
   const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
   const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
-  const writingTaskBooks = books
+  const responseByTaskId = new Map(writingResponses.map((r) => [r.taskId, r]))
+
+  function handleWritingCreated(task: WritingTask) {
+    setWritingTasks((prev) => [task, ...prev])
+    setShowWritingStarter(false)
+    setActiveWritingTask(task)
+  }
+
+  async function handleDeleteWritingTask(task: WritingTask) {
+    setWritingTasks((prev) => prev.filter((t) => t.id !== task.id))
+    try {
+      await deleteWritingTask(task.id)
+    } catch {
+      // If delete fails, restore it so the learner doesn't silently lose work.
+      setWritingTasks((prev) => [task, ...prev.filter((t) => t.id !== task.id)])
+    }
+  }
 
   return (
     <AppShell>
@@ -191,12 +221,14 @@ export default function StudentHome() {
         role={profile!.role}
       />
 
-      {writingTaskBooks.length > 0 && (
-        <WritingTasksSection
-          books={writingTaskBooks}
-          progressByBookId={progressByBookId}
-        />
-      )}
+      <WritingSection
+        tasks={writingTasks}
+        responseByTaskId={responseByTaskId}
+        currentUid={profile!.uid}
+        onOpen={setActiveWritingTask}
+        onStartNew={() => setShowWritingStarter(true)}
+        onDelete={handleDeleteWritingTask}
+      />
 
       {books.length === 0 ? (
         profile?.classroomId ? (
@@ -315,6 +347,27 @@ export default function StudentHome() {
           />
         </div>
       </section>
+
+      {/* Standalone writing modals */}
+      {activeWritingTask && (
+        <WritingTaskModal
+          task={activeWritingTask}
+          profile={profile!}
+          mode="respond"
+          onClose={() => {
+            setActiveWritingTask(null)
+            // Refresh response statuses after closing so badges update.
+            getWritingResponsesByStudent(profile!.uid).then(setWritingResponses).catch(() => {})
+          }}
+        />
+      )}
+      {showWritingStarter && (
+        <WritingStarterModal
+          profile={profile!}
+          onClose={() => setShowWritingStarter(false)}
+          onCreated={handleWritingCreated}
+        />
+      )}
 
       {/* Delete confirmation modal */}
       {confirmDelete && (
@@ -514,71 +567,137 @@ function RecentActivityCard({
   )
 }
 
-function WritingTasksSection({
-  books,
-  progressByBookId,
+function WritingSection({
+  tasks,
+  responseByTaskId,
+  currentUid,
+  onOpen,
+  onStartNew,
+  onDelete,
 }: {
-  books: Book[]
-  progressByBookId: Map<string, ReadingProgress>
+  tasks: WritingTask[]
+  responseByTaskId: Map<string, WritingResponse>
+  currentUid: string
+  onOpen: (task: WritingTask) => void
+  onStartNew: () => void
+  onDelete: (task: WritingTask) => void
 }) {
   return (
-    <section className="mb-8" aria-labelledby="writing-tasks-heading">
+    <section className="mb-8" aria-labelledby="writing-heading">
       <div className="flex items-end justify-between gap-3 mb-4">
         <div>
-          <h3 id="writing-tasks-heading" className="text-lg font-bold text-[#1A1D23]">Writing</h3>
+          <h3 id="writing-heading" className="text-lg font-bold text-[#1A1D23]">Writing</h3>
           <p className="text-sm text-[#4B5563]">
-            Open a graphic organizer and build structured writing for any book.
+            Build structured writing with a graphic organizer — no book needed.
           </p>
         </div>
+        <button
+          onClick={onStartNew}
+          className="inline-flex items-center gap-1.5 bg-[#5BB974] text-white font-bold text-sm px-4 py-2.5 rounded-xl hover:bg-[#4AA863] transition-colors shrink-0"
+        >
+          <Plus size={16} /> <span className="hidden sm:inline">New writing</span><span className="sm:hidden">New</span>
+        </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {books.map((book) => {
-          const template = book.organizerTemplateId ? ORGANIZER_TEMPLATES[book.organizerTemplateId] : null
-          const progress = progressByBookId.get(book.id)
-          const levelLabel = book.organizerScaffoldDefault === 'independent' ? 'Independent' : 'Guided'
-          return (
-            <Link
-              key={book.id}
-              to={`/student/read/${book.id}?writingTask=1`}
-              className="bg-green-50 border border-green-200 rounded-2xl p-4 hover:border-[#5BB974] hover:shadow-sm transition-all"
-            >
-              <div className="flex items-start gap-3">
-                <div className="bg-green-100 text-[#5BB974] p-2.5 rounded-xl shrink-0">
-                  <LayoutGrid size={22} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wide text-[#5BB974]">Write</span>
-                    {template && (
-                      <span className="text-[11px] font-bold text-[#4B5563] bg-white border border-green-200 px-2 py-0.5 rounded-full">{levelLabel}</span>
-                    )}
-                  </div>
-                  <h4 className="font-bold text-[#1A1D23] line-clamp-1">{book.title}</h4>
-                  {book.organizerPrompt ? (
-                    <p className="text-sm text-[#1A1D23] mt-2 line-clamp-3">{book.organizerPrompt}</p>
-                  ) : (
-                    <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
-                      {template ? `${template.name}: ${template.description}` : 'Choose a graphic organizer to structure your thoughts on this book.'}
-                    </p>
-                  )}
-                  {book.organizerPrompt && template && (
-                    <p className="text-xs text-[#6B7280] mt-2 line-clamp-1">{template.name}: {template.description}</p>
-                  )}
-                  <div className="flex items-center justify-between gap-3 mt-3">
-                    <span className="text-xs text-[#6B7280]">
-                      {progress?.completionPercent ? `${progress.completionPercent}% read` : 'Start from your organizer'}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-sm font-bold text-[#5BB974]">
-                      Open task <ArrowRight size={15} />
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          )
-        })}
-      </div>
+
+      {tasks.length === 0 ? (
+        <button
+          onClick={onStartNew}
+          className="w-full text-left bg-green-50 border border-dashed border-green-300 rounded-2xl p-5 hover:border-[#5BB974] transition-colors flex items-center gap-4"
+        >
+          <div className="bg-green-100 text-[#5BB974] p-3 rounded-xl shrink-0">
+            <LayoutGrid size={24} />
+          </div>
+          <div>
+            <p className="font-bold text-[#1A1D23]">Start your first writing piece</p>
+            <p className="text-sm text-[#4B5563] mt-0.5">Pick an organizer — paragraph, story map, compare &amp; contrast, and more.</p>
+          </div>
+        </button>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {tasks.map((task) => (
+            <WritingTaskCard
+              key={task.id}
+              task={task}
+              response={responseByTaskId.get(task.id)}
+              isOwn={task.createdBy === currentUid}
+              onOpen={() => onOpen(task)}
+              onDelete={() => onDelete(task)}
+            />
+          ))}
+        </div>
+      )}
     </section>
+  )
+}
+
+function WritingTaskCard({
+  task,
+  response,
+  isOwn,
+  onOpen,
+  onDelete,
+}: {
+  task: WritingTask
+  response?: WritingResponse
+  isOwn: boolean
+  onOpen: () => void
+  onDelete: () => void
+}) {
+  const template = ORGANIZER_TEMPLATES[task.templateId]
+  const assignedByTeacher = task.classroomId != null && task.creatorRole === 'teacher'
+  const status = response?.completed
+    ? { label: 'Complete', cls: 'bg-green-100 text-[#4AA863]' }
+    : response
+      ? { label: 'In progress', cls: 'bg-amber-100 text-amber-700' }
+      : { label: 'Not started', cls: 'bg-[#EEF1F6] text-[#6B7280]' }
+  const hasSample = task.sampleVisible && !!task.sampleFields
+
+  return (
+    <div className="relative group bg-white border border-[#EDF2F7] rounded-2xl p-4 hover:border-[#5BB974] hover:shadow-sm transition-all">
+      <button onClick={onOpen} className="w-full text-left">
+        <div className="flex items-start gap-3">
+          <div className="bg-green-100 text-[#5BB974] p-2.5 rounded-xl shrink-0">
+            <LayoutGrid size={22} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
+              {assignedByTeacher && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#4A90D9] bg-blue-50 px-2 py-0.5 rounded-full">
+                  <UserCheck size={11} /> Assigned
+                </span>
+              )}
+              {hasSample && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#9B7FD4] bg-purple-50 px-2 py-0.5 rounded-full">
+                  <Eye size={11} /> Sample
+                </span>
+              )}
+            </div>
+            <h4 className="font-bold text-[#1A1D23] line-clamp-1">{task.title}</h4>
+            <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
+              {task.prompt || (template ? `${template.name}: ${template.description}` : 'Open your graphic organizer.')}
+            </p>
+            <div className="flex items-center justify-between gap-3 mt-3">
+              <span className="text-xs text-[#6B7280]">{template?.name}</span>
+              <span className="inline-flex items-center gap-1 text-sm font-bold text-[#5BB974]">
+                {response ? 'Continue' : 'Open'} <ArrowRight size={15} />
+              </span>
+            </div>
+          </div>
+        </div>
+      </button>
+
+      {/* Learners can delete their own personal pieces (not teacher assignments). */}
+      {isOwn && !assignedByTeacher && (
+        <button
+          onClick={onDelete}
+          aria-label={`Delete ${task.title}`}
+          className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-[#9CA3AF] hover:text-red-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
+    </div>
   )
 }
 

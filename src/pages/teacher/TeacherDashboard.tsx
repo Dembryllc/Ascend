@@ -6,7 +6,7 @@ import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BarChart3, BookOpen, CheckCircle2, Circle, Copy, CopyCheck, Users, Upload, Eye, Pencil, X, Check } from 'lucide-react'
+import { BarChart3, BookOpen, CheckCircle2, Circle, Copy, CopyCheck, Users, Upload, Eye, Pencil, PenLine, X, Check } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile, refreshProfile } = useAuth()
@@ -181,6 +181,7 @@ export default function TeacherDashboard() {
       <h3 className="text-lg font-bold text-[#1A1D23] mb-3">Quick Actions</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <ActionCard to="/teacher/upload" icon={<Upload size={20} />} label="Upload a Book" desc="Add a new PDF to your library" color="blue" />
+        <ActionCard to="/teacher/writing" icon={<PenLine size={20} />} label="Writing Tasks" desc="Assign book-free graphic organizers" color="green" />
         <ActionCard to="/teacher/classroom" icon={<Users size={20} />} label="Manage Classroom" desc="View students and join code" color="green" />
         <ActionCard to="/teacher/annotations" icon={<Eye size={20} />} label="View Annotations" desc="See student reading notes" color="purple" />
         <ActionCard to="/teacher/progress" icon={<BarChart3 size={20} />} label="Class Progress" desc="Reading time and completion rates" color="blue" />

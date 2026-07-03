@@ -18,6 +18,7 @@ const PricingPage = lazy(() => import('@/pages/legal/PricingPage'))
 // Teacher
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'))
 const UploadBookPage = lazy(() => import('@/pages/teacher/UploadBookPage'))
+const WritingTasksPage = lazy(() => import('@/pages/teacher/WritingTasksPage'))
 const ClassroomPage = lazy(() => import('@/pages/teacher/ClassroomPage'))
 const AnnotationsViewerPage = lazy(() => import('@/pages/teacher/AnnotationsViewerPage'))
 const ProgressDashboardPage = lazy(() => import('@/pages/teacher/ProgressDashboardPage'))
@@ -57,6 +58,7 @@ export default function App() {
             {/* Teacher */}
             <Route path="/teacher" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
             <Route path="/teacher/upload" element={<ProtectedRoute requiredRole="teacher"><UploadBookPage /></ProtectedRoute>} />
+            <Route path="/teacher/writing" element={<ProtectedRoute requiredRole="teacher"><WritingTasksPage /></ProtectedRoute>} />
             <Route path="/teacher/classroom" element={<ProtectedRoute requiredRole="teacher"><ClassroomPage /></ProtectedRoute>} />
             <Route path="/teacher/annotations" element={<ProtectedRoute requiredRole="teacher"><AnnotationsViewerPage /></ProtectedRoute>} />
             <Route path="/teacher/progress" element={<ProtectedRoute requiredRole="teacher"><ProgressDashboardPage /></ProtectedRoute>} />

@@ -4,7 +4,7 @@ import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
 import { getTrialDaysRemaining, homeForRole } from '@/types'
 import { stripeAnnualUrl } from '@/utils/stripe'
-import { BarChart3, BookOpen, Eye, Home, LogOut, MessageSquare, TrendingUp, Upload, Users, X } from 'lucide-react'
+import { BarChart3, BookOpen, Eye, Home, LogOut, MessageSquare, PenLine, TrendingUp, Upload, Users, X } from 'lucide-react'
 
 interface Props {
   children: React.ReactNode
@@ -15,6 +15,7 @@ const TEACHER_NAV = [
   { to: '/teacher', icon: Home, label: 'Home' },
   { to: '/teacher/classroom', icon: Users, label: 'Classroom' },
   { to: '/teacher/upload', icon: Upload, label: 'Upload' },
+  { to: '/teacher/writing', icon: PenLine, label: 'Writing' },
   { to: '/teacher/annotations', icon: Eye, label: 'Annotations' },
   { to: '/teacher/progress', icon: BarChart3, label: 'Progress' },
 ]
