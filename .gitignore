@@ -26,3 +26,6 @@ dist-ssr
 *.sw?
 
 .firebase/
+
+# E2E screenshots
+e2e-shots/

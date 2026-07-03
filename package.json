@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:rules": "firebase emulators:exec --config firebase.test.json --project demo-ascend \"node --test tests/rules/*.test.mjs\""
+    "test:rules": "firebase emulators:exec --config firebase.test.json --project demo-ascend \"node --test tests/rules/*.test.mjs\"",
+    "test:e2e": "bash tests/e2e/run.sh"
   },
   "dependencies": {
     "docx": "^9.7.1",
@@ -35,6 +36,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "firebase-tools": "^15.22.4",
     "globals": "^17.6.0",
+    "playwright": "^1.61.1",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",

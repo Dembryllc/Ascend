@@ -70,6 +70,12 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
   writing collections, incl. the classroom-pinning edge cases. Dev-only deps: `firebase-tools`,
   `@firebase/rules-unit-testing`. Emulator config is `firebase.test.json` (separate from the deploy
   `firebase.json`).
+- **Browser E2E:** `npm run test:e2e` boots Auth+Firestore emulators (`firebase.emulator.json`),
+  seeds a teacher/student/task (`tests/e2e/seed.mjs`), runs Vite with `VITE_USE_EMULATORS=true`, and
+  drives Chromium through the full write → review → feedback loop (`tests/e2e/writing.e2e.mjs`),
+  screenshotting each step. `src/firebase/config.ts` connects to the emulators only when
+  `VITE_USE_EMULATORS === 'true'` (no-op in prod). Dev-only dep: `playwright` (uses the image's
+  pre-installed Chromium via `executablePath`, so no `playwright install`).
 
 ## Read Aloud (Chrome fixes — do not revert)
 - `window.speechSynthesis.resume()` before `speak()` — fixes Chrome stall bug
