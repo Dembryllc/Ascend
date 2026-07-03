@@ -3,9 +3,13 @@
 > **Source of truth:** This repo's commit history is authoritative. If anything in this file conflicts with actual code in the repo, the code wins. Verify HEAD before acting on any status claim.
 
 ## CI/CD Status
-- ✅ **CI WORKING (verified 2026-06-30).** The latest `main` deploy (`firebase-deploy.yml`, run for PR #4 "Redesign landing page", 2026-06-30 00:39) ran green and deployed to Firebase Hosting. The `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` secret has been refreshed — auth no longer fails.
-- Build + deploy both succeed on push to `main`. Live at easy-annotate.com.
+- ✅ **CI WORKING (verified 2026-07-03).** Latest `main` deploy — "Deploy to Firebase" run #65 (commit `1308dd0`, the standalone Writing feature) — ran green in ~1 min: hosting + `firestore:rules` + `firestore:indexes` all released (`✔ firestore: released rules firestore.rules to cloud.firestore`). Live at easy-annotate.com.
+- `firebase-deploy.yml` deploys `--only hosting,firestore:rules,firestore:indexes` on push to `main`, authenticating with the `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` secret. Rules + indexes ship automatically — do NOT assume a manual Console step is needed.
 - If auth breaks again: new JSON key from GCP Console → IAM → Service Accounts → update the `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` GitHub secret. Manual fallback: `npm run build && firebase deploy --only hosting --project ascend-annotate`.
+
+## Notes / Session Log
+- Session logs live in the repo at `notes/` (e.g. `notes/2026-07-03-writing-feature.md`), Obsidian-friendly frontmatter (date/project/tags).
+- The Obsidian vault is **local** (Mac / iCloud) — cloud/remote sessions CANNOT reach it. Sync locally: `git pull origin main` → copy the note into the vault, or run the local `/record-to-vault` skill.
 
 ## Stack
 - React 19 + TypeScript + Vite 8 + Tailwind CSS v4 (no tailwind.config.js — configured inline)
