@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Eye, FileDown, FileText, PenLine, X } from 'lucide-react'
-import type { OrganizerResponse, ScaffoldLevel, UserProfile, WritingTask } from '@/types'
+import { Eye, FileDown, FileText, MessageSquare, PenLine, X } from 'lucide-react'
+import type { OrganizerResponse, ScaffoldLevel, UserProfile, WritingFeedback, WritingTask } from '@/types'
 import { isPro } from '@/types'
 import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
 import { getWritingResponse, saveWritingResponse } from '@/firebase/writingResponses'
+import { getWritingFeedback } from '@/firebase/writingFeedback'
 import { saveWritingTaskSample } from '@/firebase/writingTasks'
 import { exportOrganizerPDF } from '@/utils/exportOrganizerPDF'
 import { OrganizerFieldsForm, OrganizerSampleView } from './OrganizerFields'
@@ -31,6 +32,7 @@ export default function WritingTaskModal({ task, profile, mode, onClose, onSampl
   const [scaffoldLevel, setScaffoldLevel] = useState<ScaffoldLevel>(task.scaffoldDefault ?? 'guided')
   const [fields, setFields] = useState<Record<string, string>>(mode === 'sample' ? (task.sampleFields ?? {}) : {})
   const [responseExists, setResponseExists] = useState(false)
+  const [teacherFeedback, setTeacherFeedback] = useState<WritingFeedback | null>(null)
   const [loading, setLoading] = useState(mode === 'respond' && !isGated)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showSample, setShowSample] = useState(false)
@@ -45,12 +47,18 @@ export default function WritingTaskModal({ task, profile, mode, onClose, onSampl
   useEffect(() => {
     if (mode !== 'respond' || isGated) return
     let cancelled = false
-    getWritingResponse(profile.uid, task.id)
-      .then((existing) => {
-        if (cancelled || !existing) return
-        setResponseExists(true)
-        setFields(existing.fields)
-        setScaffoldLevel(existing.scaffoldLevel)
+    Promise.all([
+      getWritingResponse(profile.uid, task.id),
+      getWritingFeedback(profile.uid, task.id),
+    ])
+      .then(([existing, fb]) => {
+        if (cancelled) return
+        if (existing) {
+          setResponseExists(true)
+          setFields(existing.fields)
+          setScaffoldLevel(existing.scaffoldLevel)
+        }
+        if (fb?.reviewed && fb.comment.trim()) setTeacherFeedback(fb)
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -276,14 +284,24 @@ export default function WritingTaskModal({ task, profile, mode, onClose, onSampl
               <OrganizerSampleView template={template} fields={task.sampleFields} />
             </div>
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
-              <PromptPanel task={task} scaffoldLevel={scaffoldLevel} mode={mode} />
-              <OrganizerFieldsForm
-                template={template}
-                scaffoldLevel={scaffoldLevel}
-                fields={fields}
-                onChange={handleFieldChange}
-              />
+            <div className="space-y-5">
+              {teacherFeedback && (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[#4AA863] mb-1.5">
+                    <MessageSquare size={13} /> Teacher feedback
+                  </p>
+                  <p className="text-sm text-[#1A1D23] whitespace-pre-wrap">{teacherFeedback.comment}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
+                <PromptPanel task={task} scaffoldLevel={scaffoldLevel} mode={mode} />
+                <OrganizerFieldsForm
+                  template={template}
+                  scaffoldLevel={scaffoldLevel}
+                  fields={fields}
+                  onChange={handleFieldChange}
+                />
+              </div>
             </div>
           )}
         </div>

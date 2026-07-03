@@ -43,20 +43,26 @@ CI does NOT deploy Firestore rules or indexes. Apply manually from Firebase Cons
 
 ## Writing Tasks (book-free writing) — added 2026-07-03
 Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORGANIZER_TEMPLATES`.
-- **Collections:** `writingTasks` (the prompt/assignment) and `writingResponses` (a learner's answer,
-  doc id `${studentId}_${taskId}`). Types in `src/types/index.ts`; data layer in
-  `src/firebase/writingTasks.ts` + `src/firebase/writingResponses.ts`.
+- **Collections:** `writingTasks` (the prompt/assignment), `writingResponses` (a learner's answer,
+  doc id `${studentId}_${taskId}`), and `writingFeedback` (teacher comment + reviewed flag, doc id
+  `${studentId}_${taskId}`, kept separate so student writes the response and teacher writes the
+  feedback). Types in `src/types/index.ts`; data layer in `src/firebase/writingTasks.ts`,
+  `writingResponses.ts`, `writingFeedback.ts`.
 - **Roles:** teachers create tasks assigned to their classroom (`classroomId` set) and can author a
   **sample/exemplar** (`sampleFields`, gated by `sampleVisible`). Students **and** individuals open a
   standalone `WritingTaskModal` from their home (`WritingSection` in `StudentHome.tsx`) and can also
   self-start a **personal** task (`classroomId: null` → private, never shown to a teacher).
-- **Teacher UI:** `/teacher/writing` (`WritingTasksPage`) + dashboard quick action + nav item.
+- **Teacher UI:** `/teacher/writing` (`WritingTasksPage`, create/assign/sample) and
+  `/teacher/writing/:taskId` (`WritingResponsesPage`) — per-student responses, completion roll-up,
+  and a comment + "reviewed" feedback box. Feedback shows back to the learner on the home card
+  (Feedback chip) and inside `WritingTaskModal`.
 - **FERPA scoping** mirrors `organizers`: a response is readable by its owner and, only when
-  `classroomId` is a string, by that classroom's teacher. Personal (null-classroom) writing stays
+  `classroomId` is a string, by that classroom's teacher; feedback is written only by the class
+  teacher and read by that teacher + the student it's about. Personal (null-classroom) writing stays
   private. Do not weaken this.
-- **⚠️ Deploy step:** `firestore.rules` gained `writingTasks` + `writingResponses` blocks and the
-  `isClassStudent` / `canAccessWritingTask` helpers. CI does NOT deploy rules — **publish
-  `firestore.rules` manually** (Firebase Console → Firestore → Rules, or
+- **⚠️ Deploy step:** `firestore.rules` gained `writingTasks`, `writingResponses`, `writingFeedback`
+  blocks and the `isClassStudent` / `canAccessWritingTask` helpers. CI does NOT deploy rules —
+  **publish `firestore.rules` manually** (Firebase Console → Firestore → Rules, or
   `firebase deploy --only firestore:rules --project ascend-annotate`) or the feature fails with
   permission-denied.
 

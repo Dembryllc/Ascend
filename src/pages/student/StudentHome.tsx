@@ -9,7 +9,8 @@ import { getReadingProgressByStudent } from '@/firebase/readingProgress'
 import { joinClassroomByCode } from '@/firebase/classrooms'
 import { getWritingTasksForLearner, deleteWritingTask } from '@/firebase/writingTasks'
 import { getWritingResponsesByStudent } from '@/firebase/writingResponses'
-import type { Annotation, Book, ReadingProgress, ReactionType, WritingTask, WritingResponse } from '@/types'
+import { getWritingFeedbackByStudent } from '@/firebase/writingFeedback'
+import type { Annotation, Book, ReadingProgress, ReactionType, WritingTask, WritingResponse, WritingFeedback } from '@/types'
 import { REACTIONS } from '@/types'
 import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
@@ -40,6 +41,7 @@ export default function StudentHome() {
   const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([])
   const [writingTasks, setWritingTasks] = useState<WritingTask[]>([])
   const [writingResponses, setWritingResponses] = useState<WritingResponse[]>([])
+  const [writingFeedback, setWritingFeedback] = useState<WritingFeedback[]>([])
   const [activeWritingTask, setActiveWritingTask] = useState<WritingTask | null>(null)
   const [showWritingStarter, setShowWritingStarter] = useState(false)
   const [loadedStudentId, setLoadedStudentId] = useState('')
@@ -58,14 +60,16 @@ export default function StudentHome() {
       getReadingProgressByStudent(profile.uid),
       getWritingTasksForLearner(profile.uid, profile.classroomId),
       getWritingResponsesByStudent(profile.uid),
+      getWritingFeedbackByStudent(profile.uid),
     ])
-      .then(([b, ann, progressRows, tasks, responses]) => {
+      .then(([b, ann, progressRows, tasks, responses, fb]) => {
         if (cancelled) return
         setBooks(b)
         setAnnotations(ann)
         setReadingProgress(progressRows)
         setWritingTasks(tasks)
         setWritingResponses(responses)
+        setWritingFeedback(fb)
         setError('')
         setLoadedStudentId(profile.uid)
       })
@@ -156,6 +160,7 @@ export default function StudentHome() {
   const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
   const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
   const responseByTaskId = new Map(writingResponses.map((r) => [r.taskId, r]))
+  const feedbackByTaskId = new Map(writingFeedback.filter((f) => f.reviewed).map((f) => [f.taskId, f]))
 
   function handleWritingCreated(task: WritingTask) {
     setWritingTasks((prev) => [task, ...prev])
@@ -224,6 +229,7 @@ export default function StudentHome() {
       <WritingSection
         tasks={writingTasks}
         responseByTaskId={responseByTaskId}
+        feedbackByTaskId={feedbackByTaskId}
         currentUid={profile!.uid}
         onOpen={setActiveWritingTask}
         onStartNew={() => setShowWritingStarter(true)}
@@ -570,6 +576,7 @@ function RecentActivityCard({
 function WritingSection({
   tasks,
   responseByTaskId,
+  feedbackByTaskId,
   currentUid,
   onOpen,
   onStartNew,
@@ -577,6 +584,7 @@ function WritingSection({
 }: {
   tasks: WritingTask[]
   responseByTaskId: Map<string, WritingResponse>
+  feedbackByTaskId: Map<string, WritingFeedback>
   currentUid: string
   onOpen: (task: WritingTask) => void
   onStartNew: () => void
@@ -619,6 +627,7 @@ function WritingSection({
               key={task.id}
               task={task}
               response={responseByTaskId.get(task.id)}
+              feedback={feedbackByTaskId.get(task.id)}
               isOwn={task.createdBy === currentUid}
               onOpen={() => onOpen(task)}
               onDelete={() => onDelete(task)}
@@ -633,12 +642,14 @@ function WritingSection({
 function WritingTaskCard({
   task,
   response,
+  feedback,
   isOwn,
   onOpen,
   onDelete,
 }: {
   task: WritingTask
   response?: WritingResponse
+  feedback?: WritingFeedback
   isOwn: boolean
   onOpen: () => void
   onDelete: () => void
@@ -670,6 +681,11 @@ function WritingTaskCard({
               {hasSample && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#9B7FD4] bg-purple-50 px-2 py-0.5 rounded-full">
                   <Eye size={11} /> Sample
+                </span>
+              )}
+              {feedback && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5BB974] bg-green-50 px-2 py-0.5 rounded-full">
+                  <MessageSquare size={11} /> Feedback
                 </span>
               )}
             </div>

@@ -50,6 +50,19 @@ export async function getWritingResponsesByStudent(studentId: string): Promise<W
   return snap.docs.map((d) => toResponse(d.id, d.data()))
 }
 
+/**
+ * All responses in a classroom (single-field query so no composite index).
+ * The teacher filters these to a specific task client-side. Personal tasks
+ * carry classroomId null, so they never appear here — they stay private.
+ */
+export async function getWritingResponsesForClassroom(classroomId: string): Promise<WritingResponse[]> {
+  const snap = await getDocs(query(
+    collection(db, 'writingResponses'),
+    where('classroomId', '==', classroomId),
+  ))
+  return snap.docs.map((d) => toResponse(d.id, d.data()))
+}
+
 export async function saveWritingResponse(
   exists: boolean,
   studentId: string,

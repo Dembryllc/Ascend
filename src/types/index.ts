@@ -111,6 +111,20 @@ export interface WritingResponse {
 
 export type WritingTaskStatus = 'not-started' | 'in-progress' | 'complete'
 
+// Teacher feedback on a learner's WritingResponse. Kept in its own collection
+// (doc id `${studentId}_${taskId}`) so the student-owned response doc stays
+// student-writable while feedback stays teacher-writable.
+export interface WritingFeedback {
+  id: string
+  studentId: string
+  taskId: string
+  classroomId: string
+  teacherId: string
+  comment: string
+  reviewed: boolean
+  updatedAt: Date
+}
+
 export type ReactionType = 'surprise' | 'think' | 'love' | 'important' | 'question'
 
 export interface Annotation {

@@ -284,6 +284,28 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isOwner(resource.data.studentId);
     }
 
+    // ── writing feedback (teacher → student) ──────────────────────────────
+    // Written only by the classroom's teacher; read by that teacher and the
+    // student the feedback is about. Kept separate from the student-owned
+    // response so each side writes only its own document.
+    match /writingFeedback/{feedbackId} {
+      allow read: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || (resource.data.classroomId is string && isClassTeacher(resource.data.classroomId))
+      );
+      allow create: if isSignedIn()
+                    && request.resource.data.teacherId == request.auth.uid
+                    && request.resource.data.classroomId is string
+                    && isClassTeacher(request.resource.data.classroomId);
+      allow update: if isSignedIn()
+                    && isClassTeacher(resource.data.classroomId)
+                    && request.resource.data.teacherId == resource.data.teacherId
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.taskId == resource.data.taskId
+                    && request.resource.data.classroomId == resource.data.classroomId;
+      allow delete: if isSignedIn() && isClassTeacher(resource.data.classroomId);
+    }
+
     // ── reading progress ─────────────────────────────────────────────────
     // Students update their own reading progress. Teachers can read progress
     // only for students in a classroom they own.

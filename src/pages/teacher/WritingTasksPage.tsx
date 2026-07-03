@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff,
   LayoutGrid,
+  MessageSquare,
   PenLine,
   Plus,
   Trash2,
@@ -246,22 +247,30 @@ function TeacherTaskCard({
         )}
       </div>
 
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[#F3F4F6]">
-        <button
-          onClick={onAuthorSample}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:bg-blue-50 py-2 rounded-xl transition-colors"
+      <div className="mt-4 pt-3 border-t border-[#F3F4F6] space-y-2">
+        <Link
+          to={`/teacher/writing/${task.id}`}
+          className="flex items-center justify-center gap-1.5 text-sm font-bold text-white bg-[#4A90D9] hover:bg-[#357ABD] py-2.5 rounded-xl transition-colors"
         >
-          <PenLine size={15} /> {hasSample ? 'Edit sample' : 'Create sample'}
-        </button>
-        {hasSample && (
+          <MessageSquare size={15} /> View responses
+        </Link>
+        <div className="flex items-center gap-2">
           <button
-            onClick={onToggleVisibility}
-            className="inline-flex items-center justify-center gap-1.5 text-sm font-bold text-[#6B7280] hover:bg-[#F3F4F6] py-2 px-3 rounded-xl transition-colors"
-            title={task.sampleVisible ? 'Hide sample from students' : 'Show sample to students'}
+            onClick={onAuthorSample}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:bg-blue-50 py-2 rounded-xl transition-colors"
           >
-            {task.sampleVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+            <PenLine size={15} /> {hasSample ? 'Edit sample' : 'Create sample'}
           </button>
-        )}
+          {hasSample && (
+            <button
+              onClick={onToggleVisibility}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-bold text-[#6B7280] hover:bg-[#F3F4F6] py-2 px-3 rounded-xl transition-colors"
+              title={task.sampleVisible ? 'Hide sample from students' : 'Show sample to students'}
+            >
+              {task.sampleVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
