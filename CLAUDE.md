@@ -65,6 +65,11 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
   **publish `firestore.rules` manually** (Firebase Console → Firestore → Rules, or
   `firebase deploy --only firestore:rules --project ascend-annotate`) or the feature fails with
   permission-denied.
+- **Rules tests:** `npm run test:rules` boots the Firestore emulator (needs Java) and runs
+  `tests/rules/*.test.mjs` against `firestore.rules` — covers read/write scoping for all three
+  writing collections, incl. the classroom-pinning edge cases. Dev-only deps: `firebase-tools`,
+  `@firebase/rules-unit-testing`. Emulator config is `firebase.test.json` (separate from the deploy
+  `firebase.json`).
 
 ## Read Aloud (Chrome fixes — do not revert)
 - `window.speechSynthesis.resume()` before `speak()` — fixes Chrome stall bug
