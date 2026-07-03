@@ -311,7 +311,7 @@ export default function WritingTaskModal({ task, profile, mode, onClose, onSampl
           <div className="px-6 pb-4 pt-2 shrink-0 border-t border-[#F3F4F6] flex items-center justify-between gap-3">
             {mode === 'respond' ? (
               <>
-                <span className="text-xs text-[#9CA3AF]">
+                <span className="text-xs text-[#9CA3AF]" aria-live="polite">
                   {saveStatus === 'saving' && 'Saving…'}
                   {saveStatus === 'saved' && '✓ Saved'}
                   {saveStatus === 'error' && 'Could not save — check your connection'}

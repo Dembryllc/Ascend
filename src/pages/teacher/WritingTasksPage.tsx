@@ -295,6 +295,12 @@ function CreateTaskModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   async function handleSubmit() {
     if (!title.trim()) { setError('Give your task a title.'); return }
     setSaving(true)

@@ -123,6 +123,12 @@ export default function WritingResponsesPage() {
         <p className="text-xs text-[#9CA3AF] mt-1">Student data is protected under FERPA and used solely for educational purposes.</p>
       </div>
 
+      {classroom && task && task.classroomId && task.classroomId !== classroom.id && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 mb-6 text-sm">
+          This task was assigned to a different classroom. You're viewing responses for your current classroom, so some may not appear.
+        </div>
+      )}
+
       {!classroom || students.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-[#F3F4F6]">
           <MessageSquare size={40} className="mx-auto text-[#D1D5DB] mb-3" />
@@ -219,9 +225,10 @@ function StudentResponseRow({
     <div className="bg-white border border-[#EDF2F7] rounded-2xl overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
         className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[#F8F9FC] transition-colors"
       >
-        <span className="text-[#9CA3AF]">{expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</span>
+        <span className="text-[#9CA3AF]" aria-hidden="true">{expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</span>
         <span className="font-bold text-[#1A1D23] flex-1 min-w-0 truncate">{student.displayName}</span>
         {feedback?.reviewed && (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5BB974] bg-green-50 px-2 py-0.5 rounded-full">
@@ -234,7 +241,10 @@ function StudentResponseRow({
       {expanded && (
         <div className="border-t border-[#F3F4F6] px-4 py-4 space-y-4">
           {response && template ? (
-            <OrganizerSampleView template={template} fields={response.fields} />
+            <>
+              <p className="text-xs text-[#9CA3AF]">Last updated {response.updatedAt.toLocaleDateString()} · {response.updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              <OrganizerSampleView template={template} fields={response.fields} />
+            </>
           ) : (
             <p className="text-sm text-[#9CA3AF] italic py-2">This student hasn't started this writing task yet.</p>
           )}

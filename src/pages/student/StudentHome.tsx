@@ -8,7 +8,7 @@ import { getAnnotationsByStudent } from '@/firebase/annotations'
 import { getReadingProgressByStudent } from '@/firebase/readingProgress'
 import { joinClassroomByCode } from '@/firebase/classrooms'
 import { getWritingTasksForLearner, deleteWritingTask } from '@/firebase/writingTasks'
-import { getWritingResponsesByStudent } from '@/firebase/writingResponses'
+import { getWritingResponsesByStudent, deleteWritingResponse } from '@/firebase/writingResponses'
 import { getWritingFeedbackByStudent } from '@/firebase/writingFeedback'
 import type { Annotation, Book, ReadingProgress, ReactionType, WritingTask, WritingResponse, WritingFeedback } from '@/types'
 import { REACTIONS } from '@/types'
@@ -173,8 +173,11 @@ export default function StudentHome() {
 
   async function handleDeleteWritingTask(task: WritingTask) {
     setWritingTasks((prev) => prev.filter((t) => t.id !== task.id))
+    setWritingResponses((prev) => prev.filter((r) => r.taskId !== task.id))
     try {
       await deleteWritingTask(task.id)
+      // Best-effort: also remove the orphaned response for this personal task.
+      await deleteWritingResponse(profile!.uid, task.id).catch(() => {})
     } catch {
       // If delete fails, restore it so the learner doesn't silently lose work.
       setWritingTasks((prev) => [task, ...prev.filter((t) => t.id !== task.id)])

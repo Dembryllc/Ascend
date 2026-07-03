@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   serverTimestamp,
@@ -94,4 +95,9 @@ export async function saveWritingResponse(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
+}
+
+/** Best-effort cleanup when a learner deletes their own personal task. */
+export async function deleteWritingResponse(studentId: string, taskId: string): Promise<void> {
+  await deleteDoc(doc(db, 'writingResponses', responseId(studentId, taskId)))
 }

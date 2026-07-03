@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import type { ScaffoldLevel, UserProfile, WritingTask } from '@/types'
 import { ORGANIZER_TEMPLATES, TEMPLATE_ORDER } from '@/data/organizerTemplates'
@@ -25,6 +25,12 @@ export default function WritingStarterModal({ profile, onClose, onCreated }: Pro
   const [error, setError] = useState('')
 
   const template = templateId ? ORGANIZER_TEMPLATES[templateId] : null
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   function chooseTemplate(id: string) {
     setTemplateId(id)
