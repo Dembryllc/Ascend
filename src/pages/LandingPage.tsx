@@ -1,5 +1,5 @@
 /* Hallmark · macrostructure: Marquee Hero (show-the-product) · genre: instructional-warm
- * tone: teacher-to-teacher, ICT-classroom-first · anchor hue: cool (brand blue)
+ * tone: teacher-to-teacher, any-classroom-first · anchor hue: cool (brand blue)
  * theme: brand-on-warm-paper · display: Fraunces · body: Inter
  * enrichment: Tier-A CSS art (annotated book page) · no fake browser chrome
  * positioning: guided reading + writing workspace, not "PDF annotator"
@@ -127,7 +127,7 @@ export default function LandingPage() {
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm text-text-secondary font-medium">
             <a href="#how" className="px-3 py-2 rounded-lg hover:bg-paper-2 transition-colors">How it works</a>
-            <a href="#ict" className="px-3 py-2 rounded-lg hover:bg-paper-2 transition-colors">For ICT classrooms</a>
+            <a href="#inclusion" className="px-3 py-2 rounded-lg hover:bg-paper-2 transition-colors">Mixed-needs classrooms</a>
             <a href="#features" className="px-3 py-2 rounded-lg hover:bg-paper-2 transition-colors">Features</a>
             <Link to="/pricing" className="px-3 py-2 rounded-lg hover:bg-paper-2 transition-colors">Pricing</Link>
           </nav>
@@ -148,7 +148,7 @@ export default function LandingPage() {
           <div className="ea-rise">
             <span className="inline-flex items-center gap-1.5 bg-white border border-border-warm text-text-secondary text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-green" />
-              Built for ICT and mixed-needs classrooms
+              For any classroom, any reader
             </span>
             <h1 className="font-display font-semibold text-4xl sm:text-5xl md:text-[3.75rem] leading-[1.04] tracking-tight mb-6 [overflow-wrap:anywhere]">
               Every Student. One Text.{' '}
@@ -316,23 +316,24 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 5. ICT / inclusion ──────────────────────────────────────────────── */}
-      <section id="ict" className="py-20 bg-white border-y border-border-warm">
+      {/* ── 5. Mixed-needs / inclusion ──────────────────────────────────────── */}
+      <section id="inclusion" className="py-20 bg-white border-y border-border-warm">
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <span className="inline-flex items-center gap-1.5 text-brand-green text-sm font-bold mb-4">
-                <Users size={15} aria-hidden="true" /> Built for ICT classrooms
+                <Users size={15} aria-hidden="true" /> One lesson, every learner
               </span>
               <h2 className="font-display font-semibold text-3xl sm:text-4xl tracking-tight mb-4 leading-tight">
-                Built for ICT Classrooms Where One Lesson Has to Reach Every Student
+                One Lesson Has to Reach Every Student — ICT, General Ed, or Independent
               </h2>
               <p className="text-text-secondary leading-relaxed">
                 In real classrooms, students do not all access text the same way. Some need
                 read-aloud support. Some need sentence starters. Some need a simpler way to show
-                thinking. Some are ready to write more deeply. Easy Annotate helps co-teachers
-                keep everyone in the same lesson while giving students the supports they need to
-                participate.
+                thinking. Some are ready to write more deeply. Easy Annotate keeps every student on
+                the same text — whether you're co-teaching an ICT section, running a general ed
+                classroom, or supporting one student one-on-one — while giving each one the
+                supports they need to participate.
               </p>
             </div>
             <ul className="space-y-3 bg-paper rounded-2xl p-6 sm:p-8 border border-border-warm">
