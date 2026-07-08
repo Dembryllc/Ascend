@@ -496,11 +496,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 10. Pricing teaser ──────────────────────────────────────────────── */}
+      {/* ── 10. Final CTA ────────────────────────────────────────────────────── */}
       <section className="bg-text-primary py-20">
         <div className="max-w-2xl mx-auto px-4 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 text-brand-yellow mb-6">
+            <Upload size={22} aria-hidden="true" />
+          </div>
           <h2 className="font-display font-semibold text-3xl sm:text-4xl tracking-tight text-white mb-3">Free to start. Upgrade when you&apos;re ready.</h2>
           <p className="text-white/65 mb-6 leading-relaxed">
+            Upload a text, assign it to your students, and see how much more visible reading becomes.
             The free plan includes 1 classroom, up to 30 students, and 5 books. Pro unlocks unlimited
             classrooms, students, books, and PDF annotation export.
           </p>
@@ -510,7 +514,7 @@ export default function LandingPage() {
               to="/register"
               className="inline-flex items-center justify-center gap-2 bg-brand-yellow text-text-primary font-bold px-8 py-4 rounded-xl hover:opacity-90 transition-opacity"
             >
-              Create a free account
+              Start for Free
               <ArrowRight size={18} aria-hidden="true" />
             </Link>
             <Link
@@ -519,34 +523,6 @@ export default function LandingPage() {
             >
               See all plans
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 11. Final CTA ───────────────────────────────────────────────────── */}
-      <section className="py-20">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-brand-blue/10 text-brand-blue mb-6">
-            <Upload size={22} aria-hidden="true" />
-          </div>
-          <h2 className="font-display font-semibold text-3xl sm:text-4xl tracking-tight mb-4">Make Your Next PDF an Interactive Lesson</h2>
-          <p className="text-text-secondary leading-relaxed mb-8">
-            Upload a text, assign it to your students, and see how much more visible reading becomes.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              to="/register"
-              className="inline-flex items-center justify-center gap-2 bg-brand-blue text-white font-bold px-8 py-4 rounded-xl hover:opacity-90 transition-opacity"
-            >
-              Start for Free
-              <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-            <a
-              href="#how"
-              className="inline-flex items-center justify-center gap-2 bg-white border border-border-warm text-text-primary font-semibold px-8 py-4 rounded-xl hover:bg-paper-2 transition-colors"
-            >
-              See How It Works
-            </a>
           </div>
         </div>
       </section>
