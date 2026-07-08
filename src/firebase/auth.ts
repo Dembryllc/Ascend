@@ -14,6 +14,7 @@ import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection, query, whe
 import { auth, db } from './config'
 import type { UserRole, UserProfile } from '@/types'
 import { joinClassroomByCode } from './classrooms'
+import { getStoredAttribution } from '@/utils/attribution'
 
 export async function registerUser(
   email: string,
@@ -38,6 +39,10 @@ export async function registerUser(
     const trialEndsAt = (role === 'teacher' || role === 'individual')
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
       : null
+    // Marketing attribution (e.g. the LinkedIn/Instagram launch push) — read once here,
+    // not resolved further downstream. Only meaningful for trial signups; the AC sync
+    // Cloud Function (functions/src/activecampaign.ts) decides what to do with it.
+    const attribution = trialEndsAt ? getStoredAttribution() : null
 
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
@@ -49,6 +54,7 @@ export async function registerUser(
       classroomId: null,
       subscriptionStatus: 'free',
       ...(trialEndsAt ? { trialEndsAt } : {}),
+      ...(attribution?.source ? { signupSource: attribution.source } : {}),
       createdAt: serverTimestamp(),
     })
   } catch (err) {
@@ -139,6 +145,7 @@ async function writeGoogleProfile(user: User, role: UserRole): Promise<void> {
   if (!email) throw new Error('Your Google account has no email address. Please use a Google account with an email.')
   const isStudent = role === 'student'
   const hasTrial = role === 'teacher' || role === 'individual'
+  const attribution = hasTrial ? getStoredAttribution() : null
   await setDoc(doc(db, 'users', user.uid), {
     uid: user.uid,
     // FERPA: student email stays in Firebase Auth only, never Firestore.
@@ -148,6 +155,7 @@ async function writeGoogleProfile(user: User, role: UserRole): Promise<void> {
     classroomId: null,
     subscriptionStatus: 'free',
     ...(hasTrial ? { trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) } : {}),
+    ...(attribution?.source ? { signupSource: attribution.source } : {}),
     createdAt: serverTimestamp(),
   })
 }

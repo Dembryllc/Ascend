@@ -10,6 +10,7 @@ export interface UserProfile {
   subscriptionStatus?: SubscriptionStatus
   stripeCustomerId?: string
   trialEndsAt?: Date
+  signupSource?: string
   createdAt: Date
 }
 
