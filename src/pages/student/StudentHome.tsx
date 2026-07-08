@@ -602,7 +602,7 @@ function WritingSection({
         <div>
           <h3 id="writing-heading" className="text-lg font-bold text-[#1A1D23]">Writing</h3>
           <p className="text-sm text-[#4B5563]">
-            Build structured writing with a graphic organizer — no book needed.
+            Start a writing task on its own — no book needed.
           </p>
         </div>
         <button
@@ -623,7 +623,7 @@ function WritingSection({
           </div>
           <div>
             <p className="font-bold text-[#1A1D23]">Start your first writing piece</p>
-            <p className="text-sm text-[#4B5563] mt-0.5">Pick an organizer — paragraph, story map, compare &amp; contrast, and more.</p>
+            <p className="text-sm text-[#4B5563] mt-0.5">Pick a writing task type — paragraph, story map, compare &amp; contrast, and more.</p>
           </div>
         </button>
       ) : (
@@ -697,7 +697,7 @@ function WritingTaskCard({
             </div>
             <h4 className="font-bold text-[#1A1D23] line-clamp-1">{task.title}</h4>
             <p className="text-sm text-[#4B5563] mt-1 line-clamp-2">
-              {task.prompt || (template ? `${template.name}: ${template.description}` : 'Open your graphic organizer.')}
+              {task.prompt || (template ? `${template.name}: ${template.description}` : 'Open your writing task.')}
             </p>
             <div className="flex items-center justify-between gap-3 mt-3">
               <span className="text-xs text-[#6B7280]">{template?.name}</span>
@@ -714,7 +714,7 @@ function WritingTaskCard({
         <button
           onClick={onDelete}
           aria-label={`Delete ${task.title}`}
-          className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-[#9CA3AF] hover:text-red-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+          className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-[#9CA3AF] hover:text-red-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-all shadow-sm"
         >
           <Trash2 size={15} />
         </button>
@@ -913,7 +913,7 @@ function BookCard({
           onClick={onDelete}
           disabled={deleting}
           aria-label={`Delete ${book.title}`}
-          className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-[#9CA3AF] hover:text-red-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-sm disabled:opacity-50"
+          className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-[#9CA3AF] hover:text-red-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-all shadow-sm disabled:opacity-50"
         >
           <Trash2 size={15} />
         </button>

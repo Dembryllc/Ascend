@@ -167,8 +167,8 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
   if (showUpgrade) {
     return (
       <UpgradeModal
-        title="Graphic organizers are a Pro feature"
-        description="Upgrade to Pro to access all graphic organizer templates, sentence starters, and PDF export."
+        title="Writing tasks are a Pro feature"
+        description="Upgrade to Pro to access all writing task templates, sentence starters, and PDF export."
         onClose={() => setShowUpgrade(false)}
       />
     )
@@ -182,7 +182,7 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Graphic Organizer"
+        aria-label="Writing Task"
         className="bg-white rounded-2xl w-full max-w-5xl shadow-xl flex flex-col max-h-[94vh]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -254,7 +254,7 @@ export default function OrganizerModal({ book, profile, onClose }: Props) {
           {isGated ? (
             <div className="text-center py-10">
               <p className="text-2xl mb-3">📝</p>
-              <p className="font-bold text-[#1A1D23] mb-1">Graphic organizers are a Pro feature</p>
+              <p className="font-bold text-[#1A1D23] mb-1">Writing tasks are a Pro feature</p>
               <p className="text-sm text-[#4B5563] mb-5">Upgrade to access all templates, sentence starters, and PDF export.</p>
               <button
                 onClick={() => setShowUpgrade(true)}
@@ -355,7 +355,7 @@ function TemplatePicker({ onSelect, scaffoldLevel, onScaffoldChange }: {
           </button>
         ))}
       </div>
-      <p className="text-sm font-semibold text-[#1A1D23] mb-3">Choose an organizer</p>
+      <p className="text-sm font-semibold text-[#1A1D23] mb-3">Choose a writing task type</p>
       <div className="space-y-2">
         {TEMPLATE_ORDER.map((id) => {
           const t = ORGANIZER_TEMPLATES[id]

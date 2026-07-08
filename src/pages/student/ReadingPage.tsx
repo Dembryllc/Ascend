@@ -585,11 +585,11 @@ export default function ReadingPage() {
             {(book.organizerTemplateId || profile?.role === 'individual') && (
               <button
                 onClick={() => setOrganizerOpen(true)}
-                aria-label="Open graphic organizer"
+                aria-label="Open writing task"
                 className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#5BB974] hover:bg-green-50 transition-colors font-semibold text-sm"
               >
                 <LayoutGrid size={20} />
-                <span className="hidden sm:inline">Organizer</span>
+                <span className="hidden sm:inline">Writing task</span>
               </button>
             )}
             {isSpeaking ? (
@@ -639,7 +639,7 @@ export default function ReadingPage() {
                         style={{ width: `${completionPct}%` }}
                       />
                     </div>
-                    <p className="text-xs text-[#6B7280] mt-1">{completedTaskCount} of {taskCount} reading actions complete</p>
+                    <p className="text-xs text-[#6B7280] mt-1">{completedTaskCount} of {taskCount} quotes &amp; reflections saved</p>
                   </div>
                 </div>
               </section>
@@ -657,7 +657,7 @@ export default function ReadingPage() {
                       <p className="text-xs text-[#4B5563] line-clamp-2">{book.organizerPrompt}</p>
                     ) : (
                       <p className="text-xs text-[#4B5563] truncate">
-                        {book.organizerTemplateId ? 'Your teacher assigned a graphic organizer for this book.' : 'Use a graphic organizer to organize your reading.'}
+                        {book.organizerTemplateId ? 'Your teacher assigned a writing task for this book.' : 'Open a writing task to organize your thinking as you read.'}
                       </p>
                     )}
                   </div>
@@ -694,6 +694,9 @@ export default function ReadingPage() {
                   </button>
                 </div>
               </div>
+              {!readingProgress?.completed && (
+                <p className="text-xs text-[#9CA3AF] mt-1">The bar below tracks your page automatically — tap Mark Complete once you&apos;ve finished the whole book.</p>
+              )}
               <div className="mt-3 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
                 <div
                   role="progressbar"
