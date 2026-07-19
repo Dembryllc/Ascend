@@ -1,5 +1,8 @@
 # Root Cause Analysis — Easy Annotate
 
+> **HISTORICAL — 2026-05-28 snapshot.** Findings below informed the Phase 1/2 stabilization pass
+> (PR #1) and are largely resolved. Check `CLAUDE.md` and current code before relying on this file.
+
 **Generated:** 2026-05-28  
 **Method:** Static analysis of all source files, Firebase rules, and git history  
 **Scope:** Both the feature branch and main/production

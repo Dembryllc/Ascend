@@ -1,5 +1,9 @@
 # Health Audit — Easy Annotate
 
+> **HISTORICAL — 2026-05-28 snapshot, largely fixed since.** Most of the P-numbered issues below
+> were addressed in the Phase 1/2 stabilization pass (PR #1) and later PRs. Do not treat this file
+> as current status — check `CLAUDE.md` and the code itself before acting on anything here.
+
 **Generated:** 2026-05-28  
 **Auditor:** Static analysis of codebase (no live environment access)  
 **Branch audited:** `claude/ascend-project-migration-Bw1rM` + comparison with `origin/main`
