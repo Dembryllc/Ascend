@@ -1,5 +1,10 @@
 # Stabilization Plan — Easy Annotate
 
+> **PARTIALLY HISTORICAL — 2026-05-28 snapshot.** Phases 1–2 (critical fixes, core functionality)
+> are done — see PR #1 and later PRs. Sections 5.3–5.7 (district-readiness backlog: multi-classroom,
+> accessibility audit, load testing, CSV export) are still an accurate outstanding roadmap as of
+> 2026-07-19. Check `CLAUDE.md` and current code before treating any single line here as done or not.
+
 **Generated:** 2026-05-28  
 **Based on:** HEALTH_AUDIT.md + ROOT_CAUSE_ANALYSIS.md  
 **Target:** Stable beta suitable for district deployment

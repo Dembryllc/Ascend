@@ -39,6 +39,7 @@ export default function ReadingPage() {
   const [selectedText, setSelectedText] = useState('')
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [savingReflection, setSavingReflection] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [containerWidth, setContainerWidth] = useState(700)
@@ -296,6 +297,7 @@ export default function ReadingPage() {
     setCapturedSelection('')
     setFloatingBar(null)
     setSaveError('')
+    setConfirmingDelete(false)
   }
 
   async function handleSave() {
@@ -331,12 +333,17 @@ export default function ReadingPage() {
   }
 
   async function handleDelete(annotationId: string) {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true)
+      return
+    }
     try {
       await deleteAnnotation(annotationId)
       setAnnotations((prev) => prev.filter((a) => a.id !== annotationId))
       closePanel()
     } catch {
       setSaveError('Could not delete. Check your connection and try again.')
+      setConfirmingDelete(false)
     }
   }
 
@@ -1015,10 +1022,13 @@ export default function ReadingPage() {
                   onClick={() => handleDelete(annotationPanel.editing!.id)}
                   className="px-4 py-3 text-red-600 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
                 >
-                  Delete
+                  {confirmingDelete ? 'Confirm delete?' : 'Delete'}
                 </button>
               )}
-              <button onClick={closePanel} className="flex-1 px-4 py-3 border border-[#D1D5DB] rounded-xl font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors">
+              <button
+                onClick={confirmingDelete ? () => setConfirmingDelete(false) : closePanel}
+                className="flex-1 px-4 py-3 border border-[#D1D5DB] rounded-xl font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors"
+              >
                 Cancel
               </button>
               <button
