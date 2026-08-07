@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
+import { getFunctions } from 'firebase/functions'
 
 // Replace these placeholder values with your actual Firebase project config.
 // In production, store these in environment variables (VITE_FIREBASE_*).
@@ -24,9 +25,10 @@ if (firebaseConfig.apiKey.startsWith('YOUR_')) {
 
 const app = initializeApp(firebaseConfig)
 
-export const auth    = getAuth(app)
-export const db      = getFirestore(app)
-export const storage = getStorage(app)
+export const auth      = getAuth(app)
+export const db        = getFirestore(app)
+export const storage   = getStorage(app)
+export const functions = getFunctions(app)
 
 // Local development / E2E only: point Auth + Firestore at the emulator suite.
 // No-op in production — only active when VITE_USE_EMULATORS === 'true'.

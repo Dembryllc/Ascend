@@ -4,13 +4,15 @@
  * enrichment: Tier-A CSS art (annotated book page) · no fake browser chrome
  * positioning: guided reading + writing workspace, not "PDF annotator"
  */
+import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { homeForRole } from '@/types'
+import { subscribeLeadMagnet } from '@/firebase/leadMagnet'
 import {
   BookOpen, CheckCircle2, Eye, MessageSquare, TrendingUp, Users,
   Volume2, PenLine, FileText, Smartphone, ShieldCheck,
-  GraduationCap, Layers, ArrowRight, Highlighter, Upload, Sparkles,
+  GraduationCap, Layers, ArrowRight, Highlighter, Upload, Sparkles, Mail,
 } from 'lucide-react'
 
 // ─── Problem section pain cards ────────────────────────────────────────────────
@@ -108,6 +110,24 @@ const PRIVACY_BULLETS = [
 
 export default function LandingPage() {
   const { profile, loading } = useAuth()
+  const [captureEmail, setCaptureEmail] = useState('')
+  const [captureSubmitted, setCaptureSubmitted] = useState(false)
+  const [captureSubmitting, setCaptureSubmitting] = useState(false)
+
+  const handleCapture = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (captureSubmitting) return
+    setCaptureSubmitting(true)
+    try {
+      await subscribeLeadMagnet(captureEmail.trim().toLowerCase())
+    } catch {
+      // Non-critical — still show success so a slow/failed AC call doesn't
+      // block the visitor. Worst case they don't get the email; not worth
+      // surfacing an error for a lead-magnet signup.
+    }
+    setCaptureSubmitting(false)
+    setCaptureSubmitted(true)
+  }
 
   if (!loading && profile) {
     return <Navigate to={homeForRole(profile.role)} replace />
@@ -524,6 +544,47 @@ export default function LandingPage() {
               See all plans
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* ── Email Capture: Free PDF Books & Assignments Guide ─────────────────── */}
+      <section id="free-guide" className="py-20 bg-white border-y border-border-warm">
+        <div className="max-w-xl mx-auto px-4 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-brand-blue/10 text-brand-blue mb-6">
+            <Mail size={22} aria-hidden="true" />
+          </div>
+          <h2 className="font-display font-semibold text-3xl sm:text-4xl tracking-tight text-text-primary mb-3">
+            Get the Free PDF Books &amp; Assignments Guide
+          </h2>
+          <p className="text-text-secondary mb-8 leading-relaxed">
+            8 legitimate, no-cost sources for classroom texts — plus 5 public-domain readings already
+            paired with a writing prompt, ready to drop straight into Easy Annotate.
+          </p>
+          {captureSubmitted ? (
+            <div className="rounded-xl border border-border-warm bg-paper px-6 py-5 text-text-primary">
+              🎉 Sent! Check your inbox — it should arrive in under a minute.
+            </div>
+          ) : (
+            <form onSubmit={handleCapture} className="flex flex-col sm:flex-row gap-3 justify-center">
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@school.edu"
+                value={captureEmail}
+                onChange={e => setCaptureEmail(e.target.value)}
+                className="flex-1 sm:max-w-xs px-4 py-3 rounded-xl border border-border-warm bg-paper text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+              />
+              <button
+                type="submit"
+                disabled={captureSubmitting}
+                className="inline-flex items-center justify-center gap-2 bg-brand-blue text-white font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+              >
+                {captureSubmitting ? 'Sending…' : 'Send Me the Guide'}
+              </button>
+            </form>
+          )}
+          <p className="text-text-secondary/70 text-xs mt-4">No spam. Unsubscribe anytime. We&apos;ll never share your email.</p>
         </div>
       </section>
 

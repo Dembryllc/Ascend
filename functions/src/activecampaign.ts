@@ -16,11 +16,11 @@ const TEACHER_LIST_ID = '12'
 const SOCIAL_SIGNUP_TAG_ID = '16'
 const SOCIAL_SOURCES = new Set(['linkedin', 'instagram'])
 
-interface AcContact {
+export interface AcContact {
   id: string
 }
 
-async function acRequest<T>(path: string, init: RequestInit): Promise<T> {
+export async function acRequest<T>(path: string, init: RequestInit): Promise<T> {
   const baseUrl = process.env.ACTIVECAMPAIGN_API_URL
   const apiKey = process.env.ACTIVECAMPAIGN_API_KEY
   if (!baseUrl || !apiKey) {
@@ -41,7 +41,7 @@ async function acRequest<T>(path: string, init: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-async function syncContact(email: string, displayName: string): Promise<AcContact> {
+export async function syncContact(email: string, displayName: string): Promise<AcContact> {
   const { contact } = await acRequest<{ contact: AcContact }>('/api/3/contact/sync', {
     method: 'POST',
     body: JSON.stringify({ contact: { email, firstName: displayName } }),
@@ -49,7 +49,7 @@ async function syncContact(email: string, displayName: string): Promise<AcContac
   return contact
 }
 
-async function addToList(contactId: string, listId: string): Promise<void> {
+export async function addToList(contactId: string, listId: string): Promise<void> {
   await acRequest('/api/3/contactLists', {
     method: 'POST',
     body: JSON.stringify({ contactList: { list: listId, contact: contactId, status: 1 } }),

@@ -6,6 +6,7 @@ import * as admin from 'firebase-admin'
 admin.initializeApp()
 
 export { syncTeacherSignupToActiveCampaign } from './activecampaign'
+export { subscribeLeadMagnet } from './leadMagnet'
 
 export const stripeWebhook = onRequest(
   { secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] },
