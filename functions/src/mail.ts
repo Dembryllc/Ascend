@@ -9,28 +9,38 @@ import { logger } from 'firebase-functions'
 // 100% completion for every contact while sending exactly zero emails. AC is
 // CRM-only now; delivery happens here.
 //
-// Required secrets:
-//   MAILGUN_API_KEY  — private API key ("key-…") from the Mailgun dashboard
-//   MAILGUN_DOMAIN   — verified sending domain, e.g. mg.easy-annotate.com
-//   MAILGUN_FROM     — From header; its domain MUST be easy-annotate.com or a
-//                      subdomain, or DMARC fails. A gmail.com From will bounce.
-export const MAIL_SECRETS = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN', 'MAILGUN_FROM'] as const
+// The API key is the only real secret. Domain and From are plain config, so
+// they live here as defaults rather than as secrets you have to provision —
+// one `functions:secrets:set` and this works.
+export const MAIL_SECRETS = ['MAILGUN_API_KEY'] as const
+
+// INTERIM (2026-08-08): sending from mg.databilityweb.com, which is already
+// verified in Mailgun (SPF include:mailgun.org, Mailgun MX). easy-annotate.com
+// has no sending domain — no SPF, no MX, no mg. subdomain — so a From on that
+// domain would fail SPF/DKIM outright.
+//
+// The From line therefore reads databilityweb.com on an Easy Annotate email.
+// Both are Dembry LLC and the body is fully Easy Annotate branded, so this is
+// a brand seam, not a deliverability problem. Same interim call as OfTheDay's
+// REPLY_TO. To move to the proper domain later: verify mg.easy-annotate.com in
+// Mailgun, then set MAILGUN_DOMAIN and MAILGUN_FROM as env overrides. No code
+// change, no redeploy of anything but config.
+const DEFAULT_DOMAIN = 'mg.databilityweb.com'
+const DEFAULT_FROM = 'Easy Annotate <hello@mg.databilityweb.com>'
 
 const REPLY_TO = 'dembryllc@gmail.com'
 const APP_URL = 'https://easy-annotate.com'
 
 export function mailConfigured(): boolean {
-  return Boolean(
-    process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN && process.env.MAILGUN_FROM,
-  )
+  return Boolean(process.env.MAILGUN_API_KEY)
 }
 
 export async function sendEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
   const apiKey = process.env.MAILGUN_API_KEY
-  const domain = process.env.MAILGUN_DOMAIN
-  const from = process.env.MAILGUN_FROM
-  if (!apiKey || !domain || !from) {
-    throw new Error('Mailgun not configured (MAILGUN_API_KEY / MAILGUN_DOMAIN / MAILGUN_FROM)')
+  const domain = process.env.MAILGUN_DOMAIN || DEFAULT_DOMAIN
+  const from = process.env.MAILGUN_FROM || DEFAULT_FROM
+  if (!apiKey) {
+    throw new Error('Mailgun not configured (MAILGUN_API_KEY)')
   }
 
   const body = new URLSearchParams({

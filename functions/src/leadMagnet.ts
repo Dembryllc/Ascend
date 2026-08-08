@@ -25,9 +25,8 @@ export const subscribeLeadMagnet = onCall(
       throw new HttpsError('invalid-argument', 'Valid email required')
     }
 
-    // The CRM write happens regardless of mail state. easy-annotate.com has no
-    // Mailgun sending domain yet, so until one exists this function captures the
-    // lead and logs a failed delivery rather than dropping the contact entirely.
+    // The CRM write happens regardless of mail state — a missing Mailgun key
+    // should cost the subscriber their guide, not their place on the list.
     let subscribed = false
     if (mailConfigured()) {
       try {
