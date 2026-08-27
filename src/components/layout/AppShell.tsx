@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import { logoutUser } from '@/firebase/auth'
+import { openBillingPortal } from '@/firebase/billing'
 import { getTrialDaysRemaining, homeForRole } from '@/types'
 import { stripeAnnualUrl } from '@/utils/stripe'
-import { BarChart3, BookOpen, Eye, Home, LogOut, MessageSquare, PenLine, TrendingUp, Upload, Users, X } from 'lucide-react'
+import { BarChart3, BookOpen, CreditCard, Eye, Home, Loader2, LogOut, MessageSquare, PenLine, TrendingUp, Upload, Users, X } from 'lucide-react'
 
 interface Props {
   children: React.ReactNode
@@ -76,6 +77,42 @@ function TrialBanner({ daysRemaining, upgradeUrl }: { daysRemaining: number; upg
   )
 }
 
+function ManageSubscriptionButton() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleClick() {
+    setLoading(true)
+    setError('')
+    try {
+      const url = await openBillingPortal()
+      window.location.href = url
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not open billing portal.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        aria-label="Manage subscription"
+        className="flex items-center gap-1.5 text-sm text-[#4B5563] hover:text-[#1A1D23] transition-colors px-3 py-2 rounded-lg hover:bg-[#F3F4F6] disabled:opacity-60"
+      >
+        {loading ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+        <span className="hidden sm:inline">Manage subscription</span>
+      </button>
+      {error && (
+        <p className="absolute right-0 top-full mt-1 w-56 text-xs text-red-600 bg-white border border-red-200 rounded-lg p-2 shadow-sm z-50">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function AppShell({ children, title }: Props) {
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -115,6 +152,7 @@ export default function AppShell({ children, title }: Props) {
                 {profile.displayName}
               </span>
             )}
+            {profile?.stripeCustomerId && <ManageSubscriptionButton />}
             <button
               onClick={handleLogout}
               aria-label="Sign out"
