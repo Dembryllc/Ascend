@@ -9,7 +9,15 @@ export { syncTeacherSignupToActiveCampaign } from './activecampaign'
 export { subscribeLeadMagnet } from './leadMagnet'
 
 export const stripeWebhook = onRequest(
-  { secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] },
+  {
+    secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
+    // Stripe calls this endpoint unauthenticated; the handler verifies every
+    // request with constructEvent() before doing anything. This must be set
+    // explicitly: firebase-tools only applies the Cloud Run invoker binding
+    // when it *creates* a function, so without it an updated deployment can
+    // silently keep a missing binding and 403 every Stripe delivery.
+    invoker: 'public',
+  },
   async (req, res) => {
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
