@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
+import OnboardingChecklist from '@/components/shared/OnboardingChecklist'
 import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BarChart3, BookOpen, CheckCircle2, Circle, Copy, CopyCheck, Users, Upload, Eye, Pencil, PenLine, X, Check } from 'lucide-react'
+import { BarChart3, BookOpen, Copy, CopyCheck, Users, Upload, Eye, Pencil, PenLine, X, Check } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile, refreshProfile } = useAuth()
@@ -276,52 +277,37 @@ function EmptyState({ message, action }: { message: string; action?: { to: strin
 }
 
 function TeacherOnboardingChecklist({ classroom, books }: { classroom: Classroom | null; books: Book[] }) {
-  const step1Done = classroom !== null
-  const step2Done = books.length > 0
-  const step3Done = (classroom?.studentIds.length ?? 0) > 0
-  const step4Done = books.some((b) => b.assignedStudentIds.length > 0)
-
-  if (step1Done && step2Done && step3Done && step4Done) return null
-
-  const steps = [
-    { done: step1Done, label: 'Create your classroom', to: '/teacher/classroom', hint: 'Get your 6-letter join code' },
-    { done: step2Done, label: 'Upload your first book', to: '/teacher/upload', hint: 'Add a PDF for students to read' },
-    { done: step3Done, label: 'Students join your classroom', to: '/teacher/classroom', hint: 'Share your join code — students enter it at sign-up or from their dashboard' },
-    { done: step4Done, label: 'Assign your book to students', to: '/teacher/classroom', hint: 'Go to Classroom → Assign to Whole Class' },
-  ]
-
   return (
-    <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-5 mb-6" role="region" aria-label="Setup checklist">
-      <h3 className="font-bold text-[#1A1D23] mb-0.5">Welcome! Let's set up your classroom</h3>
-      <p className="text-sm text-[#4B5563] mb-4">Follow these steps to get your first students reading.</p>
-      <ol className="space-y-3">
-        {steps.map((step, i) => (
-          <li key={i} className="flex items-start gap-3">
-            <span className="mt-0.5 shrink-0" aria-hidden="true">
-              {step.done
-                ? <CheckCircle2 size={20} className="text-[#5BB974]" />
-                : <Circle size={20} className="text-[#4A90D9]" />
-              }
-            </span>
-            <div className="flex-1 min-w-0">
-              <span className={`block text-sm font-semibold ${step.done ? 'text-[#9CA3AF] line-through' : 'text-[#1A1D23]'}`}>
-                {i + 1}. {step.label}
-              </span>
-              {!step.done && (
-                <span className="block text-xs text-[#4B5563] mt-0.5">{step.hint}</span>
-              )}
-            </div>
-            {!step.done && (
-              <Link
-                to={step.to}
-                className="shrink-0 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD] underline-offset-2 hover:underline"
-              >
-                Go →
-              </Link>
-            )}
-          </li>
-        ))}
-      </ol>
-    </div>
+    <OnboardingChecklist
+      title="Welcome! Let's set up your classroom"
+      subtitle="Follow these steps to get your first students reading."
+      ariaLabel="Setup checklist"
+      steps={[
+        {
+          done: classroom !== null,
+          label: 'Create your classroom',
+          hint: 'Get your 6-letter join code',
+          to: '/teacher/classroom',
+        },
+        {
+          done: books.length > 0,
+          label: 'Upload your first book',
+          hint: 'Add a PDF for students to read',
+          to: '/teacher/upload',
+        },
+        {
+          done: (classroom?.studentIds.length ?? 0) > 0,
+          label: 'Students join your classroom',
+          hint: 'Share your join code — students enter it at sign-up or from their dashboard',
+          to: '/teacher/classroom',
+        },
+        {
+          done: books.some((b) => b.assignedStudentIds.length > 0),
+          label: 'Assign your book to students',
+          hint: 'Go to Classroom → Assign to Whole Class',
+          to: '/teacher/classroom',
+        },
+      ]}
+    />
   )
 }
