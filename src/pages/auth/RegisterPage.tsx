@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser, loginWithGoogle } from '@/firebase/auth'
+import { useAuth } from '@/context/auth-context'
 import { homeForRole } from '@/types'
 import type { UserRole } from '@/types'
 import { BookOpen } from 'lucide-react'
@@ -27,6 +28,7 @@ function getAuthErrorMessage(err: unknown): string {
 
 export default function RegisterPage() {
   const navigate = useNavigate()
+  const { refreshProfile } = useAuth()
   const [role, setRole] = useState<UserRole>('student')
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -40,6 +42,9 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await loginWithGoogle(role)
+      // The auth listener read the profile before it was written — pull it in
+      // before navigating so ProtectedRoute doesn't see a missing profile.
+      await refreshProfile()
       navigate(homeForRole(role))
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
@@ -63,6 +68,12 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await registerUser(email, password, displayName, role, joinCode.trim() || undefined)
+      // createUserWithEmailAndPassword signs the user in before the Firestore
+      // profile exists, so the auth listener's first read comes back empty. Load
+      // the freshly written profile (and classroom join) before navigating —
+      // otherwise ProtectedRoute reports "Account setup incomplete" for an
+      // account that saved fine.
+      await refreshProfile()
       navigate(homeForRole(role))
     } catch (err: unknown) {
       setError(getAuthErrorMessage(err))

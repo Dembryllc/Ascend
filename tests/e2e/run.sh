@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SHOTS="${1:-e2e-shots}"
+# Flows run in order against one emulator/vite lifecycle. The writing flow runs
+# first so it sees the pristine seed; register adds students to the classroom.
+FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
@@ -28,10 +31,13 @@ for i in \$(seq 1 60); do
   sleep 1
 done
 
-echo '--- running playwright flow ---'
+echo '--- running playwright flows ---'
 set +e
-node tests/e2e/writing.e2e.mjs http://127.0.0.1:5173 '$SHOTS'
-RC=\$?
+RC=0
+for flow in $FLOWS; do
+  echo \"--- flow: \$flow ---\"
+  node \"\$flow\" http://127.0.0.1:5173 '$SHOTS' || RC=\$?
+done
 set -e
 kill \$VITE_PID 2>/dev/null || true
 exit \$RC
