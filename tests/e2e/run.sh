@@ -3,7 +3,7 @@ set -euo pipefail
 SHOTS="${1:-e2e-shots}"
 # Flows run in order against one emulator/vite lifecycle. The writing flow runs
 # first so it sees the pristine seed; register adds students to the classroom.
-FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs}"
+FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs tests/e2e/pdftext.e2e.mjs}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
@@ -13,6 +13,7 @@ cd "$ROOT"
 set -e
 echo '--- seeding ---'
 node tests/e2e/seed.mjs
+node tests/e2e/seed-pdfs.mjs
 
 echo '--- starting vite (emulator mode) ---'
 VITE_USE_EMULATORS=true \

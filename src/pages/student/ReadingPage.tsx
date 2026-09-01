@@ -10,7 +10,7 @@ import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, delet
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
 import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
-import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target, LayoutGrid, Image as ImageIcon } from 'lucide-react'
 import OrganizerModal from '@/components/student/OrganizerModal'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -47,6 +47,12 @@ export default function ReadingPage() {
   const [readerError, setReaderError] = useState('')
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
   const [readAloudStatus, setReadAloudStatus] = useState('')
+  // Whether THIS page carries a PDF text layer. Scans, photos and design-tool
+  // exports are images with no text underneath — highlighting and read aloud
+  // both need that layer, so say so instead of silently doing nothing.
+  // Recorded per page number so a result from the page you just left can never
+  // describe the page you are on now.
+  const [pageTextProbe, setPageTextProbe] = useState<{ page: number; hasText: boolean } | null>(null)
   const [reflectionText, setReflectionText] = useState('')
   const [reflectionError, setReflectionError] = useState('')
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
@@ -234,6 +240,24 @@ export default function ReadingPage() {
     })
     return () => cancelAnimationFrame(id)
   }, [currentPage])
+
+  // Probe the current page for extractable text (see pageTextStatus above).
+  useEffect(() => {
+    if (!pdfDocument) return
+    let cancelled = false
+    const page = currentPage
+    ;(async () => {
+      let hasText = true // never block reading on a failed probe
+      try {
+        const content = await (await pdfDocument.getPage(page)).getTextContent()
+        hasText = content.items.some(
+          (item) => typeof item === 'object' && item && 'str' in item && String(item.str).trim().length > 0,
+        )
+      } catch { /* leave hasText true — read aloud reports its own error */ }
+      if (!cancelled) setPageTextProbe({ page, hasText })
+    })()
+    return () => { cancelled = true }
+  }, [pdfDocument, currentPage])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -565,6 +589,7 @@ export default function ReadingPage() {
     </div>
   )
 
+  const pageIsImageOnly = pageTextProbe?.page === currentPage && !pageTextProbe.hasText
   const hasAnnotationOnPage = pageAnnotations.length > 0
   const annotatedPages = new Set(annotations.map((a) => a.pageNumber))
   const reflectionCount = annotations.filter((a) => a.annotationKind === 'reflection').length
@@ -612,7 +637,9 @@ export default function ReadingPage() {
               <button
                 onClick={speakPage}
                 aria-label="Read page aloud"
-                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#4A90D9] hover:bg-blue-50 transition-colors font-semibold text-sm"
+                disabled={pageIsImageOnly}
+                title={pageIsImageOnly ? 'This page is a picture — there is no text to read aloud' : undefined}
+                className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#4A90D9] hover:bg-blue-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors font-semibold text-sm"
               >
                 <Volume2 size={20} />
                 <span className="hidden sm:inline">Read aloud</span>
@@ -716,6 +743,29 @@ export default function ReadingPage() {
                 />
               </div>
             </section>
+
+            {/* Image-only page (scan, photo, design export) — no text layer to work with */}
+            {pageIsImageOnly && (
+              <section
+                role="status"
+                className="w-full mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3"
+              >
+                <div className="bg-amber-100 text-amber-700 p-2 rounded-xl shrink-0">
+                  <ImageIcon size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-[#1A1D23] text-sm">This page is a picture, not text</p>
+                  <p className="text-sm text-[#4B5563] mt-1">
+                    It was scanned or photographed, so there are no words underneath to select. That means
+                    highlighting a passage and Read aloud can&apos;t work on this page.
+                  </p>
+                  <p className="text-sm text-[#4B5563] mt-2">
+                    You can still tap an emoji below and write a note about this page. To highlight and
+                    listen, use a PDF saved straight from a document rather than a scan.
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* PDF */}
             <div className="flex-1 w-full flex justify-center">
@@ -991,7 +1041,9 @@ export default function ReadingPage() {
                 </div>
               ) : (
                 <div className="bg-[#F8F9FC] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#6B7280]">
-                  Select text on the page before choosing a reaction to attach a passage.
+                  {pageIsImageOnly
+                    ? 'This page is a picture, so there is no text to attach. Write a note instead.'
+                    : 'Select text on the page before choosing a reaction to attach a passage.'}
                 </div>
               )}
             </div>

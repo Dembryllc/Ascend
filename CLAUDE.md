@@ -32,6 +32,7 @@
 - **`user-select: none`** — do not apply inside `#pdf-container`. Breaks text selection for annotation.
 - **Registration step order** — profile `setDoc` must happen BEFORE classroom join in `registerUser()`. Do not reorder. See `src/firebase/auth.ts`.
 - **Registration profile race** — `createUserWithEmailAndPassword` signs the user in *before* `registerUser()` writes the Firestore profile, so `onAuthStateChanged` fires and reads an empty profile (a class join code widens the window with two extra round-trips). Three guards must stay in place, or new accounts get a false "Account setup incomplete": (1) `AuthContext` re-reads the profile with backoff (`PROFILE_RETRY_DELAYS_MS`) before settling on `null`, (2) `RegisterPage` awaits `refreshProfile()` before `navigate()`, (3) `ProtectedRoute` does one more `refreshProfile()` before showing the recovery screen. Covered by `tests/e2e/register.e2e.mjs`.
+- **Text layer is required for highlighting + read aloud** — both features read the PDF's text layer (`getTextContent()`). A scanned, photographed, or design-tool-exported PDF is a picture with no text underneath, so both are impossible on it however well the page renders. `ReadingPage` probes each page (`pageTextProbe` / `pageIsImageOnly`) and shows a "This page is a picture, not text" notice plus a disabled Read aloud button. Emoji reactions and typed notes still work on those pages — do not gate them on the text layer. There is no OCR; adding it is the only way to change this. Covered by `tests/e2e/pdftext.e2e.mjs`.
 - **`annotationKind` values** — `'annotation'` | `'reflection'` only. These are stored together and filtered throughout.
 - **`TrialExpiredModal` vs `UpgradeModal`** — expired trial teachers get `TrialExpiredModal`. Free-tier teachers (never had trial) get `UpgradeModal`. Not interchangeable.
 - **Text selection capture** — `capturedSelection` state is intentionally NOT cleared when live selection goes empty. This is required on mobile because tapping the emoji bar clears `window.getSelection()` before the click fires.
@@ -80,9 +81,12 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
 - **Browser E2E:** `npm run test:e2e` boots Auth+Firestore emulators (`firebase.emulator.json`),
   seeds a teacher/student/task (`tests/e2e/seed.mjs`), runs Vite with `VITE_USE_EMULATORS=true`, and
   drives Chromium through the full write → review → feedback loop (`tests/e2e/writing.e2e.mjs`)
-  and then the sign-up regression flow (`tests/e2e/register.e2e.mjs` — student registration with and
-  without a class join code, asserting the "Account setup incomplete" screen never appears),
-  screenshotting each step. `run.sh` takes the screenshot dir as `$1` and a space-separated flow list
+  then the sign-up regression flow (`tests/e2e/register.e2e.mjs` — student registration with and
+  without a class join code, asserting the "Account setup incomplete" screen never appears), then the
+  image-only-PDF flow (`tests/e2e/pdftext.e2e.mjs` — the same colourful page as a text-layer PDF and
+  as a scan, asserting selection + read aloud work on one and are explained away on the other),
+  screenshotting each step. `tests/e2e/seed-pdfs.mjs` seeds the two fixture books;
+  `tests/e2e/fixtures/make-pdfs.mjs` regenerates the fixture PDFs. `run.sh` takes the screenshot dir as `$1` and a space-separated flow list
   as `$2`. `src/firebase/config.ts` connects to the emulators only when
   `VITE_USE_EMULATORS === 'true'` (no-op in prod). Dev-only dep: `playwright` (uses the image's
   pre-installed Chromium via `executablePath`, so no `playwright install`).
