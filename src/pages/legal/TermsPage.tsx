@@ -100,6 +100,7 @@ export default function TermsPage() {
         <div className="max-w-4xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-[#9CA3AF]">
           <span>© 2026 Easy Annotate. All rights reserved.</span>
           <div className="flex gap-4">
+            <Link to="/accessibility" className="hover:text-[#4A90D9]">Accessibility</Link>
             <Link to="/privacy" className="hover:text-[#4A90D9]">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-[#4A90D9]">Terms of Service</Link>
           </div>

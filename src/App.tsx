@@ -14,6 +14,7 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const PrivacyPage = lazy(() => import('@/pages/legal/PrivacyPage'))
 const TermsPage = lazy(() => import('@/pages/legal/TermsPage'))
 const PricingPage = lazy(() => import('@/pages/legal/PricingPage'))
+const AccessibilityPage = lazy(() => import('@/pages/legal/AccessibilityPage'))
 
 // Teacher
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'))
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/accessibility" element={<AccessibilityPage />} />
 
             {/* Teacher */}
             <Route path="/teacher" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />

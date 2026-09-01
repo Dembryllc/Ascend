@@ -182,6 +182,7 @@ export default function AppShell({ children, title }: Props) {
           <span>© 2026 Easy Annotate</span>
           <div className="flex gap-4">
             <Link to="/pricing" className="hover:text-[#4A90D9]">Pricing</Link>
+            <Link to="/accessibility" className="hover:text-[#4A90D9]">Accessibility</Link>
             <Link to="/privacy" className="hover:text-[#4A90D9]">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-[#4A90D9]">Terms of Service</Link>
             <a
