@@ -10,8 +10,7 @@ import { joinClassroomByCode } from '@/firebase/classrooms'
 import { getWritingTasksForLearner, deleteWritingTask } from '@/firebase/writingTasks'
 import { getWritingResponsesByStudent, deleteWritingResponse } from '@/firebase/writingResponses'
 import { getWritingFeedbackByStudent } from '@/firebase/writingFeedback'
-import type { Annotation, Book, ReadingProgress, ReactionType, WritingTask, WritingResponse, WritingFeedback } from '@/types'
-import { REACTIONS } from '@/types'
+import type { Annotation, Book, ReadingProgress, WritingTask, WritingResponse, WritingFeedback } from '@/types'
 import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
 import { buildStudentProgressSummary } from '@/utils/studentProgress'
 import WritingTaskModal from '@/components/writing/WritingTaskModal'
@@ -23,14 +22,12 @@ import {
   CheckCircle2,
   Circle,
   Eye,
-  Flame,
   LayoutGrid,
   MessageSquare,
   Plus,
   Sparkles,
   Target,
   Trash2,
-  TrendingUp,
   UserCheck,
 } from 'lucide-react'
 
@@ -160,7 +157,6 @@ export default function StudentHome() {
   const myBooks = books.filter((b) => b.uploadedBy === profile?.uid)
   const assignedBooks = books.filter((b) => b.uploadedBy !== profile?.uid)
   const progress = buildStudentProgressSummary(books, annotations, readingProgress)
-  const bookTitleById = new Map(books.map((book) => [book.id, book.title]))
   const progressByBookId = new Map(readingProgress.map((row) => [row.bookId, row]))
   const responseByTaskId = new Map(writingResponses.map((r) => [r.taskId, r]))
   const feedbackByTaskId = new Map(writingFeedback.filter((f) => f.reviewed).map((f) => [f.taskId, f]))
@@ -307,7 +303,9 @@ export default function StudentHome() {
         </>
       )}
 
-      {/* Progress dashboard */}
+      {/* Progress snapshot — "am I on track?" and "what next?".
+          The detailed view (per-book breakdown, reaction mix, streak) lives on
+          /student/progress; don't duplicate it here. */}
       <section className="mt-8 mb-8" aria-labelledby="progress-heading">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
@@ -315,31 +313,19 @@ export default function StudentHome() {
             <p className="text-sm text-[#4B5563]">Your reading activity updates from your books and annotations.</p>
           </div>
           <Link
-            to="/student/annotations"
+            to="/student/progress"
             className="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD]"
           >
-            View notes <ArrowRight size={16} />
+            See full progress <ArrowRight size={16} />
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <ProgressCard
-            icon={<BookOpen size={20} />}
-            label="Books in shelf"
-            value={progress.booksInShelf.toString()}
-            detail={`${assignedBooks.length} assigned, ${myBooks.length} uploaded`}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <ProgressCard
             icon={<MessageSquare size={20} />}
             label="Annotations"
             value={progress.annotationsCount.toString()}
             detail={`${progress.pagesAnnotated} page${progress.pagesAnnotated === 1 ? '' : 's'} annotated`}
-          />
-          <ProgressCard
-            icon={<Flame size={20} />}
-            label="Minutes read"
-            value={`${progress.minutesRead}`}
-            detail={`${progress.completedBooks} completed, ${progress.booksInProgress} in progress`}
           />
           <ProgressCard
             icon={<Target size={20} />}
@@ -348,16 +334,15 @@ export default function StudentHome() {
             detail="pages annotated this week"
             meterValue={progress.weeklyGoalPercent}
           />
+          <NextActionCard progress={progress} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <NextActionCard progress={progress} />
-          <ReactionMixCard reactionCounts={progress.reactionCounts} topReaction={progress.topReaction} />
-          <RecentActivityCard
-            annotations={progress.recentAnnotations}
-            bookTitleById={bookTitleById}
-          />
-        </div>
+        <Link
+          to="/student/progress"
+          className="sm:hidden mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-[#4A90D9] hover:text-[#357ABD]"
+        >
+          See full progress <ArrowRight size={16} />
+        </Link>
       </section>
 
       {/* Standalone writing modals */}
@@ -479,103 +464,6 @@ function NextActionCard({ progress }: { progress: ReturnType<typeof buildStudent
         {progress.nextBook ? 'Open reader' : 'Upload book'} <ArrowRight size={16} />
       </span>
     </Link>
-  )
-}
-
-function ReactionMixCard({
-  reactionCounts,
-  topReaction,
-}: {
-  reactionCounts: Record<ReactionType, number>
-  topReaction: ReactionType | null
-}) {
-  const total = Object.values(reactionCounts).reduce((sum, count) => sum + count, 0)
-
-  return (
-    <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm p-5 min-h-48">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="bg-purple-50 text-[#9B7FD4] p-2 rounded-xl">
-          <TrendingUp size={20} />
-        </span>
-        <div>
-          <h4 className="font-bold text-[#1A1D23]">Reaction Mix</h4>
-          <p className="text-xs text-[#4B5563]">
-            {topReaction ? `Most used: ${REACTIONS[topReaction].label}` : 'No reactions yet'}
-          </p>
-        </div>
-      </div>
-      <div className="space-y-3">
-        {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, reaction]) => {
-          const count = reactionCounts[type]
-          const percent = total > 0 ? Math.round((count / total) * 100) : 0
-          return (
-            <div key={type}>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-semibold text-[#1A1D23]">{reaction.emoji} {reaction.label}</span>
-                <span className="text-[#4B5563]">{count}</span>
-              </div>
-              <div className="h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${percent}%`, backgroundColor: reaction.color }}
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function RecentActivityCard({
-  annotations,
-  bookTitleById,
-}: {
-  annotations: Annotation[]
-  bookTitleById: Map<string, string>
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-[#F3F4F6] shadow-sm p-5 min-h-48">
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div>
-          <h4 className="font-bold text-[#1A1D23]">Recent Activity</h4>
-          <p className="text-xs text-[#4B5563]">Latest annotations across your shelf</p>
-        </div>
-        <Link to="/student/annotations" className="text-[#4A90D9] hover:text-[#357ABD]" aria-label="View all annotations">
-          <ArrowRight size={18} />
-        </Link>
-      </div>
-
-      {annotations.length === 0 ? (
-        <p className="text-sm text-[#4B5563] leading-relaxed">
-          Your newest notes will appear here after you annotate a page.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {annotations.map((annotation) => {
-            const reaction = REACTIONS[annotation.reactionType]
-            return (
-              <Link
-                key={annotation.id}
-                to={`/student/read/${annotation.bookId}`}
-                className="flex items-start gap-3 rounded-xl hover:bg-[#F8F9FC] transition-colors"
-              >
-                <span className="text-2xl leading-none" aria-hidden="true">{reaction.emoji}</span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-[#1A1D23] truncate">
-                    {bookTitleById.get(annotation.bookId) ?? 'Unknown Book'}
-                  </span>
-                  <span className="block text-xs text-[#4B5563]">
-                    Page {annotation.pageNumber} • {annotation.timestamp.toLocaleDateString()}
-                  </span>
-                </span>
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
   )
 }
 
