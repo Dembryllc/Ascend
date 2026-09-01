@@ -132,9 +132,15 @@ export default function PricingPage() {
                 </a>
               </div>
             ) : (
-              <div className="w-full text-center py-3 rounded-xl bg-white/10 text-sm text-white/60">
-                Upgrade coming soon
-              </div>
+              // No checkout URL configured for this build. Never dead-end a buyer on the
+              // pricing page — the upgrade modals fall back to /pricing, and /pricing is
+              // the end of the line, so it has to offer a way through.
+              <a
+                href="mailto:dembryllc@gmail.com?subject=Easy%20Annotate%20Pro%20upgrade"
+                className="block w-full text-center py-3 rounded-xl bg-[#F5C842] text-[#1A1D23] font-bold hover:bg-[#E6B93A] transition-colors"
+              >
+                Contact us to upgrade
+              </a>
             )}
           </div>
         </div>
