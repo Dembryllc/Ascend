@@ -26,6 +26,26 @@ function toResponse(id: string, data: Record<string, unknown>): OrganizerRespons
   }
 }
 
+// Teacher-side lookup. Must filter on classroomId, not studentId/bookId: the organizers
+// read rule grants teachers access only through its classroomId branch, so a
+// studentId+bookId query is rejected with permission-denied for a teacher every time —
+// even when it would match zero documents, because the denial is based on the query shape
+// rather than the result set. getOrganizerResponse below is the student's own path.
+export async function getOrganizerResponseForTeacher(
+  classroomId: string,
+  studentId: string,
+  bookId: string,
+): Promise<OrganizerResponse | null> {
+  const snap = await getDocs(query(
+    collection(db, 'organizers'),
+    where('classroomId', '==', classroomId),
+  ))
+  const match = snap.docs.find(
+    (d) => d.data().studentId === studentId && d.data().bookId === bookId,
+  )
+  return match ? toResponse(match.id, match.data()) : null
+}
+
 export async function getOrganizerResponse(
   studentId: string,
   bookId: string,

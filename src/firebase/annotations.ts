@@ -101,6 +101,26 @@ export async function getAnnotationsByStudent(studentId: string): Promise<Annota
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
 }
 
+// Every annotation in a classroom, in one query.
+//
+// Filtering on classroomId is not incidental — it mirrors the annotations read rule's own
+// classroomId branch, which is what lets Firestore prove the query safe for a teacher.
+// A bookId-filtered query over the same documents is rejected with permission-denied even
+// when the teacher owns the book (see getAnnotationsByClassAndBook below). Same reason
+// getReadingProgressByClassroom filters on classroomId.
+export async function getAnnotationsByClassroom(classroomId: string): Promise<Annotation[]> {
+  const q = query(
+    collection(db, 'annotations'),
+    where('classroomId', '==', classroomId),
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map((d) => toAnnotation(d.id, d.data()))
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+}
+
+// NOTE: unused, and does not work for a teacher — the bookId-filtered query is rejected by
+// the annotations read rule. Use getAnnotationsByClassroom instead.
 export async function getAnnotationsByClassAndBook(
   studentIds: string[],
   bookId: string,

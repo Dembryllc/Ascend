@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { getBooksByTeacher } from '@/firebase/books'
-import { getAnnotationsByStudentAndBook } from '@/firebase/annotations'
+import { getAnnotationsByStudentAndBook, getAnnotationsByClassroom } from '@/firebase/annotations'
 import { getReadingProgress } from '@/firebase/readingProgress'
-import { getOrganizerResponse } from '@/firebase/organizers'
+import { getOrganizerResponseForTeacher } from '@/firebase/organizers'
 import { getUserProfile } from '@/firebase/auth'
 import type { Annotation, Book, OrganizerResponse, ReadingProgress, UserProfile } from '@/types'
 import { isPro, REACTIONS } from '@/types'
@@ -14,7 +14,7 @@ import { exportAnnotationsPDF } from '@/utils/exportPDF'
 import { exportOrganizerPDF } from '@/utils/exportOrganizerPDF'
 import { buildAnnotationSummary } from '@/utils/teacherSummary'
 import { ORGANIZER_TEMPLATES } from '@/data/organizerTemplates'
-import { BarChart3, FileDown, FileText, Lightbulb, Lock, LayoutGrid } from 'lucide-react'
+import { BarChart3, FileDown, FileText, Lightbulb, Lock, LayoutGrid, ChevronRight, MessageSquare } from 'lucide-react'
 import UpgradeModal from '@/components/shared/UpgradeModal'
 import TrialExpiredModal from '@/components/shared/TrialExpiredModal'
 
@@ -26,6 +26,9 @@ export default function AnnotationsViewerPage() {
   const [students, setStudents] = useState<UserProfile[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [selectedStudent, setSelectedStudent] = useState(searchParams.get('student') ?? '')
+  // Captured once at mount: the loader resolves this student's best book when the activity
+  // index arrives. A ref keeps it out of the loader's dependency list.
+  const deepLinkedStudent = useRef(searchParams.get('student') ?? '')
   const [selectedBook, setSelectedBook] = useState('')
   const [activeTab, setActiveTab] = useState<'annotations' | 'organizer'>('annotations')
   const [annotations, setAnnotations] = useState<Annotation[]>([])
@@ -37,6 +40,11 @@ export default function AnnotationsViewerPage() {
   const [fetchError, setFetchError] = useState('')
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [docxExporter, setDocxExporter] = useState<OrganizerDocxExporter | null>(null)
+  // Class-wide annotation index, so the page can show where the activity is instead of
+  // making the teacher guess a student/book pair. Keyed studentId -> bookId -> count.
+  const [classroomId, setClassroomId] = useState<string | null>(null)
+  const [activity, setActivity] = useState<Map<string, Map<string, number>>>(new Map())
+  const [lastActivityAt, setLastActivityAt] = useState<Map<string, Date>>(new Map())
 
   useEffect(() => {
     if (!profile) return
@@ -45,9 +53,31 @@ export default function AnnotationsViewerPage() {
       getBooksByTeacher(profile.uid),
     ]).then(async ([classroom, bks]) => {
       setBooks(bks)
+      const studentIds = classroom?.studentIds ?? []
+      setClassroomId(classroom?.id ?? null)
       if (classroom) {
-        const profs = await Promise.all(classroom.studentIds.map((id) => getUserProfile(id)))
+        const profs = await Promise.all(studentIds.map((id) => getUserProfile(id)))
         setStudents(profs.filter(Boolean) as UserProfile[])
+      }
+      // One query for the whole class, filtered on classroomId because that is the condition
+      // the annotations read rule itself checks — a bookId or studentId filter over the same
+      // documents is rejected with permission-denied even for the owning teacher.
+      if (classroom) {
+        const classAnnotations = await getAnnotationsByClassroom(classroom.id)
+        const counts = new Map<string, Map<string, number>>()
+        const latest = new Map<string, Date>()
+        classAnnotations.forEach((a) => {
+          const byBook = counts.get(a.studentId) ?? new Map<string, number>()
+          byBook.set(a.bookId, (byBook.get(a.bookId) ?? 0) + 1)
+          counts.set(a.studentId, byBook)
+          const prev = latest.get(a.studentId)
+          if (!prev || a.timestamp > prev) latest.set(a.studentId, a.timestamp)
+        })
+        setActivity(counts)
+        setLastActivityAt(latest)
+        // ?student= deep link from Class Progress: open their best book now that we know it.
+        const deepLinked = deepLinkedStudent.current
+        if (deepLinked && counts.has(deepLinked)) setSelectedBook(bestBookFor(deepLinked, counts))
       }
       setLoading(false)
     }).catch((err: unknown) => {
@@ -65,13 +95,19 @@ export default function AnnotationsViewerPage() {
     setReadingProgress(null)
     setOrganizerResponse(null)
     try {
-      const [ann, progress, organizer] = await Promise.all([
+      // The organizer is supplementary — a failure there must never take down the
+      // annotations, which are the point of this screen. It previously shared a
+      // Promise.all with them, so one rejected read blanked the whole view.
+      const [ann, progress] = await Promise.all([
         getAnnotationsByStudentAndBook(selectedStudent, selectedBook),
         getReadingProgress(selectedStudent, selectedBook),
-        getOrganizerResponse(selectedStudent, selectedBook),
       ])
       setAnnotations(ann)
       setReadingProgress(progress)
+      const organizer = classroomId
+        ? await getOrganizerResponseForTeacher(classroomId, selectedStudent, selectedBook)
+            .catch(() => null)
+        : null
       setOrganizerResponse(organizer)
     } catch (err: unknown) {
       console.error('Failed to load annotations:', err)
@@ -90,6 +126,29 @@ export default function AnnotationsViewerPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudent, selectedBook])
+
+  function bestBookFor(uid: string, index: Map<string, Map<string, number>>): string {
+    const byBook = index.get(uid)
+    if (!byBook || byBook.size === 0) return ''
+    return [...byBook.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  }
+
+  // Choosing a student opens their most-annotated book straight away, rather than leaving
+  // the teacher to guess which book has anything in it.
+  function selectStudent(uid: string, index = activity) {
+    setSelectedStudent(uid)
+    setSelectedBook(bestBookFor(uid, index))
+    setAnnotations([])
+    setReadingProgress(null)
+    setOrganizerResponse(null)
+    setFetchError('')
+  }
+
+  function totalFor(uid: string) {
+    const byBook = activity.get(uid)
+    if (!byBook) return 0
+    return [...byBook.values()].reduce((sum, n) => sum + n, 0)
+  }
 
   const selectedStudentProfile = students.find((s) => s.uid === selectedStudent)
   const selectedBookData = books.find((b) => b.id === selectedBook)
@@ -158,7 +217,50 @@ export default function AnnotationsViewerPage() {
         </div>
       )}
 
-      {/* Selector */}
+      {/* Roster — the landing view. Class Progress already proved this pattern: show where the
+          activity is and let the teacher click in, instead of demanding two selections first. */}
+      {!selectedStudent && students.length > 0 && (
+        <div className="space-y-3 mb-6">
+          {[...students]
+            .sort((a, b) => (totalFor(b.uid) - totalFor(a.uid)) || a.displayName.localeCompare(b.displayName))
+            .map((s) => {
+              const total = totalFor(s.uid)
+              const last = lastActivityAt.get(s.uid)
+              const bookCount = activity.get(s.uid)?.size ?? 0
+              return (
+                <button
+                  key={s.uid}
+                  onClick={() => selectStudent(s.uid)}
+                  className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border border-[#F3F4F6] hover:border-[#4A90D9] transition-colors flex items-center gap-4"
+                >
+                  <div className={`shrink-0 p-2.5 rounded-xl ${total > 0 ? 'bg-blue-50 text-[#4A90D9]' : 'bg-[#F3F4F6] text-[#9CA3AF]'}`}>
+                    <MessageSquare size={20} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-[#1A1D23] truncate">{s.displayName}</p>
+                    <p className="text-sm text-[#4B5563]">
+                      {total === 0
+                        ? 'No annotations yet'
+                        : `${total} annotation${total === 1 ? '' : 's'} across ${bookCount} book${bookCount === 1 ? '' : 's'}`}
+                      {last && ` · last ${last.toLocaleDateString()}`}
+                    </p>
+                  </div>
+                  <ChevronRight size={20} className="shrink-0 text-[#9CA3AF]" />
+                </button>
+              )
+            })}
+        </div>
+      )}
+
+      {!selectedStudent && students.length === 0 && !loadError && (
+        <div className="text-center py-12 bg-white rounded-2xl border border-[#F3F4F6] mb-6">
+          <p className="font-bold text-[#1A1D23] mb-1">No students yet</p>
+          <p className="text-[#4B5563] text-sm">Share your class join code — annotations appear here once students start reading.</p>
+        </div>
+      )}
+
+      {/* Selector — only once a student is chosen; the roster is the entry point. */}
+      {selectedStudent && (
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6] mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
@@ -166,13 +268,7 @@ export default function AnnotationsViewerPage() {
             <select
               id="select-student"
               value={selectedStudent}
-              onChange={(e) => {
-                setSelectedStudent(e.target.value)
-                setAnnotations([])
-                setReadingProgress(null)
-                setOrganizerResponse(null)
-                setFetchError('')
-              }}
+              onChange={(e) => selectStudent(e.target.value)}
               className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
             >
               <option value="">Select a student…</option>
@@ -200,11 +296,10 @@ export default function AnnotationsViewerPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={fetchAnnotations}
-            disabled={!selectedStudent || !selectedBook || fetching}
-            className="bg-[#4A90D9] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#357ABD] disabled:opacity-50 transition-colors"
+            onClick={() => { setSelectedStudent(''); setSelectedBook(''); setAnnotations([]); setReadingProgress(null); setOrganizerResponse(null); setFetchError('') }}
+            className="text-sm font-semibold text-[#4A90D9] hover:text-[#357ABD] px-2 py-2.5"
           >
-            {fetching ? 'Loading…' : 'Refresh'}
+            ← All students
           </button>
           {annotations.length > 0 && (
             isPro(profile) ? (
@@ -252,6 +347,8 @@ export default function AnnotationsViewerPage() {
           )}
         </div>
       </div>
+
+      )}
 
       {/* Tab switcher */}
       {(annotations.length > 0 || organizerResponse) && (
