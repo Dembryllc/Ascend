@@ -30,7 +30,10 @@ jobs:
           java-version: '21'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        # Retry once through a cleared cache: the runner's shared npm cache
+        # intermittently corrupts, failing `npm ci` with EEXIST/ENOENT on a
+        # _cacache rename before anything is built (run #88). Harmless on success.
+        run: npm ci --legacy-peer-deps || (npm cache clean --force && npm ci --legacy-peer-deps)
 
       - name: Firestore rules tests
         run: npm run test:rules
@@ -51,7 +54,10 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        # Retry once through a cleared cache: the runner's shared npm cache
+        # intermittently corrupts, failing `npm ci` with EEXIST/ENOENT on a
+        # _cacache rename before anything is built (run #88). Harmless on success.
+        run: npm ci --legacy-peer-deps || (npm cache clean --force && npm ci --legacy-peer-deps)
 
       - name: Build
         run: npm run build
