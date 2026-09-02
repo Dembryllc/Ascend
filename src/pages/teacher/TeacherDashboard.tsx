@@ -7,7 +7,7 @@ import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BookOpen, Copy, CopyCheck, Users, Eye, Pencil, X, Check } from 'lucide-react'
+import { BarChart3, BookOpen, Copy, CopyCheck, Users, Upload, Eye, Pencil, PenLine, X, Check } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile, refreshProfile } = useAuth()
@@ -178,6 +178,16 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
+      {/* Quick actions */}
+      <h3 className="text-lg font-bold text-[#1A1D23] mb-3">Quick Actions</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <ActionCard to="/teacher/upload" icon={<Upload size={20} />} label="Upload a Book" desc="Add a new PDF to your library" color="blue" />
+        <ActionCard to="/teacher/writing" icon={<PenLine size={20} />} label="Writing Tasks" desc="Assign book-free graphic organizers" color="green" />
+        <ActionCard to="/teacher/classroom" icon={<Users size={20} />} label="Manage Classroom" desc="View students and join code" color="green" />
+        <ActionCard to="/teacher/annotations" icon={<Eye size={20} />} label="View Annotations" desc="See student reading notes" color="purple" />
+        <ActionCard to="/teacher/progress" icon={<BarChart3 size={20} />} label="Class Progress" desc="Reading time and completion rates" color="blue" />
+      </div>
+
       {/* Books list */}
       <h3 className="text-lg font-bold text-[#1A1D23] mb-3">Your Books</h3>
       {books.length === 0 ? (
@@ -207,6 +217,25 @@ function StatCard({ icon, label, value, color, isText }: {
       <div className={`font-bold ${isText ? 'text-lg' : 'text-3xl'} text-[#1A1D23]`}>{value}</div>
       <div className="text-sm text-[#4B5563] mt-0.5">{label}</div>
     </div>
+  )
+}
+
+function ActionCard({ to, icon, label, desc, color }: {
+  to: string; icon: React.ReactNode; label: string; desc: string; color: string
+}) {
+  const colors: Record<string, string> = {
+    blue: 'bg-[#4A90D9] hover:bg-[#357ABD]',
+    green: 'bg-[#5BB974] hover:bg-[#4AA863]',
+    purple: 'bg-[#9B7FD4] hover:bg-[#8A6EC3]',
+  }
+  return (
+    <Link to={to} className={`${colors[color]} text-white rounded-2xl p-5 flex items-start gap-3 transition-colors`}>
+      <div className="bg-white/20 p-2 rounded-xl">{icon}</div>
+      <div>
+        <div className="font-bold text-base">{label}</div>
+        <div className="text-sm opacity-90 mt-0.5">{desc}</div>
+      </div>
+    </Link>
   )
 }
 
