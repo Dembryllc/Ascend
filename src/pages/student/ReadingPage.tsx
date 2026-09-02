@@ -12,6 +12,8 @@ import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
 import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target, LayoutGrid, Image as ImageIcon } from 'lucide-react'
 import OrganizerModal from '@/components/student/OrganizerModal'
+import ReadAloudBar from '@/components/student/ReadAloudBar'
+import { useReadAloud } from '@/hooks/useReadAloud'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -46,7 +48,6 @@ export default function ReadingPage() {
   const [loadingBook, setLoadingBook] = useState(true)
   const [readerError, setReaderError] = useState('')
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
-  const [readAloudStatus, setReadAloudStatus] = useState('')
   // Whether THIS page carries a PDF text layer. Scans, photos and design-tool
   // exports are images with no text underneath — highlighting and read aloud
   // both need that layer, so say so instead of silently doing nothing.
@@ -58,12 +59,33 @@ export default function ReadingPage() {
   const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null)
   const [markingComplete, setMarkingComplete] = useState(false)
   const lastProgressTickRef = useRef(0)
-  const highlightedSpanRef = useRef<HTMLElement | null>(null)
   const [capturedSelection, setCapturedSelection] = useState('')
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
-  const [isSpeaking, setIsSpeaking] = useState(false)
   const [organizerOpen, setOrganizerOpen] = useState(false)
   const shouldOpenWritingTask = searchParams.get('writingTask') === '1'
+
+  // Extracting the page's text is this page's job; everything about speaking it
+  // — chunking, skipping, speed, voice — lives in useReadAloud.
+  const getPageText = useCallback(async () => {
+    if (!pdfDocument) throw new Error('pdf not ready')
+    const page = await pdfDocument.getPage(currentPage)
+    const content = await page.getTextContent()
+    const rawText = content.items
+      .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
+      .join(' ')
+
+    // Clean up common PDF extraction artifacts before speaking
+    return rawText
+      .replace(/(\w)-\s+(\w)/g, '$1$2')        // rejoin hyphenated line-breaks: "nat- ural" → "natural"
+      .replace(/\s+/g, ' ')                      // collapse whitespace
+      .replace(/\b(\d{1,3})\b(?=\s|$)/g, '')   // strip bare page numbers
+      .replace(/[ \t]{2,}/g, ' ')               // remove extra spaces
+      .trim()
+  }, [pdfDocument, currentPage])
+
+  const readAloud = useReadAloud(getPageText)
+  const { isSpeaking, status: readAloudStatus, stop: stopSpeaking, reset: resetReadAloud } = readAloud
+  const speakPage = useCallback(() => { void readAloud.start(0) }, [readAloud])
 
   useEffect(() => {
     if (!bookId) return
@@ -228,18 +250,17 @@ export default function ReadingPage() {
   useEffect(() => {
     // Defer all setState calls out of the synchronous effect body to satisfy
     // the react-hooks/set-state-in-effect rule while preserving the behaviour.
-    const speaking = window.speechSynthesis?.speaking
-    if (speaking) window.speechSynthesis.cancel()
     const id = requestAnimationFrame(() => {
       setCapturedSelection('')
       setFloatingBar(null)
       setAnnotationPanel({ open: false })
       setSaveError('')
-      if (speaking) setIsSpeaking(false)
-      clearReadAloudHighlight()
+      // Turning the page ends read aloud: the sentence list belongs to the
+      // page just left, so keeping it would let Skip walk off the wrong text.
+      resetReadAloud()
     })
     return () => cancelAnimationFrame(id)
-  }, [currentPage])
+  }, [currentPage, resetReadAloud])
 
   // Probe the current page for extractable text (see pageTextStatus above).
   useEffect(() => {
@@ -395,144 +416,6 @@ export default function ReadingPage() {
     }
   }
 
-  function clearReadAloudHighlight() {
-    if (highlightedSpanRef.current) {
-      highlightedSpanRef.current.style.backgroundColor = ''
-      highlightedSpanRef.current.style.borderRadius = ''
-      highlightedSpanRef.current = null
-    }
-  }
-
-  function stopSpeaking() {
-    window.speechSynthesis?.cancel()
-    clearReadAloudHighlight()
-    setIsSpeaking(false)
-    setReadAloudStatus('')
-  }
-
-  const speakPage = useCallback(async () => {
-    if (!window.speechSynthesis) {
-      setReadAloudStatus('Read aloud is not available in this browser.')
-      return
-    }
-    if (!pdfDocument) {
-      setReadAloudStatus('The page is still loading. Try again in a moment.')
-      return
-    }
-
-    window.speechSynthesis.cancel()
-    setIsSpeaking(false)
-    setReadAloudStatus('Loading…')
-
-    let page: Awaited<ReturnType<PdfDocument['getPage']>>
-    try {
-      page = await pdfDocument.getPage(currentPage)
-    } catch {
-      setReadAloudStatus('Could not load this page for reading. Try navigating away and back.')
-      return
-    }
-
-    let content: Awaited<ReturnType<typeof page.getTextContent>>
-    try {
-      content = await page.getTextContent()
-    } catch {
-      setReadAloudStatus('Could not extract text from this page.')
-      return
-    }
-    const rawText = content.items
-      .map((item) => (typeof item === 'object' && item && 'str' in item ? String(item.str) : ''))
-      .join(' ')
-
-    // Clean up common PDF extraction artifacts before speaking
-    const text = rawText
-      .replace(/(\w)-\s+(\w)/g, '$1$2')        // rejoin hyphenated line-breaks: "nat- ural" → "natural"
-      .replace(/\s+/g, ' ')                      // collapse whitespace
-      .replace(/\b(\d{1,3})\b(?=\s|$)/g, '')   // strip bare page numbers
-      .replace(/[ \t]{2,}/g, ' ')               // remove extra spaces
-      .trim()
-
-    if (!text) {
-      setReadAloudStatus('No readable text was found on this page.')
-      return
-    }
-
-    // Score voices by quality. Microsoft Edge neural voices and Apple enhanced
-    // voices are the most natural available through Web Speech API.
-    function pickVoice(): SpeechSynthesisVoice | null {
-      const voices = window.speechSynthesis.getVoices()
-      const en = voices.filter((v) => v.lang.startsWith('en'))
-
-      function score(v: SpeechSynthesisVoice): number {
-        const n = v.name
-        if (/Microsoft.*Neural|Aria Neural|Guy Neural|Jenny Neural|Ana Neural|Christopher Neural|Eric Neural|Michelle Neural/i.test(n)) return 6
-        if (/Microsoft.*Online/i.test(n)) return 5
-        if (/enhanced/i.test(n) && /Samantha|Karen|Daniel|Moira|Tessa|Fiona/i.test(n)) return 4
-        if (/enhanced|premium|neural/i.test(n)) return 3
-        if (/google/i.test(n)) return 2
-        if (v.lang === 'en-US') return 1
-        return 0
-      }
-
-      const sorted = [...en].sort((a, b) => score(b) - score(a))
-      return sorted[0] ?? null
-    }
-
-    const trySpeak = () => {
-      const utt = new SpeechSynthesisUtterance(text)
-      const voice = pickVoice()
-      if (voice) utt.voice = voice
-      utt.rate = 0.92
-      utt.pitch = 1.0
-      utt.volume = 1.0
-      utt.onstart = () => { setIsSpeaking(true); setReadAloudStatus('') }
-      utt.onend = () => { clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('') }
-      utt.onerror = (e) => {
-        // Chrome sometimes fires 'interrupted' on cancel() — treat as normal stop
-        if (e.error === 'interrupted') return
-        clearReadAloudHighlight(); setIsSpeaking(false); setReadAloudStatus('Read aloud stopped.')
-      }
-
-      // Word-by-word highlight using the SpeechSynthesisEvent boundary event.
-      // Fires reliably in Chrome/Edge; degrades gracefully (no highlight) in Firefox/iOS Safari.
-      const ttsSpans = Array.from(
-        document.querySelectorAll<HTMLElement>('.react-pdf__Page__textContent span')
-      )
-      let spanIdx = 0
-      utt.addEventListener('boundary', (e: SpeechSynthesisEvent) => {
-        if (e.name !== 'word') return
-        const charLen = e.charLength ?? 0
-        const raw = charLen > 0 ? text.slice(e.charIndex, e.charIndex + charLen) : text.slice(e.charIndex).split(/\s/)[0]
-        const word = raw.replace(/\W/g, '').toLowerCase()
-        if (word.length < 2) return
-        if (highlightedSpanRef.current) {
-          highlightedSpanRef.current.style.backgroundColor = ''
-          highlightedSpanRef.current.style.borderRadius = ''
-        }
-        for (let i = spanIdx; i < ttsSpans.length; i++) {
-          const spanWord = (ttsSpans[i].textContent ?? '').replace(/\W/g, '').toLowerCase()
-          if (spanWord && spanWord.includes(word)) {
-            ttsSpans[i].style.backgroundColor = 'rgba(74, 144, 217, 0.3)'
-            ttsSpans[i].style.borderRadius = '2px'
-            highlightedSpanRef.current = ttsSpans[i]
-            spanIdx = i + 1
-            break
-          }
-        }
-      })
-
-      // Chrome bug: synthesis can stall if paused; resume() before speak() fixes it
-      window.speechSynthesis.resume()
-      window.speechSynthesis.speak(utt)
-    }
-
-    // Voices may not be populated yet on first call — wait for voiceschanged
-    // 50ms delay gives Chrome time to settle after cancel()
-    if (window.speechSynthesis.getVoices().length > 0) {
-      setTimeout(trySpeak, 50)
-    } else {
-      window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true })
-    }
-  }, [currentPage, pdfDocument])
 
   if (!bookId) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC] p-4">
@@ -638,7 +521,7 @@ export default function ReadingPage() {
                 onClick={speakPage}
                 aria-label="Read page aloud"
                 disabled={pageIsImageOnly}
-                title={pageIsImageOnly ? 'This page is a picture — there is no text to read aloud' : undefined}
+                title={pageIsImageOnly ? 'This page has no text layer — there are no words to read aloud' : undefined}
                 className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#4A90D9] hover:bg-blue-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors font-semibold text-sm"
               >
                 <Volume2 size={20} />
@@ -754,18 +637,27 @@ export default function ReadingPage() {
                   <ImageIcon size={20} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-[#1A1D23] text-sm">This page is a picture, not text</p>
+                  <p className="font-bold text-[#1A1D23] text-sm">This page has no text layer yet</p>
                   <p className="text-sm text-[#4B5563] mt-1">
-                    It was scanned or photographed, so there are no words underneath to select. That means
-                    highlighting a passage and Read aloud can&apos;t work on this page.
+                    The file is a real PDF — nothing is wrong with the upload. But this page was scanned
+                    or photographed, so it holds a <em>photo</em> of the words rather than the words
+                    themselves. Highlighting and Read aloud both need the words underneath, so neither
+                    can work here.
                   </p>
                   <p className="text-sm text-[#4B5563] mt-2">
-                    You can still tap an emoji below and write a note about this page. To highlight and
-                    listen, use a PDF saved straight from a document rather than a scan.
+                    You can still tap an emoji below and write a note about this page.
+                  </p>
+                  <p className="text-sm text-[#4B5563] mt-2">
+                    <span className="font-semibold text-[#1A1D23]">Scanning with a phone app?</span>{' '}
+                    Turn on its text recognition (often called OCR, &ldquo;Recognize text&rdquo; or
+                    &ldquo;Searchable PDF&rdquo;) before exporting — in CamScanner it is under the
+                    export options. Re-upload that version and highlighting and Read aloud will work.
                   </p>
                 </div>
               </section>
             )}
+
+            {!pageIsImageOnly && <ReadAloudBar readAloud={readAloud} />}
 
             {/* PDF */}
             <div className="flex-1 w-full flex justify-center">
@@ -1042,7 +934,7 @@ export default function ReadingPage() {
               ) : (
                 <div className="bg-[#F8F9FC] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#6B7280]">
                   {pageIsImageOnly
-                    ? 'This page is a picture, so there is no text to attach. Write a note instead.'
+                    ? 'This page has no text layer, so there is no text to attach. Write a note instead.'
                     : 'Select text on the page before choosing a reaction to attach a passage.'}
                 </div>
               )}

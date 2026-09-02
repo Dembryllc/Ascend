@@ -25,7 +25,7 @@ async function probe(bookId, label) {
   await page.waitForTimeout(2500)
 
   const spans = await page.locator('.react-pdf__Page__textContent span').count()
-  const banner = await page.getByText(/this page is a picture, not text/i).count()
+  const banner = await page.getByText(/this page has no text layer yet/i).count()
   const readAloudDisabled = await page.getByRole('button', { name: /read page aloud/i }).first().isDisabled()
 
   // Select the way a student does: drag across the rendered text spans.
@@ -98,7 +98,7 @@ try {
   if (text.emoji !== 'SAVED') fail.push(`emoji annotation failed on text PDF: ${text.emoji}`)
   // An image-only PDF must explain itself rather than fail silently.
   if (scan.spans !== 0) fail.push('scan fixture unexpectedly has a text layer')
-  if (scan.banner === 0) fail.push('no "picture, not text" notice on an image-only page')
+  if (scan.banner === 0) fail.push('no "no text layer" notice on an image-only page')
   if (!scan.readAloudDisabled) fail.push('read aloud still offered on an image-only page')
   if (scan.emoji !== 'SAVED') fail.push(`emoji + note must still work on an image-only page: ${scan.emoji}`)
   if (fail.length) throw new Error(fail.join('; '))

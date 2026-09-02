@@ -141,10 +141,34 @@ Teachers can add students and books but for a long time could remove neither.
   side shows no "Unknown Book" ghosts (MyAnnotationsPage's fallback for an orphaned annotation, and
   so the visible symptom of a cascade that did not run).
 
-## Read Aloud (Chrome fixes — do not revert)
-- `window.speechSynthesis.resume()` before `speak()` — fixes Chrome stall bug
-- 50ms setTimeout after `cancel()` before calling `speak()` — fixes Chrome race condition
-- `interrupted` errors from `cancel()` are swallowed — they should NOT show "Read aloud stopped"
+## Read Aloud — `src/hooks/useReadAloud.ts`
+The engine lives in the hook, not `ReadingPage`; `ReadAloudBar` is the UI. The page only supplies
+`getPageText()`.
+- **Chrome fixes — do not revert:** `speechSynthesis.resume()` before `speak()` (stall bug); 50ms
+  setTimeout after `cancel()` before `speak()` (race); `interrupted` errors from `cancel()` are
+  swallowed — they should NOT show "Read aloud stopped".
+- **A page is spoken as chunks, not one utterance** (`splitIntoChunks`, sentence-sized, max 220
+  chars). This is what makes skip/start-anywhere possible — a single utterance has nothing to seek
+  within — and it dodges a Chrome bug where long utterances stop partway with no error.
+- **The generation ref (`genRef`) is load-bearing.** `cancel()` fires `onend` for the utterance it
+  kills; without the guard that stale event chains to the next chunk and the page keeps reading
+  after Stop. Every stop/restart bumps it, and every callback checks it.
+- **Rate cannot change on a live utterance** — `setRate`/`setVoiceURI` restart the current sentence
+  via `restartRef`. That restart lives in the setters, not an effect: it is user-initiated, and an
+  effect trips `react-hooks/set-state-in-effect`.
+- **`stop()` keeps the sentence list; `reset()` clears it.** Turning the page calls `reset()` — the
+  chunks belong to the page just left, so Skip would otherwise walk the wrong text.
+- **Voice quality is capped by the device.** Web Speech only exposes what the OS installed, so
+  `scoreVoice` ranks Microsoft Neural > Online > Apple enhanced > Google. On Apple devices with no
+  enhanced voice installed, `suggestBetterVoices` points the reader at Settings → Accessibility →
+  Spoken Content → Voices. Consistently natural voices across all devices would need cloud TTS
+  (backend + per-character cost + a privacy-policy line) — not built.
+- **No-voice devices are handled** — some Chromebooks and Linux without speech-dispatcher never fire
+  `voiceschanged`, so `start()` gives up after `VOICE_WAIT_MS` and says so rather than sitting on
+  "Loading…" forever.
+- Speed and voice persist in localStorage. Covered by `tests/e2e/readaloud.e2e.mjs`, which asserts
+  the controls, sentence list, jump/skip and persistence — but deliberately NOT playback, since
+  headless Chromium produces no audio.
 
 ## Stripe — Current State
 - Webhook deployed as Cloud Function (`stripewebhook-v7wgh3m3ca-uc.a.run.app`)
