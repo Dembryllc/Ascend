@@ -6,6 +6,7 @@ import {
   getDocs,
   writeBatch,
   arrayUnion,
+  arrayRemove,
   query,
   where,
   serverTimestamp,
@@ -84,4 +85,39 @@ export async function joinClassroomByCode(studentId: string, joinCode: string): 
   }
 
   return classroomId
+}
+
+/**
+ * Removes a student from a teacher's classroom without touching the student's
+ * own work. Un-enrolment, not deletion: their annotations, organizers and
+ * writing stay theirs, and the teacher simply stops being able to read them —
+ * every teacher-side rule is scoped by classroom membership or book assignment.
+ *
+ * All three writes matter:
+ *  - `classrooms.studentIds` is what teacher-side reads are scoped by.
+ *  - The student's own `classroomId` must be cleared too, or they are left in a
+ *    broken state: validAnnotationClassroomLink rejects every annotation written
+ *    against a classroom they are no longer a member of, so they would silently
+ *    stop being able to annotate anything.
+ *  - `joinClassroomByCode` assigns the teacher's whole library on join, so
+ *    removal has to undo that or a removed student keeps read access to the
+ *    teacher's PDFs.
+ */
+export async function removeStudentFromClassroom(
+  studentId: string,
+  classroomId: string,
+  teacherId: string,
+): Promise<void> {
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'classrooms', classroomId), { studentIds: arrayRemove(studentId) })
+  batch.update(doc(db, 'users', studentId), { classroomId: null })
+  await batch.commit()
+
+  const booksSnap = await getDocs(query(collection(db, 'books'), where('uploadedBy', '==', teacherId)))
+  const assigned = booksSnap.docs.filter((d) => (d.data().assignedStudentIds ?? []).includes(studentId))
+  if (assigned.length > 0) {
+    const bookBatch = writeBatch(db)
+    assigned.forEach((d) => bookBatch.update(d.ref, { assignedStudentIds: arrayRemove(studentId) }))
+    await bookBatch.commit()
+  }
 }

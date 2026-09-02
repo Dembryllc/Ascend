@@ -4,7 +4,7 @@
 
 ## CI/CD Status
 - ✅ **CI WORKING (verified 2026-07-03).** Latest `main` deploy — "Deploy to Firebase" run #65 (commit `1308dd0`, the standalone Writing feature) — ran green in ~1 min: hosting + `firestore:rules` + `firestore:indexes` all released (`✔ firestore: released rules firestore.rules to cloud.firestore`). Live at easy-annotate.com.
-- `firebase-deploy.yml` deploys `--only hosting,firestore:rules,firestore:indexes` on push to `main`, authenticating with the `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` secret. Rules + indexes ship automatically — do NOT assume a manual Console step is needed.
+- `firebase-deploy.yml` deploys `--only hosting,firestore:rules,firestore:indexes,storage` on push to `main`, authenticating with the `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` secret. Firestore rules, indexes **and Storage rules** ship automatically — do NOT assume a manual Console step is needed. (`storage` was added 2026-09-02: book deletion needs a Storage rule, and storage.rules had never been deployed by CI.)
 - If auth breaks again: new JSON key from GCP Console → IAM → Service Accounts → update the `FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE` GitHub secret. Manual fallback: `npm run build && firebase deploy --only hosting --project ascend-annotate`.
 
 ## Notes / Session Log
@@ -40,14 +40,34 @@
   links in the DOM does NOT prove navigation exists — the hidden bar is still in the DOM at desktop
   widths. Assert visibility at a real width. Covered by `tests/e2e/navigation.e2e.mjs`, which checks
   every destination at 390 / 768 / 1280px for both roles.
+- **Storage deletes need their own `allow delete`** — `request.resource` is null on a delete, so a
+  combined `allow write: if ... request.resource.contentType == 'application/pdf'` denies **every**
+  delete. That is why student book deletions silently left their PDFs in the bucket until
+  2026-09-02. `storage.rules` now splits `create, update` from `delete`. Teacher uploads also moved
+  to `books/{teacherId}/...` so deletion can be scoped by owner — files uploaded before that are
+  under a flat `books/` path and cannot be removed by any rule; their Firestore doc still deletes.
+- **Book deletion order is load-bearing** — `deleteTeacherBook` deletes annotations, organizers and
+  readingProgress BEFORE the book document. The rules authorising those deletes
+  (`isAssignedBookTeacher`) resolve by reading the book doc, so removing the book first strands
+  every child record permanently. The cascade also walks `assignedStudentIds` rather than querying
+  annotations by `bookId` alone: a bookId-only query returns docs for unassigned students, the read
+  rule rejects them, and one rejected doc fails the whole query.
+- **Best-effort Storage cleanup must be time-boxed** — Storage requests have no deadline of their
+  own, so an unreachable bucket leaves `deleteObject` pending forever and strands the teacher's
+  confirmation dialog on "Deleting…". `deleteTeacherBook` races it against
+  `STORAGE_CLEANUP_TIMEOUT_MS`. The Firestore doc is the source of truth and is already gone.
+- **`npm run test:rules` runs one file at a time** — `--test-concurrency=1`. Every rules test file
+  shares one emulator and calls `clearFirestore()` in `beforeEach`, so running them in parallel
+  wipes each other's seed data and produces failures that look like broken rules but are not.
 - **`annotationKind` values** — `'annotation'` | `'reflection'` only. These are stored together and filtered throughout.
 - **`TrialExpiredModal` vs `UpgradeModal`** — expired trial teachers get `TrialExpiredModal`. Free-tier teachers (never had trial) get `UpgradeModal`. Not interchangeable.
 - **Text selection capture** — `capturedSelection` state is intentionally NOT cleared when live selection goes empty. This is required on mobile because tapping the emoji bar clears `window.getSelection()` before the click fires.
 
 ## Firestore Rules & Indexes — Auto-Deployed by CI
-`firebase-deploy.yml` runs `firebase deploy --only hosting,firestore:rules,firestore:indexes` on
-push to `main` (rules from `firestore.rules`, indexes from `firestore.indexes.json`). Edit those
-files and merge to `main` and they publish automatically — no manual Console step. Composite indexes
+`firebase-deploy.yml` runs `firebase deploy --only hosting,firestore:rules,firestore:indexes,storage`
+on push to `main` (rules from `firestore.rules`, indexes from `firestore.indexes.json`, Storage rules
+from `storage.rules`). Edit those files and merge to `main` and they publish automatically — no
+manual Console step. Composite indexes
 currently defined:
 - `annotations`: `studentId ASC → bookId ASC → pageNumber ASC`
 - `annotations`: `studentId ASC → timestamp DESC`
@@ -97,6 +117,29 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
   as `$2`. `src/firebase/config.ts` connects to the emulators only when
   `VITE_USE_EMULATORS === 'true'` (no-op in prod). Dev-only dep: `playwright` (uses the image's
   pre-installed Chromium via `executablePath`, so no `playwright install`).
+
+## Removing students and books — added 2026-09-02
+Teachers can add students and books but for a long time could remove neither.
+- **Remove a student** (`removeStudentFromClassroom`, ClassroomPage roster row) is **un-enrolment,
+  not deletion**: the student keeps their account and everything they wrote, and the teacher simply
+  stops being able to read it. Three writes, all required: drop them from `classrooms.studentIds`;
+  clear their own `users/{uid}.classroomId` (or `validAnnotationClassroomLink` rejects every
+  annotation they write from then on — a silent, total breakage); and drop them from the
+  `assignedStudentIds` of the teacher's books, because `joinClassroomByCode` assigns the whole
+  library on join and otherwise a removed student keeps read access to the teacher's PDFs.
+- **Delete a book** (`deleteTeacherBook`, "Your Books" card) IS destructive and cascades to that
+  book's annotations, organizers and readingProgress. The confirmation reads the count first
+  (`countBookStudentRecords`) and names it — "This also deletes N student notes" — and the confirm
+  button stays disabled until that count is known. See the two book-deletion gotchas above.
+- **Rules:** `firestore.rules` gained the teacher-clears-`classroomId` branch on `users`, and
+  `isAssignedBookTeacher` (renamed from `isBookTeacherForAnnotation`) now also authorises delete on
+  `annotations`, `organizers` and `readingProgress`. That predicate is exactly the one that already
+  granted the teacher READ on those documents, so this adds no visibility — only the ability to
+  clear up what a deleted book leaves behind. Covered by `tests/rules/removal.test.mjs`.
+- **E2E:** `tests/e2e/removal.e2e.mjs`, which must run LAST — it deletes seeded data the earlier
+  flows read. It asserts the impact count, that both removals survive a reload, and that the student
+  side shows no "Unknown Book" ghosts (MyAnnotationsPage's fallback for an orphaned annotation, and
+  so the visible symptom of a cascade that did not run).
 
 ## Read Aloud (Chrome fixes — do not revert)
 - `window.speechSynthesis.resume()` before `speak()` — fixes Chrome stall bug

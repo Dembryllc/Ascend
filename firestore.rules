@@ -95,7 +95,10 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/classrooms/$(data.classroomId)).data.studentIds
         );
     }
-    function isBookTeacherForAnnotation(data) {
+    // The teacher who uploaded the book, for a record naming that book and a
+    // student the book is assigned to. Used by annotations, organizers and
+    // readingProgress alike — each carries bookId + studentId.
+    function isAssignedBookTeacher(data) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/books/$(data.bookId))
         && get(/databases/$(database)/documents/books/$(data.bookId)).data.uploadedBy == request.auth.uid
@@ -127,7 +130,15 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid);
+      allow update: if isOwner(uid)
+        // A classroom's teacher may clear that student's classroomId when
+        // removing them from the roster — that key only, and only to null.
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['classroomId'])
+          && request.resource.data.classroomId == null
+          && resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        );
     }
 
     // ── classrooms ────────────────────────────────────────────────────────
@@ -197,7 +208,7 @@ service cloud.firestore {
           && resource.data.classroomId is string
           && isClassTeacher(resource.data.classroomId)
         )
-        || isBookTeacherForAnnotation(resource.data)
+        || isAssignedBookTeacher(resource.data)
       );
       allow create: if isSignedIn()
                     && validAnnotationData(request.resource.data)
@@ -212,7 +223,10 @@ service cloud.firestore {
                     && request.resource.data.classroomId == resource.data.classroomId
                     && request.resource.data.pageNumber == resource.data.pageNumber
                     && request.resource.data.annotationKind == resource.data.annotationKind;
-      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+      allow delete: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || isAssignedBookTeacher(resource.data)
+      );
     }
 
     // ── organizers ───────────────────────────────────────────────────────
@@ -235,7 +249,10 @@ service cloud.firestore {
                     && request.resource.data.studentId == resource.data.studentId
                     && request.resource.data.bookId == resource.data.bookId
                     && request.resource.data.classroomId == resource.data.classroomId;
-      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+      allow delete: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || isAssignedBookTeacher(resource.data)
+      );
     }
 
     // ── writing tasks (book-free) ─────────────────────────────────────────
@@ -336,7 +353,10 @@ service cloud.firestore {
                     && request.resource.data.totalSecondsRead >= resource.data.totalSecondsRead
                     && request.resource.data.highestPageRead >= resource.data.highestPageRead
                     && request.resource.data.completionPercent >= resource.data.completionPercent;
-      allow delete: if isSignedIn() && isOwner(resource.data.studentId);
+      allow delete: if isSignedIn() && (
+        isOwner(resource.data.studentId)
+        || isAssignedBookTeacher(resource.data)
+      );
     }
   }
 }

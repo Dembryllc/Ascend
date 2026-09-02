@@ -82,7 +82,7 @@ jobs:
           npm install -g firebase-tools
           set +e
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
-            --only hosting,firestore:rules,firestore:indexes \
+            --only hosting,firestore:rules,firestore:indexes,storage \
             --project ascend-annotate 2>&1 | tee /tmp/firebase-deploy.log
           deploy_status=${PIPESTATUS[0]}
           set -e

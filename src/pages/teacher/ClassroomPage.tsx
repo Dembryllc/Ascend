@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
-import { getClassroomByTeacher, createClassroom } from '@/firebase/classrooms'
+import { getClassroomByTeacher, createClassroom, removeStudentFromClassroom } from '@/firebase/classrooms'
 import { getUserProfile } from '@/firebase/auth'
-import { getBooksByTeacher } from '@/firebase/books'
+import { getBooksByTeacher, countBookStudentRecords, deleteTeacherBook } from '@/firebase/books'
 import { assignBookToStudent, assignBookToClass } from '@/firebase/books'
 import type { Classroom, Book, UserProfile } from '@/types'
-import { Users, Copy, CheckCheck, CheckCircle2, Plus } from 'lucide-react'
+import { Users, Copy, CheckCheck, CheckCircle2, Plus, BookOpen, Trash2, UserMinus } from 'lucide-react'
 
 export default function ClassroomPage() {
   const { profile } = useAuth()
@@ -22,6 +22,13 @@ export default function ClassroomPage() {
   const [assignError, setAssignError] = useState('')
   const [assignSelects, setAssignSelects] = useState<Record<string, string>>({})
   const [assignedAll, setAssignedAll] = useState<Record<string, boolean>>({})
+  const [confirmRemove, setConfirmRemove] = useState<UserProfile | null>(null)
+  const [confirmDeleteBook, setConfirmDeleteBook] = useState<Book | null>(null)
+  // null while the count is still being read — the dialog says "checking…" rather
+  // than claiming zero student notes and then deleting some.
+  const [deleteImpact, setDeleteImpact] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     if (!profile) return
@@ -62,6 +69,49 @@ export default function ClassroomPage() {
     navigator.clipboard.writeText(classroom.joinCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleRemoveStudent(student: UserProfile) {
+    if (!classroom || !profile) return
+    setBusy(true)
+    setActionError('')
+    try {
+      await removeStudentFromClassroom(student.uid, classroom.id, profile.uid)
+      setStudents((prev) => prev.filter((s) => s.uid !== student.uid))
+      setClassroom((prev) => prev
+        ? { ...prev, studentIds: prev.studentIds.filter((id) => id !== student.uid) }
+        : prev)
+      setBooks((prev) => prev.map((b) => ({
+        ...b,
+        assignedStudentIds: b.assignedStudentIds.filter((id) => id !== student.uid),
+      })))
+      setConfirmRemove(null)
+    } catch {
+      setActionError(`Could not remove ${student.displayName}. Please try again.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openDeleteBook(book: Book) {
+    setConfirmDeleteBook(book)
+    setDeleteImpact(null)
+    setActionError('')
+    setDeleteImpact(await countBookStudentRecords(book))
+  }
+
+  async function handleDeleteBook(book: Book) {
+    setBusy(true)
+    setActionError('')
+    try {
+      await deleteTeacherBook(book)
+      setBooks((prev) => prev.filter((b) => b.id !== book.id))
+      setConfirmDeleteBook(null)
+    } catch {
+      setActionError(`Could not delete ${book.title}. Please try again.`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleAssignBook(bookId: string, studentId: string) {
@@ -215,6 +265,7 @@ export default function ClassroomPage() {
                       <p className="font-semibold text-[#1A1D23]">{s.displayName}</p>
                       <p className="text-xs text-[#6B7280]">Student</p>
                     </div>
+                    <div className="flex items-center gap-2">
                     {books.length > 0 && (
                       <select
                         value={assignSelects[s.uid] ?? ''}
@@ -237,17 +288,32 @@ export default function ClassroomPage() {
                         ))}
                       </select>
                     )}
+                    <button
+                      onClick={() => { setActionError(''); setConfirmRemove(s) }}
+                      aria-label={`Remove ${s.displayName} from classroom`}
+                      className="flex items-center gap-1 text-xs font-semibold text-[#9CA3AF] hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <UserMinus size={14} /> Remove
+                    </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          {/* Assign books to whole class */}
-          {books.length > 0 && students.length > 0 && (
+          {/* Books */}
+          {books.length > 0 && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6]">
-              <h3 className="font-bold text-lg text-[#1A1D23] mb-1">Assign to Whole Class</h3>
-              <p className="text-sm text-[#4B5563] mb-4">Assign a book to every student at once.</p>
+              <div className="flex items-center gap-2 mb-1">
+                <BookOpen size={20} className="text-[#4A90D9]" />
+                <h3 className="font-bold text-lg text-[#1A1D23]">Your Books ({books.length})</h3>
+              </div>
+              <p className="text-sm text-[#4B5563] mb-4">
+                {students.length > 0
+                  ? 'Assign a book to every student at once, or remove one from your library.'
+                  : 'Remove a book from your library. Assigning needs at least one student.'}
+              </p>
               <div className="space-y-2">
                 {books.map((b) => (
                   <div key={b.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-[#F3F4F6] last:border-0">
@@ -255,25 +321,92 @@ export default function ClassroomPage() {
                       <span className="text-sm font-medium text-[#1A1D23]">{b.title}</span>
                       {b.assignmentPrompt && <p className="text-xs text-[#6B7280] mt-1">{b.assignmentPrompt}</p>}
                     </div>
-                    <button
-                      onClick={() => handleAssignAll(b.id)}
-                      disabled={assignedAll[b.id]}
-                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold self-start sm:self-auto transition-colors ${
-                        assignedAll[b.id]
-                          ? 'bg-[#5BB974]/20 text-[#5BB974] cursor-default'
-                          : 'bg-[#5BB974] text-white hover:bg-[#4AA863]'
-                      }`}
-                    >
-                      {assignedAll[b.id]
-                        ? <><CheckCircle2 size={14} /> Assigned!</>
-                        : 'Assign All'
-                      }
-                    </button>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      {students.length > 0 && (
+                        <button
+                          onClick={() => handleAssignAll(b.id)}
+                          disabled={assignedAll[b.id]}
+                          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                            assignedAll[b.id]
+                              ? 'bg-[#5BB974]/20 text-[#5BB974] cursor-default'
+                              : 'bg-[#5BB974] text-white hover:bg-[#4AA863]'
+                          }`}
+                        >
+                          {assignedAll[b.id]
+                            ? <><CheckCircle2 size={14} /> Assigned!</>
+                            : 'Assign All'
+                          }
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openDeleteBook(b)}
+                        aria-label={`Delete ${b.title}`}
+                        className="flex items-center gap-1 text-xs font-semibold text-[#9CA3AF] hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {confirmRemove && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setConfirmRemove(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-xl text-[#1A1D23] mb-2">Remove from this classroom?</h3>
+            <p className="text-[#4B5563] mb-1 font-semibold">{confirmRemove.displayName}</p>
+            <p className="text-sm text-[#4B5563] mb-6">
+              They keep their account and everything they have written — removing them
+              only ends their place in this class, so your books and their notes are no
+              longer shared with you. They can rejoin any time with the join code.
+            </p>
+            {actionError && <p className="text-sm text-red-600 mb-3">{actionError}</p>}
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmRemove(null)} className="flex-1 border border-[#D1D5DB] rounded-xl py-3 font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRemoveStudent(confirmRemove)}
+                disabled={busy}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-bold transition-colors disabled:opacity-60"
+              >
+                {busy ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteBook && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDeleteBook(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-xl text-[#1A1D23] mb-2">Delete this book?</h3>
+            <p className="text-[#4B5563] mb-1 font-semibold">{confirmDeleteBook.title}</p>
+            <p className="text-sm text-[#4B5563] mb-6">
+              {deleteImpact === null
+                ? 'Checking what this would remove…'
+                : deleteImpact === 0
+                ? 'No student has annotated this book yet. The PDF is removed for everyone it was assigned to. This cannot be undone.'
+                : `This also deletes ${deleteImpact} student note${deleteImpact === 1 ? '' : 's'} on this book, along with their reading progress and graphic organizers for it. This cannot be undone.`}
+            </p>
+            {actionError && <p className="text-sm text-red-600 mb-3">{actionError}</p>}
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteBook(null)} className="flex-1 border border-[#D1D5DB] rounded-xl py-3 font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteBook(confirmDeleteBook)}
+                disabled={busy || deleteImpact === null}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-bold transition-colors disabled:opacity-60"
+              >
+                {busy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </AppShell>

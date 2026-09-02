@@ -2,23 +2,34 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Teacher-uploaded books: any authenticated user can read (needed to render PDFs).
-    // Writes restricted to PDF files under 50 MB.
+    // Any authenticated user can read a book PDF — the reader has to render it,
+    // and Firestore rules decide which books a user can see in the first place.
+    // Legacy teacher uploads live flat under books/, so this match stays broad.
     match /books/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
+    }
+
+    // Teacher-uploaded books, filed under the uploading teacher's uid so that
+    // deletion can be scoped to its owner. Writes restricted to PDFs under 50 MB.
+    // `request.resource` is null on a delete, so the content checks have to live
+    // on create/update only — a combined `allow write` rule denies every delete.
+    match /books/{ownerId}/{allPaths=**} {
+      allow create, update: if request.auth != null
+        && request.auth.uid == ownerId
         && request.resource.contentType == 'application/pdf'
         && request.resource.size < 52428800;
+      allow delete: if request.auth != null && request.auth.uid == ownerId;
     }
 
     // Student-uploaded books: stored under their uid folder.
     // Only the owning student can write or delete; any authenticated user can read.
     match /student-books/{studentId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow create, update: if request.auth != null
         && request.auth.uid == studentId
         && request.resource.contentType == 'application/pdf'
         && request.resource.size < 52428800;
+      allow delete: if request.auth != null && request.auth.uid == studentId;
     }
   }
 }

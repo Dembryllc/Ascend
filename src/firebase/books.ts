@@ -16,6 +16,10 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from './config'
 import type { Book } from '@/types'
 
+// Cap on the best-effort Storage cleanup after a book's Firestore records are
+// already deleted. See the note at the end of deleteTeacherBook.
+const STORAGE_CLEANUP_TIMEOUT_MS = 5000
+
 export async function uploadBook(
   file: File,
   title: string,
@@ -33,7 +37,9 @@ export async function uploadBook(
   const cleanAssignmentPrompt = assignmentPrompt.trim()
   const cleanSuccessCriteria = successCriteria.trim()
   const cleanOrganizerPrompt = organizerPrompt?.trim() ?? ''
-  const storageRef = ref(storage, `books/${Date.now()}_${file.name}`)
+  // Filed under the teacher's uid so Storage rules can scope deletion to its
+  // owner — a flat books/ path gives them nothing to check.
+  const storageRef = ref(storage, `books/${teacherId}/${Date.now()}_${file.name}`)
   const task = uploadBytesResumable(storageRef, file)
 
   const storageUrl = await new Promise<string>((resolve, reject) => {
@@ -206,4 +212,72 @@ export async function deleteStudentBook(bookId: string, storageUrl: string, stud
     await batch.commit()
   }
   await deleteDoc(doc(db, 'readingProgress', `${studentId}_${bookId}`)).catch(() => {})
+}
+
+/**
+ * Counts what deleting a teacher's book would take with it, so the confirmation
+ * can name the cost before the teacher commits to it.
+ *
+ * Scoped to `assignedStudentIds` for the same reason `deleteTeacherBook` is —
+ * see the note there.
+ */
+export async function countBookStudentRecords(book: Book): Promise<number> {
+  const perStudent = await Promise.all(
+    book.assignedStudentIds.map((studentId) =>
+      getDocs(query(
+        collection(db, 'annotations'),
+        where('bookId', '==', book.id),
+        where('studentId', '==', studentId),
+      )).then((snap) => snap.size).catch(() => 0)
+    )
+  )
+  return perStudent.reduce((sum, n) => sum + n, 0)
+}
+
+/**
+ * Deletes a teacher's book and the student records that only exist because of it.
+ *
+ * Order matters: the annotation, organizer and readingProgress delete rules all
+ * authorise the teacher by reading the *book* document (isAssignedBookTeacher),
+ * so the book doc has to be the last Firestore delete. Removing it first would
+ * strand every child record permanently.
+ *
+ * The cascade walks `assignedStudentIds` rather than querying annotations by
+ * bookId alone: a bookId-only query returns documents belonging to students who
+ * are no longer assigned, which the read rule rejects — and one rejected document
+ * fails the whole query. Notes belonging to a since-removed student are therefore
+ * left alone, which is also the behaviour we want: their work is not the
+ * teacher's to delete once they are off the roster.
+ */
+export async function deleteTeacherBook(book: Book): Promise<void> {
+  for (const studentId of book.assignedStudentIds) {
+    const annSnap = await getDocs(query(
+      collection(db, 'annotations'),
+      where('bookId', '==', book.id),
+      where('studentId', '==', studentId),
+    ))
+    if (!annSnap.empty) {
+      const batch = writeBatch(db)
+      annSnap.docs.forEach((d) => batch.delete(d.ref))
+      await batch.commit()
+    }
+    // organizers and readingProgress both use a deterministic
+    // `${studentId}_${bookId}` id, so neither needs a query.
+    await deleteDoc(doc(db, 'organizers', `${studentId}_${book.id}`)).catch(() => {})
+    await deleteDoc(doc(db, 'readingProgress', `${studentId}_${book.id}`)).catch(() => {})
+  }
+
+  await deleteDoc(doc(db, 'books', book.id))
+
+  // Last, and strictly best-effort. The Firestore document is the source of
+  // truth and is already gone by this point, so the blob cleanup must never
+  // decide the outcome — nor be able to stall it. Storage requests have no
+  // deadline of their own: an unreachable bucket leaves this pending forever,
+  // which strands the teacher's confirmation dialog on "Deleting…". Books
+  // uploaded before storage paths carried the teacher's uid have no rule that
+  // permits their removal either, and simply stay behind.
+  await Promise.race([
+    deleteObject(ref(storage, book.storageUrl)).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, STORAGE_CLEANUP_TIMEOUT_MS)),
+  ])
 }
