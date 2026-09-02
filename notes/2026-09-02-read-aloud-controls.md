@@ -62,9 +62,10 @@ Function, per-character cost, cached audio per book+page, and a privacy-policy l
 book text to a third party. Roughly $10 once per 300-page book if cached. Not built; it is a
 decision, not an oversight.
 
-Found while testing: devices with no speech engine at all (some Chromebooks, Linux without
-speech-dispatcher) never fire `voiceschanged`, so read aloud sat on "Loading…" forever. Now it
-gives up after 3s and explains.
+Found while testing: a browser with no speech engine never fires `voiceschanged`, so read aloud
+sat on "Loading…" forever. Now it gives up after 3s and explains. This is defensive only — I had
+guessed Chromebooks might be such a case, and that guess was wrong: Chromebooks were confirmed
+working in production the same day.
 
 ## CamScanner
 

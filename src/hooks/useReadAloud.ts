@@ -330,10 +330,11 @@ export function useReadAloud(getPageText: () => Promise<string>): ReadAloud {
     const begin = Math.min(Math.max(0, fromIndex), list.length - 1)
     setChunkIndex(begin)
 
-    // Voices can still be empty on the very first press, and on a device with
-    // no speech engine at all (some Chromebooks, Linux without speech-dispatcher)
-    // 'voiceschanged' never fires. Without the timeout the reader would sit on
-    // "Loading…" forever with nothing explaining why.
+    // Voices can still be empty on the very first press, and on a browser with
+    // no speech engine at all (Linux without speech-dispatcher, locked-down
+    // builds) 'voiceschanged' never fires. Without the timeout the reader would
+    // sit on "Loading…" forever with nothing explaining why. Defensive only —
+    // Chromebooks were confirmed working in production.
     if (window.speechSynthesis.getVoices().length > 0) {
       runFrom(begin)
       return

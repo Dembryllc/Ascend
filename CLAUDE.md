@@ -163,9 +163,11 @@ The engine lives in the hook, not `ReadingPage`; `ReadAloudBar` is the UI. The p
   enhanced voice installed, `suggestBetterVoices` points the reader at Settings → Accessibility →
   Spoken Content → Voices. Consistently natural voices across all devices would need cloud TTS
   (backend + per-character cost + a privacy-policy line) — not built.
-- **No-voice devices are handled** — some Chromebooks and Linux without speech-dispatcher never fire
-  `voiceschanged`, so `start()` gives up after `VOICE_WAIT_MS` and says so rather than sitting on
-  "Loading…" forever.
+- **No-voice devices are handled** — a browser with no speech engine (e.g. Linux without
+  speech-dispatcher, or a locked-down build) never fires `voiceschanged`, so `start()` gives up
+  after `VOICE_WAIT_MS` and says so rather than sitting on "Loading…" forever. This is a
+  defensive path, not a known-broken device: **Chromebooks were confirmed working in production
+  on 2026-09-02** — they carry voices and read aloud plays normally.
 - Speed and voice persist in localStorage. Covered by `tests/e2e/readaloud.e2e.mjs`, which asserts
   the controls, sentence list, jump/skip and persistence — but deliberately NOT playback, since
   headless Chromium produces no audio.
