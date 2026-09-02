@@ -163,6 +163,36 @@ export default function AppShell({ children, title }: Props) {
             </button>
           </div>
         </div>
+
+        {/* Primary navigation — tablet and desktop. The mobile bottom bar below
+            is the same set of destinations for narrow screens. */}
+        {profile && (
+          <nav
+            className="hidden sm:block border-t border-[#E5E7EB]"
+            aria-label="Main navigation"
+          >
+            <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
+              {navItems.map(({ to, icon: Icon, label }) => {
+                const active = activeNavTo === to
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 md:px-3 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                      active
+                        ? 'text-[#4A90D9] border-[#4A90D9]'
+                        : 'text-[#4B5563] border-transparent hover:text-[#1A1D23] hover:border-[#E5E7EB]'
+                    }`}
+                  >
+                    <Icon size={16} strokeWidth={active ? 2.5 : 2} />
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          </nav>
+        )}
       </header>
 
       {/* Trial banner — teachers and individuals with an active trial */}
@@ -195,7 +225,7 @@ export default function AppShell({ children, title }: Props) {
         </div>
       </footer>
 
-      {/* Bottom nav — mobile only */}
+      {/* Bottom nav — mobile only (the header nav covers >=640px) */}
       {profile && (
         <nav
           className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-[#E5E7EB] z-40 flex"

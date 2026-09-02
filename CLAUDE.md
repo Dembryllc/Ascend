@@ -33,6 +33,13 @@
 - **Registration step order** — profile `setDoc` must happen BEFORE classroom join in `registerUser()`. Do not reorder. See `src/firebase/auth.ts`.
 - **Registration profile race** — `createUserWithEmailAndPassword` signs the user in *before* `registerUser()` writes the Firestore profile, so `onAuthStateChanged` fires and reads an empty profile (a class join code widens the window with two extra round-trips). Three guards must stay in place, or new accounts get a false "Account setup incomplete": (1) `AuthContext` re-reads the profile with backoff (`PROFILE_RETRY_DELAYS_MS`) before settling on `null`, (2) `RegisterPage` awaits `refreshProfile()` before `navigate()`, (3) `ProtectedRoute` does one more `refreshProfile()` before showing the recovery screen. Covered by `tests/e2e/register.e2e.mjs`.
 - **Text layer is required for highlighting + read aloud** — both features read the PDF's text layer (`getTextContent()`). A scanned, photographed, or design-tool-exported PDF is a picture with no text underneath, so both are impossible on it however well the page renders. `ReadingPage` probes each page (`pageTextProbe` / `pageIsImageOnly`) and shows a "This page is a picture, not text" notice plus a disabled Read aloud button. Emoji reactions and typed notes still work on those pages — do not gate them on the text layer. There is no OCR; adding it is the only way to change this. Covered by `tests/e2e/pdftext.e2e.mjs`.
+- **Navigation is rendered twice, and both are required** — `AppShell` renders a header nav row
+  (`hidden sm:block`, >=640px) and a bottom bar (`sm:hidden`, <640px). Deleting either leaves that
+  width with no navigation. This shipped once: the bottom bar was the only nav, so every teacher on
+  an iPad had no route to Classroom, Upload, Writing, Annotations or Progress. Counting `nav a`
+  links in the DOM does NOT prove navigation exists — the hidden bar is still in the DOM at desktop
+  widths. Assert visibility at a real width. Covered by `tests/e2e/navigation.e2e.mjs`, which checks
+  every destination at 390 / 768 / 1280px for both roles.
 - **`annotationKind` values** — `'annotation'` | `'reflection'` only. These are stored together and filtered throughout.
 - **`TrialExpiredModal` vs `UpgradeModal`** — expired trial teachers get `TrialExpiredModal`. Free-tier teachers (never had trial) get `UpgradeModal`. Not interchangeable.
 - **Text selection capture** — `capturedSelection` state is intentionally NOT cleared when live selection goes empty. This is required on mobile because tapping the emoji bar clears `window.getSelection()` before the click fires.
