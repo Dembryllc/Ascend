@@ -248,9 +248,15 @@ export async function countBookStudentRecords(book: Book): Promise<number> {
  * fails the whole query. Notes belonging to a since-removed student are therefore
  * left alone, which is also the behaviour we want: their work is not the
  * teacher's to delete once they are off the roster.
+ *
+ * The uploader is walked alongside the assigned students because a teacher who
+ * read their own book at /teacher/read/:bookId owns annotations on it too. Those
+ * would otherwise be stranded permanently: once the book document is gone,
+ * isAssignedBookTeacher can no longer authorise a delete, and no screen lists
+ * them. They are the teacher's own documents, so `isOwner` covers the delete.
  */
 export async function deleteTeacherBook(book: Book): Promise<void> {
-  for (const studentId of book.assignedStudentIds) {
+  for (const studentId of new Set([...book.assignedStudentIds, book.uploadedBy])) {
     const annSnap = await getDocs(query(
       collection(db, 'annotations'),
       where('bookId', '==', book.id),

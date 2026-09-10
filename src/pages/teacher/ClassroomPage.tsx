@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
 import AppShell from '@/components/layout/AppShell'
 import { getClassroomByTeacher, createClassroom, removeStudentFromClassroom } from '@/firebase/classrooms'
@@ -6,7 +7,7 @@ import { getUserProfile } from '@/firebase/auth'
 import { getBooksByTeacher, countBookStudentRecords, deleteTeacherBook } from '@/firebase/books'
 import { assignBookToStudent, assignBookToClass } from '@/firebase/books'
 import type { Classroom, Book, UserProfile } from '@/types'
-import { Users, Copy, CheckCheck, CheckCircle2, Plus, BookOpen, Trash2, UserMinus } from 'lucide-react'
+import { Users, Copy, CheckCheck, CheckCircle2, Plus, BookOpen, Highlighter, Trash2, UserMinus } from 'lucide-react'
 
 export default function ClassroomPage() {
   const { profile } = useAuth()
@@ -322,6 +323,13 @@ export default function ClassroomPage() {
                       {b.assignmentPrompt && <p className="text-xs text-[#6B7280] mt-1">{b.assignmentPrompt}</p>}
                     </div>
                     <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <Link
+                        to={`/teacher/read/${b.id}`}
+                        aria-label={`Read and annotate ${b.title}`}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold text-[#4A90D9] hover:bg-blue-50 transition-colors"
+                      >
+                        <Highlighter size={14} /> Read
+                      </Link>
                       {students.length > 0 && (
                         <button
                           onClick={() => handleAssignAll(b.id)}
@@ -390,8 +398,8 @@ export default function ClassroomPage() {
               {deleteImpact === null
                 ? 'Checking what this would remove…'
                 : deleteImpact === 0
-                ? 'No student has annotated this book yet. The PDF is removed for everyone it was assigned to. This cannot be undone.'
-                : `This also deletes ${deleteImpact} student note${deleteImpact === 1 ? '' : 's'} on this book, along with their reading progress and graphic organizers for it. This cannot be undone.`}
+                ? 'No student has annotated this book yet. The PDF is removed for everyone it was assigned to, and any notes you made on it go too. This cannot be undone.'
+                : `This also deletes ${deleteImpact} student note${deleteImpact === 1 ? '' : 's'} on this book, along with their reading progress and graphic organizers for it — and any notes you made on it yourself. This cannot be undone.`}
             </p>
             {actionError && <p className="text-sm text-red-600 mb-3">{actionError}</p>}
             <div className="flex gap-3">

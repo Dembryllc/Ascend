@@ -7,7 +7,7 @@ import { getBooksByTeacher } from '@/firebase/books'
 import { getClassroomByTeacher } from '@/firebase/classrooms'
 import { updateTeacherDisplayName } from '@/firebase/auth'
 import type { Book, Classroom } from '@/types'
-import { BarChart3, BookOpen, Copy, CopyCheck, Users, Upload, Eye, Pencil, PenLine, X, Check } from 'lucide-react'
+import { BarChart3, BookOpen, Copy, CopyCheck, Users, Upload, Eye, Pencil, PenLine, X, Check, Highlighter } from 'lucide-react'
 
 export default function TeacherDashboard() {
   const { profile, refreshProfile } = useAuth()
@@ -258,6 +258,12 @@ function BookCard({ book }: { book: Book }) {
       <p className="text-xs text-[#9CA3AF] mt-2">
         {book.assignedStudentIds.length} student{book.assignedStudentIds.length !== 1 ? 's' : ''} assigned
       </p>
+      <Link
+        to={`/teacher/read/${book.id}`}
+        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 bg-[#4A90D9] text-white text-sm font-bold px-3 py-2 rounded-xl hover:bg-[#357ABD] transition-colors"
+      >
+        <Highlighter size={16} /> Read &amp; annotate
+      </Link>
     </div>
   )
 }

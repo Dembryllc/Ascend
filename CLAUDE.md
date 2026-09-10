@@ -28,7 +28,16 @@
 - Do not write student names (only nicknames/first names at registration)
 
 ## Critical Gotchas — Do Not Change
-- **PDF.js worker** — do not use `?url` imports or CDN URLs. The `pdfWorkerPlugin` in `vite.config.ts` copies `pdf.worker.mjs` to `dist/`. Hardcoded as `'/pdf.worker.mjs'` in ReadingPage.tsx. All three alternatives were tried and failed.
+- **PDF.js worker — this entry no longer matches the code (noticed 2026-09-10).** It used
+  to read "do not use `?url` imports or CDN URLs … hardcoded as `'/pdf.worker.mjs'` in
+  ReadingPage.tsx". `ReadingPage` has in fact imported `pdfjs-dist/build/pdf.worker.mjs?url`
+  since `ab496e5`, while `pdfWorkerPlugin` in `vite.config.ts` still copies the unhashed
+  worker to `dist/`. The plugin's own comment says the `?url` form is what produced a
+  content-hashed URL, the SPA HTML fallback, and an iOS Safari MIME-type error — so the
+  hazard the old rule described is real and the current import is the shape it warned
+  about. Nobody has reported it since, so this is recorded rather than reverted: check it
+  on a real iPhone before assuming either state is correct, and do not "restore" the old
+  wording without changing the code to match.
 - **`--legacy-peer-deps`** — required for all npm operations. Do not remove.
 - **`user-select: none`** — do not apply inside `#pdf-container`. Breaks text selection for annotation.
 - **Registration step order** — profile `setDoc` must happen BEFORE classroom join in `registerUser()`. Do not reorder. See `src/firebase/auth.ts`.
@@ -63,6 +72,29 @@
 - **`annotationKind` values** — `'annotation'` | `'reflection'` only. These are stored together and filtered throughout.
 - **`TrialExpiredModal` vs `UpgradeModal`** — expired trial teachers get `TrialExpiredModal`. Free-tier teachers (never had trial) get `UpgradeModal`. Not interchangeable.
 - **Text selection capture** — `capturedSelection` state is intentionally NOT cleared when live selection goes empty. This is required on mobile because tapping the emoji bar clears `window.getSelection()` before the click fires.
+- **Full screen goes on the reader's ROOT element, never on the PDF** — a fullscreened
+  element is promoted to the browser's top layer and everything outside it stops
+  painting. Fullscreen the PDF and the floating emoji bar, the annotation panel and the
+  writing-task modal stay in the DOM, correctly laid out, and completely invisible.
+  Anything that must be usable while reading has to live inside whatever gets
+  fullscreened. Covered by `tests/e2e/reader.e2e.mjs`, which selects text in full screen
+  and asserts the emoji bar is *visible* — presence in the DOM proves nothing here.
+- **The Fullscreen API is best-effort; the CSS fallback is not** — `enterImmersive` sets
+  the immersive state (a `fixed inset-0` layout) BEFORE requesting fullscreen, and
+  swallows a rejection. iPhone Safari has no element fullscreen at all. Never gate the
+  layout on the request succeeding, and never assert on `document.fullscreenElement` in
+  a test — headless Chromium may refuse it too.
+- **Measure the reader with callback refs, not `[]` effects** — `ReadingPage`'s first
+  render is the "Opening book…" screen, so an effect with `[]` deps runs before the PDF
+  stage exists and measures nothing, forever. That is exactly how `containerWidth` sat
+  pinned at its 700px default for every reader on every screen until 2026-09-10. The
+  stage `ResizeObserver` is wired as a callback ref (`stageRef`) so it attaches when the
+  node does.
+- **Teacher annotations carry `classroomId: null`** — `validAnnotationClassroomLink` only
+  accepts a classroom whose `studentIds` contain the author, and a teacher never is one,
+  so a teacher note pinned to their own classroom is rejected outright. `ReadingPage`
+  forces null via `annotationClassroomId`. This is also what keeps those notes out of
+  `getAnnotationsByClassroom`, i.e. off the teacher's own annotations dashboard.
 
 ## Firestore Rules & Indexes — Auto-Deployed by CI
 `firebase-deploy.yml` runs `firebase deploy --only hosting,firestore:rules,firestore:indexes,storage`
@@ -103,7 +135,9 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
   indexes required.
 - **Rules tests:** `npm run test:rules` boots the Firestore emulator (needs Java) and runs
   `tests/rules/*.test.mjs` against `firestore.rules` — covers read/write scoping for all three
-  writing collections, incl. the classroom-pinning edge cases. Dev-only deps: `firebase-tools`,
+  writing collections, incl. the classroom-pinning edge cases, plus student/book removal
+  (`removal.test.mjs`) and teacher annotations (`teacherAnnotations.test.mjs`). 44 checks
+  across 7 suites as of 2026-09-10. Dev-only deps: `firebase-tools`,
   `@firebase/rules-unit-testing`. Emulator config is `firebase.test.json` (separate from the deploy
   `firebase.json`).
 - **Browser E2E:** `npm run test:e2e` boots Auth+Firestore emulators (`firebase.emulator.json`),
@@ -141,6 +175,44 @@ Teachers can add students and books but for a long time could remove neither.
   flows read. It asserts the impact count, that both removals survive a reload, and that the student
   side shows no "Unknown Book" ghosts (MyAnnotationsPage's fallback for an orphaned annotation, and
   so the visible symptom of a cascade that did not run).
+
+## Full-screen reading + the teacher reader — added 2026-09-10
+One request, two features, both landing in `ReadingPage` (still filed under
+`src/pages/student/` — it now serves every role).
+- **Full screen** is a header button next to Read aloud, plus zoom steps and a Fit page /
+  Fit width toggle that exist only inside it. It fullscreens the reader's ROOT element
+  with a CSS `fixed inset-0` fallback — see the two full-screen gotchas above, both of
+  which are the whole reason it is built this way.
+- **Nothing unmounts on toggle.** Every block hidden in full screen is a `{!immersive &&
+  …}` left in its own slot, so `<Document>` keeps its position in the tree and the PDF is
+  never re-downloaded. Move an element instead of gating it and you reintroduce a
+  multi-second reload on every toggle.
+- **One measured box drives both fit modes** — `stageSize`, from a `ResizeObserver` on the
+  stage wrapper. That wrapper never scrolls (an inner div does): measuring the scroller
+  itself shrinks the box as a scrollbar appears and oscillates the page size.
+- **Teachers read at `/teacher/read/:bookId`** — the same component and the same route
+  guard style as the student route, reached from "Read & annotate" on each dashboard book
+  card and "Read" on each Your Books row in Classroom. Differences all hang off
+  `isTeacher`: no reading progress at all (`persistProgress` returns early — a teacher
+  paging through their own book is not a tracked learner and must not land in their own
+  class's progress data), `classroomId: null` on their annotations, and back goes to
+  `/teacher`.
+- **No new Firestore rules were needed** — `canReadBook` already accepts the book's
+  `uploadedBy` and `isOwner` already grants an author their own annotation. That is
+  precisely why `tests/rules/teacherAnnotations.test.mjs` exists: nothing in
+  `firestore.rules` names teacher annotations, so a later edit could remove the capability
+  or widen it without looking wrong in a diff. It pins both directions, including that a
+  teacher cannot forge a note attributed to a student.
+- **`deleteTeacherBook` now walks the uploader too**, not just `assignedStudentIds`. A
+  teacher's own notes on a book they delete would otherwise be stranded permanently:
+  `isAssignedBookTeacher` cannot authorise the delete once the book doc is gone, and no
+  screen lists them. `countBookStudentRecords` is unchanged — the number quoted in the
+  dialog is still student notes, which is what it says.
+- **E2E:** `tests/e2e/reader.e2e.mjs`, between the annotations and navigation flows in
+  `run.sh`. Teacher saves a note and **reloads** (a rules rejection would have left it in
+  React state and nowhere else), full screen is checked against the real canvas box, text
+  is selected while full screen to prove the emoji bar is painted, and the teacher's note
+  is asserted absent from the student's own notes page.
 
 ## Read Aloud — `src/hooks/useReadAloud.ts`
 The engine lives in the hook, not `ReadingPage`; `ReadAloudBar` is the UI. The page only supplies

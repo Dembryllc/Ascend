@@ -1,3 +1,8 @@
+// The reader, shared by every role that opens a book:
+//   /student/read/:bookId  — students and individuals (tracked reading)
+//   /teacher/read/:bookId  — teachers reading and annotating their own library
+// It lives under pages/student/ for historical reasons; the role differences are
+// all driven from `isTeacher` below.
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -10,7 +15,7 @@ import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, delet
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
 import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
 import { REACTIONS } from '@/types'
-import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, MessageSquare, Target, LayoutGrid, Image as ImageIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, ArrowLeft, CheckCircle, Clock, Maximize2, MessageSquare, Minimize2, Target, LayoutGrid, Image as ImageIcon, ZoomIn, ZoomOut } from 'lucide-react'
 import OrganizerModal from '@/components/student/OrganizerModal'
 import ReadAloudBar from '@/components/student/ReadAloudBar'
 import { useReadAloud } from '@/hooks/useReadAloud'
@@ -18,6 +23,19 @@ import { useReadAloud } from '@/hooks/useReadAloud'
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const HIGHLIGHT_STOP_WORDS = new Set(['and', 'are', 'for', 'not', 'that', 'the', 'this', 'was', 'with'])
+
+// Zoom is stepped rather than free: a child pressing + on a tablet needs a
+// predictable jump, and every step here still renders the page at a sane size.
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3]
+
+// Safari (iPadOS included) still ships the prefixed Fullscreen API, and iPhone
+// Safari ships no element fullscreen at all — hence the optional members here
+// and the CSS fallback in enterImmersive().
+type FullscreenElement = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void }
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null
+  webkitExitFullscreen?: () => Promise<void> | void
+}
 
 type PdfDocument = {
   numPages: number
@@ -44,7 +62,6 @@ export default function ReadingPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [savingReflection, setSavingReflection] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [containerWidth, setContainerWidth] = useState(700)
   const [loadingBook, setLoadingBook] = useState(true)
   const [readerError, setReaderError] = useState('')
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
@@ -63,6 +80,31 @@ export default function ReadingPage() {
   const [floatingBar, setFloatingBar] = useState<{ x: number; y: number } | null>(null)
   const [organizerOpen, setOrganizerOpen] = useState(false)
   const shouldOpenWritingTask = searchParams.get('writingTask') === '1'
+
+  // Full-screen ("immersive") reading. Two mechanisms on purpose:
+  //   1. The Fullscreen API, so the browser's own chrome gets out of the way.
+  //   2. A CSS `fixed inset-0` fallback, applied first, for the browsers that
+  //      refuse the request — iPhone Safari has no element fullscreen at all,
+  //      and a rejected request must never leave the reader half-switched.
+  // The request goes to the reader's ROOT element, not the PDF: a fullscreened
+  // element is promoted to the top layer and everything outside it stops
+  // painting, so the floating emoji bar, the annotation panel and the writing
+  // task modal all have to live inside whatever we fullscreen.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [immersive, setImmersive] = useState(false)
+  const [fitMode, setFitMode] = useState<'width' | 'page'>('width')
+  const [zoom, setZoom] = useState(1)
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 })
+
+  // Teachers open their own books at /teacher/read/:bookId — the same reader,
+  // minus the parts that only mean something for a tracked learner.
+  const isTeacher = profile?.role === 'teacher'
+  const homePath = isTeacher ? '/teacher' : '/student'
+  // A teacher's notes are never a classroom record: validAnnotationClassroomLink
+  // only accepts a classroomId whose studentIds contain the author, so a teacher
+  // writing one would be rejected outright. Their notes are lesson prep, private
+  // to them, and carry no classroom link.
+  const annotationClassroomId = isTeacher ? null : (profile?.classroomId ?? null)
 
   // Extracting the page's text is this page's job; everything about speaking it
   // — chunking, skipping, speed, voice — lives in useReadAloud.
@@ -87,13 +129,72 @@ export default function ReadingPage() {
   const { isSpeaking, status: readAloudStatus, stop: stopSpeaking, reset: resetReadAloud } = readAloud
   const speakPage = useCallback(() => { void readAloud.start(0) }, [readAloud])
 
+  const enterImmersive = useCallback(() => {
+    // Default to fitting the whole page: a full-screen reader that still needs
+    // scrolling to reach the bottom of the page has not gained the reader much.
+    setFitMode('page')
+    setZoom(1)
+    setImmersive(true)
+    const el = rootRef.current as FullscreenElement | null
+    const request = el?.requestFullscreen ?? el?.webkitRequestFullscreen
+    // A missing or rejected request is not a failure — the CSS fallback is
+    // already applied above, so the reader fills the window either way.
+    if (el && request) Promise.resolve(request.call(el)).catch(() => {})
+  }, [])
+
+  const exitImmersive = useCallback(() => {
+    setImmersive(false)
+    setFitMode('width')
+    setZoom(1)
+    const doc = document as FullscreenDocument
+    if (doc.fullscreenElement ?? doc.webkitFullscreenElement) {
+      const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen
+      if (exit) Promise.resolve(exit.call(doc)).catch(() => {})
+    }
+  }, [])
+
+  function stepZoom(direction: 1 | -1) {
+    setZoom((current) => {
+      const index = ZOOM_STEPS.indexOf(current)
+      const next = (index === -1 ? ZOOM_STEPS.indexOf(1) : index) + direction
+      return ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, next))]
+    })
+  }
+
+  // Leaving full screen by a route the app did not drive — Esc, the browser's
+  // own control, a swipe — has to put the layout back too, or the reader is
+  // left in immersive styling inside a normal window.
+  useEffect(() => {
+    function onFullscreenChange() {
+      const doc = document as FullscreenDocument
+      if (doc.fullscreenElement ?? doc.webkitFullscreenElement) return
+      setImmersive(false)
+      setFitMode('width')
+      setZoom(1)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
+      // Navigating away while full screen would otherwise leave the whole app
+      // fullscreened on a page that never asked for it.
+      const doc = document as FullscreenDocument
+      if (doc.fullscreenElement ?? doc.webkitFullscreenElement) {
+        const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen
+        if (exit) Promise.resolve(exit.call(doc)).catch(() => {})
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (!bookId) return
     if (!profile) return
     Promise.all([
       getBook(bookId),
       getAnnotationsByStudentAndBook(profile.uid, bookId),
-      getReadingProgress(profile.uid, bookId),
+      // Teachers are not tracked readers — see persistProgress.
+      profile.role === 'teacher' ? Promise.resolve(null) : getReadingProgress(profile.uid, bookId),
     ]).then(([b, ann, progress]) => {
       if (!b) {
         setReaderError('This book could not be found. It may have been deleted or not assigned to you.')
@@ -154,15 +255,29 @@ export default function ReadingPage() {
     return () => window.clearTimeout(timer)
   }, [pageAnnotations, currentPage])
 
-  // Responsive PDF width
-  useEffect(() => {
-    function measure() {
-      const el = document.getElementById('pdf-main-column')
-      if (el) setContainerWidth(Math.min(el.clientWidth - 32, 900))
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+  // The page image is sized from the box it actually sits in. A ResizeObserver
+  // rather than a resize listener, because the box also changes on entering and
+  // leaving full screen, on rotation, and when the read aloud bar appears —
+  // none of which fire a window resize.
+  //
+  // It is wired as a CALLBACK REF, not an effect. The reader's first render is
+  // the "Opening book…" screen, so an effect with [] deps runs while the stage
+  // does not exist yet and silently measures nothing — which is exactly how the
+  // old width measure ended up pinned to its 700px default for every reader on
+  // every screen. A callback ref runs when the node actually attaches.
+  const stageObserverRef = useRef<ResizeObserver | null>(null)
+  const stageRef = useCallback((el: HTMLDivElement | null) => {
+    stageObserverRef.current?.disconnect()
+    stageObserverRef.current = null
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      setStageSize({
+        width: Math.round(entry.contentRect.width),
+        height: Math.round(entry.contentRect.height),
+      })
+    })
+    observer.observe(el)
+    stageObserverRef.current = observer
   }, [])
 
   function onDocumentLoaded(pdf: unknown) {
@@ -178,6 +293,10 @@ export default function ReadingPage() {
 
   const persistProgress = useCallback(async (secondsRead = 0, completed = false) => {
     if (!profile || !bookId || numPages === 0) return
+    // Reading progress measures a learner. A teacher paging through their own
+    // book to prepare a lesson is not a learner, and writing the record anyway
+    // would put the teacher into the progress data they are meant to read.
+    if (profile.role === 'teacher') return
     const progress = await recordReadingProgress({
       studentId: profile.uid,
       bookId,
@@ -283,6 +402,9 @@ export default function ReadingPage() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && annotationPanel.open) { closePanel(); return }
+      // Real full screen gets Escape handled by the browser (and answered by the
+      // fullscreenchange listener). The CSS fallback has to handle it here.
+      if (e.key === 'Escape' && immersive) { exitImmersive(); return }
       // Arrow key page navigation — skip if focused in a text field or panel open
       if (annotationPanel.open || organizerOpen) return
       const tag = (document.activeElement as HTMLElement)?.tagName
@@ -292,7 +414,7 @@ export default function ReadingPage() {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [annotationPanel.open, organizerOpen, numPages])
+  }, [annotationPanel.open, organizerOpen, numPages, immersive, exitImmersive])
 
   async function handleMarkComplete() {
     setMarkingComplete(true)
@@ -366,7 +488,7 @@ export default function ReadingPage() {
           )
         )
       } else {
-        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, cleanNote, cleanSelectedText, 'annotation', profile.classroomId)
+        const ann = await saveAnnotation(profile.uid, bookId, currentPage, selectedReaction, cleanNote, cleanSelectedText, 'annotation', annotationClassroomId)
         setAnnotations((prev) => [...prev, ann])
       }
       closePanel()
@@ -405,7 +527,7 @@ export default function ReadingPage() {
         reflectionText.trim(),
         '',
         'reflection',
-        profile.classroomId,
+        annotationClassroomId,
       )
       setAnnotations((prev) => [...prev, ann])
       setReflectionText('')
@@ -423,10 +545,10 @@ export default function ReadingPage() {
         <h2 className="text-xl font-bold text-[#1A1D23] mb-2">We couldn&apos;t open this book</h2>
         <p className="text-[#4B5563] text-sm mb-6">Missing book id.</p>
         <button
-          onClick={() => navigate('/student')}
+          onClick={() => navigate(homePath)}
           className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
         >
-          Back to Bookshelf
+          {isTeacher ? 'Back to Dashboard' : 'Back to Bookshelf'}
         </button>
       </div>
     </div>
@@ -456,10 +578,10 @@ export default function ReadingPage() {
           </button>
         )}
         <button
-          onClick={() => navigate('/student')}
+          onClick={() => navigate(homePath)}
           className="bg-[#4A90D9] text-white font-bold px-5 py-3 rounded-xl hover:bg-[#357ABD] transition-colors"
         >
-          Back to Bookshelf
+          {isTeacher ? 'Back to Dashboard' : 'Back to Bookshelf'}
         </button>
       </div>
       {organizerOpen && book && profile && (
@@ -483,21 +605,88 @@ export default function ReadingPage() {
   const readingCompletionPct = readingProgress?.completionPercent ?? (numPages > 0 ? Math.round((currentPage / numPages) * 100) : 0)
   const minutesRead = Math.max(0, Math.round((readingProgress?.totalSecondsRead ?? 0) / 60))
 
+  // Fit and zoom belong to full screen; outside it the reader keeps the plain
+  // fit-to-column behaviour it has always had, whatever the last state was.
+  const effectiveFit = immersive ? fitMode : 'width'
+  const effectiveZoom = immersive ? zoom : 1
+  // react-pdf takes one dimension and width wins when both are set, so only
+  // ever hand it the one the current fit mode is driving.
+  // Outside full screen the page keeps its comfortable reading measure: inset
+  // from the column and capped, rather than stretched across a wide monitor.
+  const columnWidth = Math.min(Math.max(240, stageSize.width - 32), 900)
+  const pageWidth = effectiveFit === 'width'
+    ? Math.round((immersive ? Math.max(240, stageSize.width - 16) : columnWidth) * effectiveZoom)
+    : undefined
+  const pageHeight = effectiveFit === 'page'
+    ? Math.round(Math.max(240, stageSize.height - 16) * effectiveZoom)
+    : undefined
+  // Rendering before the stage has been measured would raster the page at the
+  // 240px floor and then immediately raster it again at the real size — a
+  // visible flash of a tiny page every time a book opens.
+  const stageMeasured = stageSize.width > 0
+
   return (
-    <div className="min-h-screen bg-[#F8F9FC] flex flex-col">
+    <div
+      ref={rootRef}
+      className={immersive
+        // `fixed inset-0` is the fallback for browsers that refuse the Fullscreen
+        // request, and harmless when the request succeeded — the element already
+        // fills the screen. The dark ground is what makes a lit page readable.
+        ? 'fixed inset-0 z-50 bg-[#12151B] flex flex-col overflow-hidden'
+        : 'min-h-screen bg-[#F8F9FC] flex flex-col'}
+    >
       {/* Header */}
-      <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <button onClick={() => navigate('/student')} aria-label="Back to home" className="flex items-center gap-1 text-[#4B5563] hover:text-[#1A1D23] transition-colors">
+      <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-40 shrink-0">
+        <div className={`${immersive ? 'max-w-none' : 'max-w-4xl'} mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2 sm:gap-4`}>
+          <button onClick={() => navigate(homePath)} aria-label="Back to home" className="flex items-center gap-1 text-[#4B5563] hover:text-[#1A1D23] transition-colors shrink-0">
             <ArrowLeft size={20} />
-            <span className="text-sm font-medium hidden sm:inline">My Books</span>
+            <span className="text-sm font-medium hidden sm:inline">{isTeacher ? 'Dashboard' : 'My Books'}</span>
           </button>
           <div className="text-center flex-1 min-w-0">
             <p className="font-bold text-[#1A1D23] text-sm truncate">{book.title}</p>
-            <p className="text-xs text-[#4B5563]">{book.author}</p>
+            <p className="text-xs text-[#4B5563] truncate">{immersive ? `Page ${currentPage} of ${numPages || '…'}` : book.author}</p>
           </div>
           <div className="flex items-center gap-1">
-            {(book.organizerTemplateId || profile?.role === 'individual') && (
+            {immersive && (
+              <>
+                <div className="hidden sm:flex items-center gap-0.5 mr-1">
+                  <button
+                    onClick={() => stepZoom(-1)}
+                    disabled={zoom <= ZOOM_STEPS[0]}
+                    aria-label="Zoom out"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl text-[#4B5563] hover:bg-[#F3F4F6] disabled:opacity-35 disabled:hover:bg-transparent transition-colors"
+                  >
+                    <ZoomOut size={18} />
+                  </button>
+                  <span className="text-xs font-semibold text-[#4B5563] tabular-nums w-11 text-center">{Math.round(zoom * 100)}%</span>
+                  <button
+                    onClick={() => stepZoom(1)}
+                    disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+                    aria-label="Zoom in"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl text-[#4B5563] hover:bg-[#F3F4F6] disabled:opacity-35 disabled:hover:bg-transparent transition-colors"
+                  >
+                    <ZoomIn size={18} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setZoom(1); setFitMode((m) => (m === 'page' ? 'width' : 'page')) }}
+                  aria-label={fitMode === 'page' ? 'Fit the page width instead' : 'Fit the whole page instead'}
+                  className="min-h-[44px] px-3 rounded-xl text-xs sm:text-sm font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors whitespace-nowrap"
+                >
+                  {fitMode === 'page' ? 'Fit page' : 'Fit width'}
+                </button>
+              </>
+            )}
+            <button
+              onClick={immersive ? exitImmersive : enterImmersive}
+              aria-label={immersive ? 'Exit full screen' : 'Read in full screen'}
+              title={immersive ? 'Exit full screen (Esc)' : 'Read in full screen'}
+              className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl text-[#9B7FD4] hover:bg-purple-50 transition-colors font-semibold text-sm"
+            >
+              {immersive ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              <span className="hidden md:inline">{immersive ? 'Exit full screen' : 'Full screen'}</span>
+            </button>
+            {!immersive && (book.organizerTemplateId || profile?.role === 'individual') && (
               <button
                 onClick={() => setOrganizerOpen(true)}
                 aria-label="Open writing task"
@@ -532,10 +721,22 @@ export default function ReadingPage() {
         </div>
       </header>
 
-      <div id="pdf-container" className="flex-1 px-3 sm:px-4 py-4 max-w-7xl mx-auto w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
-          <main id="pdf-main-column" className="min-w-0">
-            {(book.assignmentPrompt || book.successCriteria) && (
+      {/* The ids here are load-bearing: #pdf-container bounds the text-selection
+          check, #pdf-main-column is what the non-immersive width measure reads.
+          Full screen only swaps their classes — every element below stays in the
+          same slot in both layouts so that toggling never remounts <Document>
+          and re-downloads the PDF. */}
+      <div
+        id="pdf-container"
+        className={immersive
+          ? 'flex-1 min-h-0 w-full flex flex-col overflow-hidden'
+          : 'flex-1 px-3 sm:px-4 py-4 max-w-7xl mx-auto w-full'}
+      >
+        <div className={immersive
+          ? 'flex-1 min-h-0 flex flex-col'
+          : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start'}>
+          <main id="pdf-main-column" className={immersive ? 'flex-1 min-h-0 flex flex-col px-2 pb-2 pt-2' : 'min-w-0'}>
+            {!immersive && (book.assignmentPrompt || book.successCriteria) && (
               <section className="w-full mb-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
                 <div className="flex items-start gap-3">
                   <div className="bg-blue-50 text-[#4A90D9] p-2 rounded-xl shrink-0">
@@ -562,7 +763,7 @@ export default function ReadingPage() {
               </section>
             )}
 
-            {(book.organizerTemplateId || profile?.role === 'individual') && (
+            {!immersive && (book.organizerTemplateId || profile?.role === 'individual') && (
               <section className="w-full mb-4 bg-green-50 rounded-2xl border border-green-200 p-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="bg-green-100 text-[#5BB974] p-2 rounded-xl shrink-0">
@@ -574,7 +775,11 @@ export default function ReadingPage() {
                       <p className="text-xs text-[#4B5563] line-clamp-2">{book.organizerPrompt}</p>
                     ) : (
                       <p className="text-xs text-[#4B5563] truncate">
-                        {book.organizerTemplateId ? 'Your teacher assigned a writing task for this book.' : 'Open a writing task to organize your thinking as you read.'}
+                        {isTeacher
+                          ? 'Open the writing task your students see for this book.'
+                          : book.organizerTemplateId
+                          ? 'Your teacher assigned a writing task for this book.'
+                          : 'Open a writing task to organize your thinking as you read.'}
                       </p>
                     )}
                   </div>
@@ -588,6 +793,7 @@ export default function ReadingPage() {
               </section>
             )}
 
+            {!immersive && !isTeacher && (
             <section className="w-full mb-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -626,9 +832,18 @@ export default function ReadingPage() {
                 />
               </div>
             </section>
+            )}
+
+            {/* Full screen has no room for the full explanation — say the same
+                thing in one line and keep the long version for the normal view. */}
+            {pageIsImageOnly && immersive && (
+              <p role="status" className="w-full shrink-0 mb-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-900">
+                This page has no text layer yet — it is a scan, so highlighting and Read aloud cannot work here. Emoji notes still can.
+              </p>
+            )}
 
             {/* Image-only page (scan, photo, design export) — no text layer to work with */}
-            {pageIsImageOnly && (
+            {pageIsImageOnly && !immersive && (
               <section
                 role="status"
                 className="w-full mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3"
@@ -659,8 +874,15 @@ export default function ReadingPage() {
 
             {!pageIsImageOnly && <ReadAloudBar readAloud={readAloud} />}
 
-            {/* PDF */}
-            <div className="flex-1 w-full flex justify-center">
+            {/* PDF. stageRef sits on the OUTER box, which never scrolls: measuring
+                the scroller itself would shrink the box as a scrollbar appears and
+                oscillate the page size. `contents` keeps the inner wrapper out of
+                the normal-view layout entirely. */}
+            <div
+              ref={stageRef}
+              className={immersive ? 'flex-1 min-h-0 w-full overflow-hidden' : 'flex-1 w-full flex justify-center'}
+            >
+              <div className={immersive ? 'w-full h-full overflow-auto flex justify-center items-start p-2' : 'contents'}>
               <Document
                   file={book.storageUrl}
                   onLoadSuccess={onDocumentLoaded}
@@ -672,17 +894,23 @@ export default function ReadingPage() {
                   }
                   loading={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
                 >
-                  <Page
-                    pageNumber={currentPage}
-                    width={containerWidth}
-                    renderTextLayer
-                    renderAnnotationLayer={false}
-                  />
+                  {stageMeasured && (
+                    <Page
+                      pageNumber={currentPage}
+                      width={pageWidth}
+                      height={pageHeight}
+                      renderTextLayer
+                      renderAnnotationLayer={false}
+                    />
+                  )}
                 </Document>
+              </div>
             </div>
 
             {/* Page navigation */}
-            <div className="w-full mt-4 flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm border border-[#F3F4F6]">
+            <div className={`w-full flex items-center justify-between bg-white rounded-2xl shadow-sm border border-[#F3F4F6] ${
+              immersive ? 'shrink-0 mt-2 px-3 py-2' : 'mt-4 px-4 py-3'
+            }`}>
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
@@ -714,28 +942,32 @@ export default function ReadingPage() {
             )}
 
             {/* Annotation toolbar */}
-            <div className="w-full mt-4 bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
-          <p className="text-sm font-bold text-[#1A1D23] mb-3">How does this page make you feel?</p>
-          <div className="grid grid-cols-5 gap-2">
+            <div className={`w-full bg-white rounded-2xl shadow-sm border border-[#F3F4F6] ${
+              immersive ? 'shrink-0 mt-2 px-3 py-2' : 'mt-4 p-4'
+            }`}>
+          {!immersive && <p className="text-sm font-bold text-[#1A1D23] mb-3">How does this page make you feel?</p>}
+          <div className={`grid grid-cols-5 gap-2 ${immersive ? 'max-w-md mx-auto' : ''}`}>
             {(Object.entries(REACTIONS) as [ReactionType, typeof REACTIONS[ReactionType]][]).map(([type, r]) => (
               <button
                 key={type}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => openAnnotationPanel(type)}
                 aria-label={r.label}
-                className="flex flex-col items-center gap-1 p-2 rounded-xl border-2 border-transparent hover:border-[#4A90D9] hover:bg-blue-50 transition-all"
+                className={`flex flex-col items-center gap-1 rounded-xl border-2 border-transparent hover:border-[#4A90D9] hover:bg-blue-50 transition-all ${
+                  immersive ? 'py-1 px-2' : 'p-2'
+                }`}
               >
-                <span className="text-2xl sm:text-3xl">{r.emoji}</span>
-                <span className="text-xs text-[#4B5563] font-medium text-center leading-tight hidden sm:block">{r.label}</span>
+                <span className={immersive ? 'text-2xl' : 'text-2xl sm:text-3xl'}>{r.emoji}</span>
+                <span className={`text-xs text-[#4B5563] font-medium text-center leading-tight ${immersive ? 'hidden' : 'hidden sm:block'}`}>{r.label}</span>
               </button>
             ))}
           </div>
 
           {/* Existing page annotations */}
           {hasAnnotationOnPage && (
-            <div className="mt-4 pt-4 border-t border-[#F3F4F6]">
+            <div className={`border-t border-[#F3F4F6] ${immersive ? 'mt-2 pt-2' : 'mt-4 pt-4'}`}>
               <p className="text-xs font-bold text-[#4B5563] uppercase tracking-wide mb-2">Your notes on this page</p>
-              <div className="space-y-2">
+              <div className={`space-y-2 ${immersive ? 'max-h-28 overflow-y-auto pr-1' : ''}`}>
                 {pageAnnotations.map((ann) => {
                   const r = REACTIONS[ann.reactionType]
                   return (
@@ -768,12 +1000,19 @@ export default function ReadingPage() {
             </div>
           </main>
 
+          {!immersive && (
           <aside className="lg:sticky lg:top-20 space-y-4">
             <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
               <div className="flex items-center gap-2 mb-3">
                 <MessageSquare size={18} className="text-[#9B7FD4]" />
-                <h3 className="font-bold text-[#1A1D23]">Annotation sidebar</h3>
+                <h3 className="font-bold text-[#1A1D23]">{isTeacher ? 'Your notes on this book' : 'Annotation sidebar'}</h3>
               </div>
+              {isTeacher && (
+                <p className="text-xs text-[#4B5563] bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mb-3">
+                  These notes are yours alone — students never see them. Mark the passages you want
+                  to teach from before the lesson.
+                </p>
+              )}
               <div className="grid grid-cols-3 gap-2 mb-4">
                 <MiniStat label="Notes" value={annotations.filter((ann) => ann.annotationKind !== 'reflection').length} />
                 <MiniStat label="Quotes" value={quoteCount} />
@@ -819,10 +1058,12 @@ export default function ReadingPage() {
             </section>
 
             <section className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] p-4">
-              <div className="flex items-center gap-2 mb-3 text-sm text-[#4B5563]">
-                <Clock size={16} className="text-[#4A90D9]" />
-                <span>{minutesRead} minute{minutesRead === 1 ? '' : 's'} tracked in this book</span>
-              </div>
+              {!isTeacher && (
+                <div className="flex items-center gap-2 mb-3 text-sm text-[#4B5563]">
+                  <Clock size={16} className="text-[#4A90D9]" />
+                  <span>{minutesRead} minute{minutesRead === 1 ? '' : 's'} tracked in this book</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle size={18} className="text-[#5BB974]" />
                 <h3 className="font-bold text-[#1A1D23]">After reading</h3>
@@ -833,7 +1074,9 @@ export default function ReadingPage() {
                 onChange={(e) => setReflectionText(e.target.value)}
                 rows={4}
                 maxLength={600}
-                placeholder="What changed in your thinking? What should your teacher notice?"
+                placeholder={isTeacher
+                  ? 'What do you want to come back to when you teach this?'
+                  : 'What changed in your thinking? What should your teacher notice?'}
                 className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9] resize-none"
               />
               <button
@@ -848,6 +1091,7 @@ export default function ReadingPage() {
               )}
             </section>
           </aside>
+          )}
         </div>
       </div>
 

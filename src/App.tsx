@@ -26,6 +26,8 @@ const AnnotationsViewerPage = lazy(() => import('@/pages/teacher/AnnotationsView
 const ProgressDashboardPage = lazy(() => import('@/pages/teacher/ProgressDashboardPage'))
 
 // Student
+// ReadingPage is shared: teachers open their own books in the same reader at
+// /teacher/read/:bookId (see the teacher routes below).
 const StudentHome = lazy(() => import('@/pages/student/StudentHome'))
 const StudentUploadPage = lazy(() => import('@/pages/student/StudentUploadPage'))
 const ReadingPage = lazy(() => import('@/pages/student/ReadingPage'))
@@ -66,6 +68,9 @@ export default function App() {
             <Route path="/teacher/classroom" element={<ProtectedRoute requiredRole="teacher"><ClassroomPage /></ProtectedRoute>} />
             <Route path="/teacher/annotations" element={<ProtectedRoute requiredRole="teacher"><AnnotationsViewerPage /></ProtectedRoute>} />
             <Route path="/teacher/progress" element={<ProtectedRoute requiredRole="teacher"><ProgressDashboardPage /></ProtectedRoute>} />
+            {/* Teachers read and annotate their own books in the same reader the
+                class uses. Their notes stay private to them — see ReadingPage. */}
+            <Route path="/teacher/read/:bookId" element={<ProtectedRoute requiredRole="teacher"><ReadingPage /></ProtectedRoute>} />
 
             {/* Student + Individual — shared shelf/reading/annotation routes */}
             <Route path="/student" element={<ProtectedRoute requiredRole={['student', 'individual']}><StudentHome /></ProtectedRoute>} />
