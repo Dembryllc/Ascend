@@ -9,7 +9,8 @@
 
 ## Notes / Session Log
 - Session logs live in the repo at `notes/` (e.g. `notes/2026-07-03-writing-feature.md`), Obsidian-friendly frontmatter (date/project/tags).
-- The Obsidian vault is **local** (Mac / iCloud) — cloud/remote sessions CANNOT reach it. Sync locally: `git pull origin main` → copy the note into the vault, or run the local `/record-to-vault` skill.
+- The Obsidian vault is a **git repo — `Dembryllc/Mike-Vault`** — and a cloud/remote session CAN reach it: ask for it to be added to the session, then read and write it like any other repo and push to `main`. The Mac copy is an Obsidian vault on top of that same repo, auto-committed and synced by the `obsidian-git` plugin (its commits read `vault update <timestamp>`), so a push here reaches the Mac on its next sync. **This line previously said the vault was local and unreachable from cloud sessions; that was wrong** (corrected 2026-09-10 after a remote session read, edited and pushed it directly) — do not re-add that claim, and do not hand-copy notes into the vault.
+- Easy Annotate's vault notes: `Claude Vault/Projects/Easy-Annotate-Ascend-Annotate.md` (status + change history), `Company OS/02-Engineering/Easy-Annotate/Tech-Debt.md`, session logs in `Claude Vault/Sessions/`, handoffs in `Claude Vault/Reference/`. The vault lags this repo whenever a session forgets to record — verify HEAD here before trusting a status claim there.
 
 ## Stack
 - React 19 + TypeScript + Vite 8 + Tailwind CSS v4 (no tailwind.config.js — configured inline)
