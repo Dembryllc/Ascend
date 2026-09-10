@@ -58,7 +58,12 @@ register, pdftext) green.
 ## Still open — decision needed
 This makes the failure legible; it does not make a scanned book readable.
 **OCR is the only thing that would**, and it is a real decision:
-client-side (tesseract.js — free, private, slow, ~2-4s/page and a few MB of
-worker) vs. a cloud OCR API (fast, accurate, costs per page, and sends student
-reading material off-device — a FERPA question). Not started; not to be added
-without an explicit call.
+client-side (tesseract.js — free, no per-page cost, ~2-4s/page and a few MB of
+worker to download) vs. a cloud OCR API (fast, much more accurate on messy
+scans, costs per page). Weigh it on cost, latency and accuracy. Not started;
+not to be added without an explicit call.
+
+Correction (2026-09-10, per Mike): an earlier version of this note framed cloud
+OCR as a FERPA question. That was wrong. Easy Annotate is a general K-12 reading
+tool, not a special-ed-only program, and the only data collected is name and
+email. FERPA is not the frame for this decision.
