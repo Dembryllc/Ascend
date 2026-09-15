@@ -90,6 +90,19 @@
   pinned at its 700px default for every reader on every screen until 2026-09-10. The
   stage `ResizeObserver` is wired as a callback ref (`stageRef`) so it attaches when the
   node does.
+- **A teacher cannot delete a student's login from the browser — ever** — the Firebase
+  client SDK only deletes *the currently signed-in user*. That is the whole reason
+  `deleteStudentAccount` is a Cloud Function, and the reason a teacher's only option used
+  to be the Firebase Console. Do not "simplify" it back to the client: there is no client
+  API for it. It also means **CI does not deploy this feature** — see the deploy note in
+  the delete-a-student section below.
+- **Removal provenance is load-bearing, not bookkeeping** — `removeStudentFromClassroom`
+  severs every link between teacher and student (roster, `classroomId`, book
+  assignments), so `removedByTeacherId` / `removedFromClassroomId` / `removedAt` on the
+  student's own user doc are the only trace left. They are what lets a teacher finish
+  deleting an account they already un-enrolled, and what the "Removed from this class"
+  list is queried by. `joinClassroomByCode` clears them — a learner who rejoins any class
+  must drop off the previous teacher's list and stop being deletable by them.
 - **Teacher annotations carry `classroomId: null`** — `validAnnotationClassroomLink` only
   accepts a classroom whose `studentIds` contain the author, and a teacher never is one,
   so a teacher note pinned to their own classroom is rejected outright. `ReadingPage`
@@ -175,6 +188,48 @@ Teachers can add students and books but for a long time could remove neither.
   flows read. It asserts the impact count, that both removals survive a reload, and that the student
   side shows no "Unknown Book" ghosts (MyAnnotationsPage's fallback for an orphaned annotation, and
   so the visible symptom of a cascade that did not run).
+
+## Deleting a student account — added 2026-09-15
+Reported from production: "I removed a student from my roster but wasn't able to delete
+them from the program without going in to firebase and manually removing them." Both
+halves were real. **Remove is still un-enrolment and still the default** (see the
+2026-09-02 section) — this adds the destructive option next to it, it does not replace it.
+- **`deleteStudentAccount`** (`functions/src/deleteStudent.ts`) is an `onCall` function.
+  It cascades `annotations`, `organizers`, `readingProgress`, `writingResponses`,
+  `writingFeedback`, personal `writingTasks` and self-uploaded `books` (+ their
+  `student-books/{uid}/` blobs), strips the uid from every `classrooms.studentIds` and
+  `books.assignedStudentIds`, then deletes the Auth user, then the profile doc.
+- **`dryRun: true` returns the same counts without deleting.** The dialog calls it first
+  and keeps the confirm button disabled until it answers — the same contract
+  `countBookStudentRecords` set for book deletion. Confirmation also requires typing the
+  student's display name.
+- **Deletion order is deliberate.** While `users/{studentId}` still exists the call can be
+  retried and still authorises, so any earlier failure is recoverable; the profile doc
+  goes last. Storage goes last of all and is raced against
+  `STORAGE_CLEANUP_TIMEOUT_MS` — the same reason `deleteTeacherBook` time-boxes its own
+  cleanup. Do not move the Storage step earlier.
+- **Authorisation lives in `canDelete()` alone**: the student is on the roster of a
+  classroom this teacher owns, OR this teacher is the one who removed them. Role is
+  checked too — `teacher` and `individual` accounts can never be deleted this way. The
+  Admin SDK bypasses rules, so **no client-side rule was widened** to allow a teacher to
+  delete another user's documents; don't add one.
+- **`firestore.rules`** — the teacher-clears-`classroomId` branch on `users` now also
+  accepts the three provenance keys and pins them to this teacher and this classroom. The
+  provenance is optional so an already-loaded older bundle keeps working. Covered by
+  `tests/rules/removal.test.mjs` (now 50 checks across 7 suites).
+- **⚠️ CI DOES NOT DEPLOY CLOUD FUNCTIONS.** `firebase-deploy.yml` ships hosting, Firestore
+  rules, indexes and Storage rules only. Merging this to `main` publishes the button
+  without the function behind it, and Delete fails with `functions/not-found`. Deploy the
+  function FIRST, then merge:
+  `cd functions && npm install && npm run build && firebase deploy --only functions:deleteStudentAccount --project ascend-annotate`
+- **E2E:** `tests/e2e/deletestudent.e2e.mjs` runs **last** — it destroys the seeded student
+  account every other flow signs in as. It deletes a student `removal.e2e.mjs` has
+  **already un-enrolled**, because deleting straight from the roster would not exercise the
+  order the teacher actually worked in. Its final assertion is the point of the whole
+  feature: the deleted student's credentials no longer sign in. `firebase.emulator.json`
+  boots functions for it, `config.ts` calls `connectFunctionsEmulator` under
+  `VITE_USE_EMULATORS`, and `run.sh` builds `functions/` before the emulators start
+  (the functions emulator loads `functions/lib` at startup, before the script runs).
 
 ## Full-screen reading + the teacher reader — added 2026-09-10
 One request, two features, both landing in `ReadingPage` (still filed under

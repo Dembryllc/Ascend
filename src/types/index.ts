@@ -12,6 +12,13 @@ export interface UserProfile {
   trialEndsAt?: Date
   signupSource?: string
   createdAt: Date
+  // Set by removeStudentFromClassroom. Removal severs every link between a
+  // teacher and a student, so this is the only trace left of who un-enrolled
+  // them — it is what lets the teacher still finish deleting the account
+  // afterwards, and what the "Removed students" list is queried by.
+  removedByTeacherId?: string
+  removedFromClassroomId?: string
+  removedAt?: Date
 }
 
 export function isPro(profile: UserProfile | null | undefined): boolean {

@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   writeBatch,
+  deleteField,
   arrayUnion,
   arrayRemove,
   query,
@@ -71,7 +72,15 @@ export async function joinClassroomByCode(studentId: string, joinCode: string): 
 
   const batch = writeBatch(db)
   batch.update(doc(db, 'classrooms', classroomId), { studentIds: arrayUnion(studentId) })
-  batch.update(doc(db, 'users', studentId), { classroomId })
+  // Joining any class clears the removal provenance: this learner is somebody's
+  // student again, so they must drop off the previous teacher's "Removed
+  // students" list and stop being deletable by them.
+  batch.update(doc(db, 'users', studentId), {
+    classroomId,
+    removedByTeacherId: deleteField(),
+    removedFromClassroomId: deleteField(),
+    removedAt: deleteField(),
+  })
   await batch.commit()
 
   // Add student to all books already uploaded by this classroom's teacher
@@ -102,6 +111,13 @@ export async function joinClassroomByCode(studentId: string, joinCode: string): 
  *  - `joinClassroomByCode` assigns the teacher's whole library on join, so
  *    removal has to undo that or a removed student keeps read access to the
  *    teacher's PDFs.
+ *
+ * It also records WHO removed them. Removal leaves no other link between the
+ * teacher and the student, so without this a teacher who un-enrolled someone
+ * could never afterwards delete that account — the exact dead end that sent a
+ * real teacher into the Firebase Console by hand. `getRemovedStudents` lists by
+ * it and `deleteStudentAccount` authorises by it. `joinClassroomByCode` clears
+ * it again, so a student who rejoins any class drops off that list.
  */
 export async function removeStudentFromClassroom(
   studentId: string,
@@ -110,7 +126,12 @@ export async function removeStudentFromClassroom(
 ): Promise<void> {
   const batch = writeBatch(db)
   batch.update(doc(db, 'classrooms', classroomId), { studentIds: arrayRemove(studentId) })
-  batch.update(doc(db, 'users', studentId), { classroomId: null })
+  batch.update(doc(db, 'users', studentId), {
+    classroomId: null,
+    removedByTeacherId: teacherId,
+    removedFromClassroomId: classroomId,
+    removedAt: serverTimestamp(),
+  })
   await batch.commit()
 
   const booksSnap = await getDocs(query(collection(db, 'books'), where('uploadedBy', '==', teacherId)))

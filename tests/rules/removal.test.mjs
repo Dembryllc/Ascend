@@ -87,6 +87,65 @@ describe('removing a student from a classroom', () => {
     await assertFails(updateDoc(doc(db(S1), 'classrooms', CLASS), { studentIds: [S1] }))
   })
 
+  it('the class teacher can stamp removal provenance while un-enrolling', async () => {
+    await assertSucceeds(updateDoc(doc(db(T), 'users', S1), {
+      classroomId: null,
+      removedByTeacherId: T,
+      removedFromClassroomId: CLASS,
+      removedAt: new Date(),
+    }))
+  })
+
+  it('a teacher cannot name someone else as the remover', async () => {
+    // The delete function trusts removedByTeacherId to decide who may erase an
+    // un-enrolled account, so forging it would hand that power to another teacher.
+    await assertFails(updateDoc(doc(db(T), 'users', S1), {
+      classroomId: null,
+      removedByTeacherId: T2,
+      removedFromClassroomId: CLASS,
+      removedAt: new Date(),
+    }))
+  })
+
+  it('a teacher cannot claim the student left a classroom they were not in', async () => {
+    await assertFails(updateDoc(doc(db(T), 'users', S1), {
+      classroomId: null,
+      removedByTeacherId: T,
+      removedFromClassroomId: OTHER_CLASS,
+      removedAt: new Date(),
+    }))
+  })
+
+  it('another teacher cannot stamp provenance on a student who is not theirs', async () => {
+    await assertFails(updateDoc(doc(db(T2), 'users', S1), {
+      classroomId: null,
+      removedByTeacherId: T2,
+      removedFromClassroomId: CLASS,
+      removedAt: new Date(),
+    }))
+  })
+
+  it('provenance cannot smuggle in another field', async () => {
+    await assertFails(updateDoc(doc(db(T), 'users', S1), {
+      classroomId: null,
+      removedByTeacherId: T,
+      removedFromClassroomId: CLASS,
+      removedAt: new Date(),
+      subscriptionStatus: 'pro',
+    }))
+  })
+
+  it('the student clears their own provenance when they rejoin', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'users', S1), {
+        classroomId: null, removedByTeacherId: T, removedFromClassroomId: CLASS, removedAt: new Date(),
+      })
+    })
+    await assertSucceeds(updateDoc(doc(db(S1), 'users', S1), {
+      classroomId: CLASS, removedByTeacherId: null, removedFromClassroomId: null, removedAt: null,
+    }))
+  })
+
   it('the class teacher can clear that student\'s classroomId', async () => {
     await assertSucceeds(updateDoc(doc(db(T), 'users', S1), { classroomId: null }))
   })

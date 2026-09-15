@@ -131,13 +131,35 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isOwner(uid);
       allow update: if isOwner(uid)
-        // A classroom's teacher may clear that student's classroomId when
-        // removing them from the roster — that key only, and only to null.
+        // A classroom's teacher may un-enrol that student: clear their
+        // classroomId and stamp who did it. Those four keys only, never any
+        // other field, and only for a class this teacher actually owns.
+        //
+        // The provenance is not bookkeeping — removal severs every other link
+        // between teacher and student, so it is the only thing that lets the
+        // teacher still finish deleting the account afterwards (see
+        // functions/src/deleteStudent.ts). It is pinned here so a teacher can
+        // only ever name THEMSELVES as the remover and their OWN classroom as
+        // the one left, which is exactly what that function trusts.
         || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['classroomId'])
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['classroomId', 'removedByTeacherId', 'removedFromClassroomId', 'removedAt'])
           && request.resource.data.classroomId == null
           && resource.data.classroomId is string
           && isClassTeacher(resource.data.classroomId)
+          && (
+            // The provenance itself is optional — a browser tab still running
+            // the pre-2026-09-15 bundle writes classroomId alone, and that must
+            // keep working. But if it IS written the teacher can only ever name
+            // themselves and the class the student is actually leaving.
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['removedByTeacherId', 'removedFromClassroomId', 'removedAt'])
+            || (
+              request.resource.data.removedByTeacherId == request.auth.uid
+              && request.resource.data.removedFromClassroomId == resource.data.classroomId
+              && request.resource.data.removedAt is timestamp
+            )
+          )
         );
     }
 

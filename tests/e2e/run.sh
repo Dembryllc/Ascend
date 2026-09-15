@@ -3,9 +3,19 @@ set -euo pipefail
 SHOTS="${1:-e2e-shots}"
 # Flows run in order against one emulator/vite lifecycle. The writing flow runs
 # first so it sees the pristine seed; register adds students to the classroom.
-FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs tests/e2e/pdftext.e2e.mjs tests/e2e/annotations.e2e.mjs tests/e2e/reader.e2e.mjs tests/e2e/navigation.e2e.mjs tests/e2e/readaloud.e2e.mjs tests/e2e/removal.e2e.mjs}"
+FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs tests/e2e/pdftext.e2e.mjs tests/e2e/annotations.e2e.mjs tests/e2e/reader.e2e.mjs tests/e2e/navigation.e2e.mjs tests/e2e/readaloud.e2e.mjs tests/e2e/removal.e2e.mjs tests/e2e/deletestudent.e2e.mjs}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+
+# The delete-student flow calls a real Cloud Function, so the emulator suite
+# boots functions too — and it loads them from functions/lib at startup, before
+# the script below runs. Build first or the callable simply is not there.
+if [ ! -d functions/node_modules ]; then
+  echo '--- installing cloud function deps ---'
+  (cd functions && npm install --silent)
+fi
+echo '--- building cloud functions ---'
+(cd functions && npm run build)
 
 # Everything runs inside the emulator lifecycle so Auth+Firestore are up.
 ./node_modules/.bin/firebase emulators:exec \

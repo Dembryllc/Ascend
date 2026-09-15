@@ -6,8 +6,10 @@ import { getClassroomByTeacher, createClassroom, removeStudentFromClassroom } fr
 import { getUserProfile } from '@/firebase/auth'
 import { getBooksByTeacher, countBookStudentRecords, deleteTeacherBook } from '@/firebase/books'
 import { assignBookToStudent, assignBookToClass } from '@/firebase/books'
+import { deleteStudentAccount, getRemovedStudents, totalStudentRecords } from '@/firebase/students'
+import type { DeleteStudentCounts } from '@/firebase/students'
 import type { Classroom, Book, UserProfile } from '@/types'
-import { Users, Copy, CheckCheck, CheckCircle2, Plus, BookOpen, Highlighter, Trash2, UserMinus } from 'lucide-react'
+import { Users, Copy, CheckCheck, CheckCircle2, Plus, BookOpen, Highlighter, Trash2, UserMinus, UserX } from 'lucide-react'
 
 export default function ClassroomPage() {
   const { profile } = useAuth()
@@ -24,6 +26,14 @@ export default function ClassroomPage() {
   const [assignSelects, setAssignSelects] = useState<Record<string, string>>({})
   const [assignedAll, setAssignedAll] = useState<Record<string, boolean>>({})
   const [confirmRemove, setConfirmRemove] = useState<UserProfile | null>(null)
+  // Students un-enrolled but not deleted. Removal leaves no other link to them,
+  // so this list is the only way back to an account the teacher still wants gone.
+  const [removedStudents, setRemovedStudents] = useState<UserProfile[]>([])
+  const [confirmDeleteStudent, setConfirmDeleteStudent] = useState<UserProfile | null>(null)
+  // null while the dry run is still counting — same contract as deleteImpact
+  // below: never claim zero and then delete something.
+  const [studentImpact, setStudentImpact] = useState<DeleteStudentCounts | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [confirmDeleteBook, setConfirmDeleteBook] = useState<Book | null>(null)
   // null while the count is still being read — the dialog says "checking…" rather
   // than claiming zero student notes and then deleting some.
@@ -36,9 +46,11 @@ export default function ClassroomPage() {
     Promise.all([
       getClassroomByTeacher(profile.uid),
       getBooksByTeacher(profile.uid),
-    ]).then(async ([c, b]) => {
+      getRemovedStudents(profile.uid),
+    ]).then(async ([c, b, removed]) => {
       setClassroom(c)
       setBooks(b)
+      setRemovedStudents(removed)
       if (c) {
         const profiles = await Promise.all(c.studentIds.map((id) => getUserProfile(id)))
         setStudents(profiles.filter(Boolean) as UserProfile[])
@@ -86,9 +98,49 @@ export default function ClassroomPage() {
         ...b,
         assignedStudentIds: b.assignedStudentIds.filter((id) => id !== student.uid),
       })))
+      setRemovedStudents((prev) => [...prev, { ...student, classroomId: null }]
+        .sort((a, b) => a.displayName.localeCompare(b.displayName)))
       setConfirmRemove(null)
     } catch {
       setActionError(`Could not remove ${student.displayName}. Please try again.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openDeleteStudent(student: UserProfile) {
+    setConfirmDeleteStudent(student)
+    setStudentImpact(null)
+    setDeleteConfirmText('')
+    setActionError('')
+    try {
+      const result = await deleteStudentAccount(student.uid, true)
+      setStudentImpact(result.counts)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error
+        ? err.message
+        : `Could not check what deleting ${student.displayName} would remove. Please try again.`)
+    }
+  }
+
+  async function handleDeleteStudent(student: UserProfile) {
+    if (!classroom && !student.removedByTeacherId) return
+    setBusy(true)
+    setActionError('')
+    try {
+      await deleteStudentAccount(student.uid)
+      setStudents((prev) => prev.filter((s) => s.uid !== student.uid))
+      setRemovedStudents((prev) => prev.filter((s) => s.uid !== student.uid))
+      setClassroom((prev) => prev
+        ? { ...prev, studentIds: prev.studentIds.filter((id) => id !== student.uid) }
+        : prev)
+      setBooks((prev) => prev.map((b) => ({
+        ...b,
+        assignedStudentIds: b.assignedStudentIds.filter((id) => id !== student.uid),
+      })))
+      setConfirmDeleteStudent(null)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : `Could not delete ${student.displayName}. Please try again.`)
     } finally {
       setBusy(false)
     }
@@ -296,12 +348,57 @@ export default function ClassroomPage() {
                     >
                       <UserMinus size={14} /> Remove
                     </button>
+                    <button
+                      onClick={() => openDeleteStudent(s)}
+                      aria-label={`Delete ${s.displayName}'s account`}
+                      className="flex items-center gap-1 text-xs font-semibold text-[#9CA3AF] hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <UserX size={14} /> Delete
+                    </button>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
+
+          {/* Removed students — the only remaining handle on an un-enrolled
+              account. Without this a teacher who removed someone first (the
+              natural order) could never finish deleting them in the app. */}
+          {removedStudents.length > 0 && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3F4F6]">
+              <div className="flex items-center gap-2 mb-1">
+                <UserX size={20} className="text-[#9CA3AF]" />
+                <h3 className="font-bold text-lg text-[#1A1D23]">Removed from this class ({removedStudents.length})</h3>
+              </div>
+              <p className="text-sm text-[#4B5563] mb-4">
+                These students still have an account and everything they wrote — removing
+                them only ended their place in your class. Delete an account to erase it
+                for good, or leave it alone and they can rejoin with your join code.
+              </p>
+              <ul className="divide-y divide-[#F3F4F6]">
+                {removedStudents.map((s) => (
+                  <li key={s.uid} className="flex items-center justify-between gap-2 py-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#1A1D23] truncate">{s.displayName}</p>
+                      <p className="text-xs text-[#6B7280]">
+                        {s.removedAt
+                          ? `Removed ${s.removedAt.toLocaleDateString()}`
+                          : 'Removed from your class'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => openDeleteStudent(s)}
+                      aria-label={`Delete ${s.displayName}'s account`}
+                      className="shrink-0 flex items-center gap-1 text-xs font-semibold text-[#9CA3AF] hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <UserX size={14} /> Delete account
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Books */}
           {books.length > 0 && (
@@ -383,6 +480,49 @@ export default function ClassroomPage() {
                 className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-bold transition-colors disabled:opacity-60"
               >
                 {busy ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteStudent && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDeleteStudent(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-xl text-[#1A1D23] mb-2">Delete this account?</h3>
+            <p className="text-[#4B5563] mb-1 font-semibold">{confirmDeleteStudent.displayName}</p>
+            <p className="text-sm text-[#4B5563] mb-3">
+              {studentImpact === null
+                ? 'Checking what this would erase…'
+                : totalStudentRecords(studentImpact) === 0
+                ? 'They have not written anything yet. Their sign-in is deleted along with the account, so they will not be able to log in again. This cannot be undone.'
+                : `This erases ${totalStudentRecords(studentImpact)} thing${totalStudentRecords(studentImpact) === 1 ? '' : 's'} they wrote — notes, writing and reading progress — and deletes their sign-in, so they will not be able to log in again. This cannot be undone.`}
+            </p>
+            <label htmlFor="delete-student-confirm" className="block text-xs font-semibold text-[#4B5563] mb-1">
+              Type <span className="font-bold text-[#1A1D23]">{confirmDeleteStudent.displayName}</span> to confirm
+            </label>
+            <input
+              id="delete-student-confirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoComplete="off"
+              className="w-full border border-[#D1D5DB] rounded-xl px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            {actionError && <p className="text-sm text-red-600 mb-3">{actionError}</p>}
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteStudent(null)} className="flex-1 border border-[#D1D5DB] rounded-xl py-3 font-semibold text-[#4B5563] hover:bg-[#F3F4F6] transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteStudent(confirmDeleteStudent)}
+                disabled={
+                  busy
+                  || studentImpact === null
+                  || deleteConfirmText.trim() !== confirmDeleteStudent.displayName
+                }
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl py-3 font-bold transition-colors disabled:opacity-60"
+              >
+                {busy ? 'Deleting…' : 'Delete account'}
               </button>
             </div>
           </div>
