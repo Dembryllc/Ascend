@@ -1,0 +1,75 @@
+# Manual Cloud Function deploys.
+#
+# firebase-deploy.yml ships hosting, Firestore rules, indexes and Storage rules
+# on every push to main, but deliberately NOT functions — a function deploy is
+# slow, rebuilds containers, and is not something every docs commit should do.
+# So functions have always been "run the CLI by hand", which is no help at all
+# if the hand in question is holding an iPad.
+#
+# This is that CLI, on a runner, behind a button: Actions → Deploy Cloud
+# Functions → Run workflow. It works from any browser, including mobile.
+#
+# It is workflow_dispatch only. It will never fire on a push.
+name: Deploy Cloud Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag or SHA to deploy the functions from'
+        required: true
+        default: 'main'
+      functions:
+        description: 'Which functions, comma-separated (e.g. deleteStudentAccount). Use "all" for every function.'
+        required: true
+        default: 'deleteStudentAccount'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout ${{ inputs.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and build functions
+        working-directory: functions
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ASCEND_ANNOTATE }}
+          TARGETS: ${{ inputs.functions }}
+        run: |
+          printf '%s' "$SA_JSON" > /tmp/sa.json
+          trap 'rm -f /tmp/sa.json' EXIT
+          npm install -g firebase-tools
+
+          # "all" means the whole codebase; anything else is turned into the
+          # functions:a,functions:b form the CLI expects. Deploying one function
+          # by name is the default on purpose — it leaves stripeWebhook and the
+          # ActiveCampaign trigger untouched, and avoids needing their secrets.
+          if [ "$TARGETS" = "all" ]; then
+            ONLY="functions"
+          else
+            ONLY=$(echo "$TARGETS" | tr -d ' ' | sed 's/[^,][^,]*/functions:&/g')
+          fi
+          echo "Deploying --only $ONLY from ${{ inputs.ref }}"
+
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
+            --only "$ONLY" \
+            --project ascend-annotate \
+            --non-interactive
