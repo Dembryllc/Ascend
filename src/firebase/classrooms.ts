@@ -1,43 +1,32 @@
 import {
   collection,
   doc,
-  addDoc,
   getDoc,
   getDocs,
   writeBatch,
-  arrayUnion,
   arrayRemove,
   query,
   where,
-  serverTimestamp,
 } from 'firebase/firestore'
-import { db } from './config'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from './config'
 import type { Classroom } from '@/types'
 
-function generateJoinCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-}
-
-async function generateUniqueJoinCode(): Promise<string> {
-  for (let i = 0; i < 8; i += 1) {
-    const joinCode = generateJoinCode()
-    const existing = await getDocs(query(collection(db, 'classrooms'), where('joinCode', '==', joinCode)))
-    if (existing.empty) return joinCode
-  }
-  throw new Error('Could not create a unique join code. Please try again.')
-}
-
-export async function createClassroom(name: string, teacherId: string): Promise<Classroom> {
-  const joinCode = await generateUniqueJoinCode()
-  const ref = await addDoc(collection(db, 'classrooms'), {
-    name,
-    teacherId,
-    joinCode,
-    studentIds: [],
-    createdAt: serverTimestamp(),
-  })
-  return { id: ref.id, name, teacherId, joinCode, studentIds: [], createdAt: new Date() }
+/**
+ * Creates the signed-in teacher's classroom.
+ *
+ * Server-side (functions/src/classroom.ts) because the join code has to be
+ * unique across every classroom in the product, and checking that means
+ * reading classrooms this teacher has no business reading. firestore.rules
+ * denies classroom creation to clients outright — this is the only way in.
+ */
+export async function createClassroom(name: string): Promise<Classroom> {
+  const call = httpsCallable<
+    { name: string },
+    { id: string; name: string; teacherId: string; joinCode: string; studentIds: string[] }
+  >(functions, 'createClassroom')
+  const { data } = await call({ name })
+  return { ...data, createdAt: new Date() }
 }
 
 export async function getClassroomByTeacher(teacherId: string): Promise<Classroom | null> {
@@ -60,31 +49,23 @@ export async function getClassroom(classroomId: string): Promise<Classroom | nul
   return { id: snap.id, ...data, createdAt: data.createdAt?.toDate() ?? new Date() } as Classroom
 }
 
-export async function joinClassroomByCode(studentId: string, joinCode: string): Promise<string> {
-  const q = query(collection(db, 'classrooms'), where('joinCode', '==', joinCode.toUpperCase().trim()))
-  const snap = await getDocs(q)
-  if (snap.empty) throw new Error('Invalid join code. Check the code with your teacher.')
-
-  const classroomDoc = snap.docs[0]
-  const classroomId = classroomDoc.id
-  const teacherId = classroomDoc.data().teacherId as string
-
-  const batch = writeBatch(db)
-  batch.update(doc(db, 'classrooms', classroomId), { studentIds: arrayUnion(studentId) })
-  batch.update(doc(db, 'users', studentId), { classroomId })
-  await batch.commit()
-
-  // Add student to all books already uploaded by this classroom's teacher
-  const booksSnap = await getDocs(query(collection(db, 'books'), where('uploadedBy', '==', teacherId)))
-  if (!booksSnap.empty) {
-    const bookBatch = writeBatch(db)
-    booksSnap.docs.forEach((bookDoc) => {
-      bookBatch.update(bookDoc.ref, { assignedStudentIds: arrayUnion(studentId) })
-    })
-    await bookBatch.commit()
-  }
-
-  return classroomId
+/**
+ * Enrols the signed-in student in the classroom matching `joinCode`.
+ *
+ * Server-side (functions/src/classroom.ts) because a Firestore rule cannot see
+ * the join code: it is never written into the document being changed, and a
+ * rule cannot read the values a client filtered its query by. The old rule
+ * could therefore only check that the caller was adding themselves — which
+ * every attacker also is — so any signed-in account could enrol in any
+ * classroom in the product. The callable checks the code before it writes.
+ */
+export async function joinClassroomByCode(joinCode: string): Promise<string> {
+  const call = httpsCallable<{ joinCode: string }, { classroomId: string; name: string }>(
+    functions,
+    'joinClassroom',
+  )
+  const { data } = await call({ joinCode })
+  return data.classroomId
 }
 
 /**

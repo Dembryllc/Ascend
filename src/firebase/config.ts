@@ -1,8 +1,8 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
-import { getFunctions } from 'firebase/functions'
+import { getStorage, connectStorageEmulator } from 'firebase/storage'
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 
 // Replace these placeholder values with your actual Firebase project config.
 // In production, store these in environment variables (VITE_FIREBASE_*).
@@ -30,11 +30,16 @@ export const db        = getFirestore(app)
 export const storage   = getStorage(app)
 export const functions = getFunctions(app)
 
-// Local development / E2E only: point Auth + Firestore at the emulator suite.
-// No-op in production — only active when VITE_USE_EMULATORS === 'true'.
+// Local development / E2E only: point Auth, Firestore and Functions at the
+// emulator suite. No-op in production — only active when
+// VITE_USE_EMULATORS === 'true'. Functions is in the list because classroom
+// creation and enrolment are callables now, so the registration and join
+// flows do not work against emulators without it.
 if (import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001)
+  connectStorageEmulator(storage, '127.0.0.1', 9199)
 }
 
 export default app

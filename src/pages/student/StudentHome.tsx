@@ -218,7 +218,6 @@ export default function StudentHome() {
       </div>
 
       <StudentOnboardingChecklist
-        studentId={profile!.uid}
         classroomId={profile!.classroomId}
         firstBookId={(assignedBooks[0] ?? myBooks[0])?.id ?? null}
         hasStartedReading={readingProgress.length > 0}
@@ -611,7 +610,6 @@ function WritingTaskCard({
 }
 
 function StudentOnboardingChecklist({
-  studentId,
   classroomId,
   firstBookId,
   hasStartedReading,
@@ -619,7 +617,6 @@ function StudentOnboardingChecklist({
   onJoined,
   role,
 }: {
-  studentId: string
   classroomId: string | null | undefined
   firstBookId: string | null
   hasStartedReading: boolean
@@ -640,7 +637,7 @@ function StudentOnboardingChecklist({
     setJoining(true)
     setJoinError('')
     try {
-      await joinClassroomByCode(studentId, code.trim())
+      await joinClassroomByCode(code.trim())
       setJoined(true)
       setTimeout(onJoined, 1500)
     } catch (err: unknown) {

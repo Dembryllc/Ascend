@@ -12,7 +12,7 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore'
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage'
+import { ref, uploadBytesResumable, getDownloadURL, getBlob, deleteObject } from 'firebase/storage'
 import { db, storage } from './config'
 import type { Book } from '@/types'
 
@@ -126,12 +126,29 @@ export async function getBook(bookId: string): Promise<Book | null> {
   return { id: snap.id, ...data, createdAt: data.createdAt?.toDate() ?? new Date() } as Book
 }
 
+/**
+ * Downloads a book's PDF through the Storage SDK, as the signed-in user.
+ *
+ * This used to be a plain `fetch(storageUrl)`. A getDownloadURL() link carries
+ * its own access token in the query string and is honoured on its own — it does
+ * not authenticate as anybody, so storage.rules is never consulted and every
+ * rule in it may as well not exist for anyone holding the link. Going through
+ * getBlob() sends the user's ID token instead, so reads are actually evaluated.
+ *
+ * `ref(storage, url)` accepts a full download URL, so the stored storageUrl on
+ * existing book documents keeps working untouched.
+ *
+ * Two things this does NOT fix, both ops work rather than code:
+ *  - the tokens already minted stay valid for anyone who has one. They are
+ *    revoked per-object in the Firebase console (Storage → file → Create new
+ *    access token), which invalidates the old link.
+ *  - getBlob() is an XHR carrying an Authorization header, so the bucket's CORS
+ *    config must allow that header for the app's origin. A plain GET of a
+ *    tokenized URL did not need it. If books stop opening after this ships,
+ *    that is the first thing to check.
+ */
 export async function getBookPdfBlob(storageUrl: string): Promise<Blob> {
-  const response = await fetch(storageUrl)
-  if (!response.ok) {
-    throw new Error(`PDF download failed: ${response.status}`)
-  }
-  return response.blob()
+  return getBlob(ref(storage, storageUrl))
 }
 
 export async function assignBookToStudent(bookId: string, studentId: string): Promise<void> {

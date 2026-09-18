@@ -26,6 +26,14 @@
 - Teacher access to annotations and progress is classroom-scoped by Firestore rules — never weaken this
 - FERPA notices on `AnnotationsViewerPage` and `ProgressDashboardPage` must remain visible
 - Do not write student names (only nicknames/first names at registration)
+- **`allow read: if isSignedIn()` is never an acceptable rule on a collection holding
+  user data.** It was on `users` and on `classrooms` until 2026-09-18 and it published
+  every student's name, role and classroom, every teacher's email and `stripeCustomerId`,
+  and every roster and join code to any account that could sign up. See the access-control
+  section below.
+- **Enrolment is server-side and must stay there** — `createClassroom` / `joinClassroom`
+  callables. A rule cannot verify a join code, so a client-side enrolment write can only
+  ever check that the caller is adding *themselves*, which every attacker also is.
 
 ## Critical Gotchas — Do Not Change
 - **PDF.js worker — this entry no longer matches the code (noticed 2026-09-10).** It used
@@ -96,6 +104,67 @@
   forces null via `annotationClassroomId`. This is also what keeps those notes out of
   `getAnnotationsByClassroom`, i.e. off the teacher's own annotations dashboard.
 
+## Access control — the 2026-09-18 FERPA audit
+Three collections and the Storage bucket were readable by any account that could sign up.
+All three holes are closed; the shape of the fix matters more than the diff.
+
+- **`users` reads** are the owner, plus the teacher of the classroom named by that user's
+  own `classroomId`. That second branch is exactly what the four teacher dashboards need —
+  each maps over its own `classroom.studentIds` calling `getUserProfile(id)`. It also
+  revokes itself: `removeStudentFromClassroom` clears `classroomId`, so the teacher's read
+  stops the moment the student leaves. Teacher/individual profiles carry `classroomId:
+  null`, which is what keeps their email and `stripeCustomerId` private from everyone.
+- **`classrooms` reads** are the owning teacher and enrolled students. `allow create: if
+  false` — no client may create one at all.
+- **No self-add anywhere.** The `studentIds` branch on `classrooms` and the
+  `assignedStudentIds` branch on `books` are both gone. They proved the caller was adding
+  themselves and nothing else, so any account could enrol in any classroom and assign
+  itself any book (i.e. read the PDF).
+- **`functions/src/classroom.ts`** holds the two callables that replaced them.
+  `createClassroom` exists because a unique join code has to be checked against a
+  collection no client can read — and because a client that picks its own code can collide
+  with a real teacher's, sending their students onto an attacker's roster.
+  `joinClassroom` checks the code before it writes, throttles wrong guesses on the
+  caller's own user doc, and does the same three writes the client used to.
+- **Registration order is now forced, not just preferred** — the callable authorises on
+  role, so the profile `setDoc` must land before the join. A wrong code at registration no
+  longer deletes the account; it leaves a registered student who is not in a class yet,
+  which is what StudentHome's onboarding checklist is for.
+- **`storage.rules` uses `firestore.get()`** to resolve entitlement, because nothing in an
+  object's path names a book. A teacher's folder is readable by the teacher and by
+  students enrolled in their classroom; `student-books/` is owner-only, matching Firestore
+  (`canReadBook` never grants a teacher a student's own upload).
+- **Legacy flat `books/<file>` objects are still world-readable to signed-in accounts** —
+  a deliberate migration shim, commented as such in `storage.rules`. Nothing in their path
+  names an owner, so no rule can scope them. They are teacher-uploaded texts, never
+  student work. Re-upload them and delete that match block.
+- **Rules tests that only walk the happy path prove nothing.** All six pre-existing suites
+  passed unchanged against both the broken rules and the fixed ones, because they seed via
+  `withSecurityRulesDisabled` and then test what the app does. `tests/rules/accessControl.test.mjs`
+  asks who *else* could have done it; 11 of its 19 checks fail against the old rules.
+
+## Critical gotcha — a download URL is not access control
+`getDownloadURL()` mints a URL with a token in the query string that is honoured on its
+own, authenticating as nobody. `ReadingPage` used to hand that URL straight to react-pdf
+(`<Document file={book.storageUrl}>`), so pdf.js fetched it unauthenticated and
+`storage.rules` was never consulted on the one path that opens a book — every rule in that
+file was decorative for the reader. (`getBookPdfBlob` had the same `fetch()` bug but no
+callers at all, so fixing it alone would have changed nothing.) The page now downloads the
+bytes through `getBookPdfBlob` → `getBlob()`, which sends the user's ID token, and passes
+`<Document>` a Blob. Four things to keep in mind:
+- **Hold the Blob with the URL it came from** (`pdf: { url, blob }`) and derive what
+  `<Document>` gets. Clearing it in the effect body instead trips
+  `react-hooks/set-state-in-effect`, and a bare Blob would let a stale one paint after a
+  book switch. Identity must stay stable across renders or the full-screen toggle
+  re-downloads the PDF — see the "nothing unmounts on toggle" rule.
+- `noData` on `<Document>` carries the spinner while the download is in flight, so the
+  element never unmounts and remounts.
+- Tokens already minted stay valid for whoever holds them. Revoking is per-object in the
+  Firebase console (Storage → file → Create new access token).
+- `getBlob()` is an XHR with an `Authorization` header, so the bucket's CORS config must
+  allow that header. A plain GET of a tokenized URL did not. **If books stop opening in
+  production after this ships, check CORS first** — the emulator does not exercise it.
+
 ## Firestore Rules & Indexes — Auto-Deployed by CI
 `firebase-deploy.yml` runs `firebase deploy --only hosting,firestore:rules,firestore:indexes,storage`
 on push to `main` (rules from `firestore.rules`, indexes from `firestore.indexes.json`, Storage rules
@@ -136,18 +205,31 @@ Standalone graphic-organizer writing that is **not tied to a book**. Reuses `ORG
 - **Rules tests:** `npm run test:rules` boots the Firestore emulator (needs Java) and runs
   `tests/rules/*.test.mjs` against `firestore.rules` — covers read/write scoping for all three
   writing collections, incl. the classroom-pinning edge cases, plus student/book removal
-  (`removal.test.mjs`) and teacher annotations (`teacherAnnotations.test.mjs`). 44 checks
-  across 7 suites as of 2026-09-10. Dev-only deps: `firebase-tools`,
+  (`removal.test.mjs`), teacher annotations (`teacherAnnotations.test.mjs`) and the
+  access-control scoping from the FERPA audit (`accessControl.test.mjs`). 63 checks
+  across 10 suites as of 2026-09-18. Dev-only deps: `firebase-tools`,
   `@firebase/rules-unit-testing`. Emulator config is `firebase.test.json` (separate from the deploy
   `firebase.json`).
-- **Browser E2E:** `npm run test:e2e` boots Auth+Firestore emulators (`firebase.emulator.json`),
-  seeds a teacher/student/task (`tests/e2e/seed.mjs`), runs Vite with `VITE_USE_EMULATORS=true`, and
+- **Browser E2E:** `npm run test:e2e` boots Auth+Firestore+**Functions**+**Storage**
+  emulators (`firebase.emulator.json`; `run.sh` builds `functions/` first, and `config.ts`
+  wires `connectFunctionsEmulator` / `connectStorageEmulator` — without the first the
+  class-join flow has nothing to call, and without the second no flow touches
+  `storage.rules` at all). The fixture PDFs are uploaded to the Storage emulator by
+  `seed-pdfs.mjs` and `seed-annotations.mjs` rather than served from a relative Vite path,
+  which is what makes the reader exercise the real download path.
+  `tests/e2e/storage-scope.e2e.mjs` then asserts the bucket's answers directly — an
+  enrolled student reads their teacher's book, the teacher is denied the student's own
+  upload, an unenrolled account is denied both.
+  The suite seeds a teacher/student/task (`tests/e2e/seed.mjs`), runs Vite with `VITE_USE_EMULATORS=true`, and
   drives Chromium through the full write → review → feedback loop (`tests/e2e/writing.e2e.mjs`)
   then the sign-up regression flow (`tests/e2e/register.e2e.mjs` — student registration with and
   without a class join code, asserting the "Account setup incomplete" screen never appears), then the
   image-only-PDF flow (`tests/e2e/pdftext.e2e.mjs` — the same colourful page as a text-layer PDF and
   as a scan, asserting selection + read aloud work on one and are explained away on the other),
-  screenshotting each step. `tests/e2e/seed-pdfs.mjs` seeds the two fixture books;
+  screenshotting each step. `tests/e2e/seed.mjs` writes the classroom through the Firestore emulator's
+  `Authorization: Bearer owner` admin bypass, because the rules deny classroom creation to
+  every client — it stands in for the callable rather than pretending a client could.
+  `tests/e2e/seed-pdfs.mjs` seeds the two fixture books;
   `tests/e2e/fixtures/make-pdfs.mjs` regenerates the fixture PDFs. `run.sh` takes the screenshot dir as `$1` and a space-separated flow list
   as `$2`. `src/firebase/config.ts` connects to the emulators only when
   `VITE_USE_EMULATORS === 'true'` (no-op in prod). Dev-only dep: `playwright` (uses the image's

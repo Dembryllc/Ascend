@@ -124,11 +124,30 @@ service cloud.firestore {
     }
 
     // ── users ─────────────────────────────────────────────────────────────
-    // Users read their own profile, or any authenticated user can read
-    // profiles (teachers need to look up student display names).
-    // Only the account owner may write their own document.
+    // Read: the account owner, plus the teacher of the classroom this user is
+    // currently enrolled in. That second branch is what the teacher dashboards
+    // need — every one of them maps over its own classroom.studentIds calling
+    // getUserProfile(id) to put a name on a row.
+    //
+    // This used to be `allow read: if isSignedIn()`, on the reasoning that
+    // "teachers need to look up student display names". It let ANY signed-in
+    // account read EVERY user document: every student's display name, role and
+    // classroom, and every teacher's email and stripeCustomerId. That is an
+    // unauthorized disclosure of education records under FERPA, and it is the
+    // hole this branch closes — the lookup teachers actually need is scoped to
+    // their own roster, and nothing else was ever using the broad read.
+    //
+    // Un-enrolment revokes it for free: removeStudentFromClassroom clears the
+    // student's own classroomId, so this branch stops matching the moment they
+    // leave the roster. Teacher and individual profiles carry classroomId null,
+    // so no one but the owner can read them at all.
     match /users/{uid} {
-      allow read: if isSignedIn();
+      allow read: if isOwner(uid)
+        || (
+          resource.data.keys().hasAll(['classroomId'])
+          && resource.data.classroomId is string
+          && isClassTeacher(resource.data.classroomId)
+        );
       allow create: if isOwner(uid);
       allow update: if isOwner(uid)
         // A classroom's teacher may clear that student's classroomId when
@@ -142,30 +161,46 @@ service cloud.firestore {
     }
 
     // ── classrooms ────────────────────────────────────────────────────────
-    // Any signed-in user may read classrooms (join-code lookup at registration).
-    // Only the teacher who owns the classroom may write it.
+    // Read: the teacher who owns it, or a student currently on its roster.
+    //
+    // This used to be `allow read: if isSignedIn()` so the client could look a
+    // join code up at registration. That published every classroom in the
+    // product to every signed-in account — the full roster of student uids AND
+    // the join code needed to walk into it. Join-code lookup is now the
+    // joinClassroom callable's job (functions/src/classroom.ts), which runs as
+    // admin and never hands the classroom back to an unenrolled caller.
+    //
+    // Create is closed to clients entirely. A classroom's join code has to be
+    // unique across the whole collection, and proving that means querying
+    // classrooms the creator cannot read — the check has to be server-side, so
+    // the write is too. It also has to be: a client that picks its own join
+    // code can mint one that collides with a real teacher's, and students who
+    // typed their teacher's code would land on the attacker's roster, whose
+    // annotations the attacker then reads as isClassTeacher. createClassroom
+    // in functions/src/classroom.ts is the only way in.
+    //
+    // Update no longer carries a self-add-to-studentIds branch. It checked
+    // only that the caller was adding themselves and adding exactly one id —
+    // never that they knew the join code, because the code is never part of
+    // the written document and a rule cannot see a query's filter values. Any
+    // signed-in account could therefore enrol itself in any classroom it could
+    // read, which was all of them. Enrolment is the callable's job now.
     match /classrooms/{classroomId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
+      allow read: if isSignedIn() && (
         isOwner(resource.data.teacherId)
-        || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentIds'])
-          && !(request.auth.uid in resource.data.studentIds)
-          && request.auth.uid in request.resource.data.studentIds
-          && request.resource.data.studentIds.hasAll(resource.data.studentIds)
-          && request.resource.data.studentIds.size() == resource.data.studentIds.size() + 1
-        )
+        || request.auth.uid in resource.data.studentIds
       );
+      allow create: if false;
+      allow update: if isSignedIn() && isOwner(resource.data.teacherId);
       allow delete: if isSignedIn() && isOwner(resource.data.teacherId);
     }
 
     // ── books ─────────────────────────────────────────────────────────────
     // Read: any signed-in user who appears in assignedStudentIds, OR the teacher
     //       who uploaded it, OR a student reading their own uploaded book.
-    // Create: any signed-in user (teacher uploads or student self-upload).
-    //         For student books the app sets uploadedBy = uid and
-    //         assignedStudentIds = [uid] — enforced here.
+    // Create: any signed-in user, filing the book under their own uid
+    //         (teacher uploads or student self-upload). For student books the
+    //         app sets uploadedBy = uid and assignedStudentIds = [uid].
     // Update/delete: only the user who originally uploaded the book.
     match /books/{bookId} {
       allow read: if isSignedIn() && (
@@ -173,33 +208,34 @@ service cloud.firestore {
         || isOwner(resource.data.uploadedBy)
       );
 
-      allow create: if isSignedIn() && (
-        // Teacher upload — no special constraints beyond being signed in
-        !request.resource.data.keys().hasAll(['uploadedByStudent'])
-        // Student self-upload — must own the doc and be in assignedStudentIds
-        || (request.resource.data.uploadedByStudent == true
-            && request.resource.data.uploadedBy == request.auth.uid
-            && request.auth.uid in request.resource.data.assignedStudentIds)
-      );
+      // Either kind of upload must claim itself: uploadedBy is the author's own
+      // uid. The teacher branch used to assert nothing but "signed in", which
+      // let any account file a book under another teacher's name.
+      allow create: if isSignedIn()
+        && request.resource.data.uploadedBy == request.auth.uid
+        && (
+          // Teacher upload
+          !request.resource.data.keys().hasAll(['uploadedByStudent'])
+          // Student self-upload — must also be in assignedStudentIds
+          || (request.resource.data.uploadedByStudent == true
+              && request.auth.uid in request.resource.data.assignedStudentIds)
+        );
 
-      allow update: if isSignedIn() && (
-        isOwner(resource.data.uploadedBy)
-        || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedStudentIds'])
-          && request.auth.uid in request.resource.data.assignedStudentIds
-          && !(request.auth.uid in resource.data.assignedStudentIds)
-          && request.resource.data.assignedStudentIds.hasAll(resource.data.assignedStudentIds)
-          && request.resource.data.assignedStudentIds.size() == resource.data.assignedStudentIds.size() + 1
-        )
-      );
+      // Only the uploader. The self-add-to-assignedStudentIds branch that used
+      // to live here was the same hole as the classrooms one: it proved the
+      // caller was adding themselves, never that they were entitled to. Any
+      // signed-in account could assign itself any book in the product and read
+      // the PDF. joinClassroom assigns the teacher's library server-side now.
+      allow update: if isSignedIn() && isOwner(resource.data.uploadedBy);
       allow delete: if isSignedIn() && isOwner(resource.data.uploadedBy);
     }
 
     // ── annotations ───────────────────────────────────────────────────────
-    // Students own their annotations; teachers can read any annotation
-    // (needed for the annotations viewer dashboard).
-    // We avoid a role lookup by letting any signed-in user read — the app
-    // only ever queries annotations scoped to a specific studentId or bookId.
+    // Students own their annotations. A teacher reads one only by standing in
+    // a named relation to it: teacher of the classroom the annotation is
+    // pinned to, or the teacher who uploaded the book it is on and who has
+    // that student assigned to it. There is no role check and no blanket
+    // signed-in read — the two predicates below are the whole grant.
     match /annotations/{annotationId} {
       allow read: if isSignedIn() && (
         isOwner(resource.data.studentId)

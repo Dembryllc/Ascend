@@ -10,7 +10,7 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth'
-import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, setDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './config'
 import type { UserRole, UserProfile } from '@/types'
 import { joinClassroomByCode } from './classrooms'
@@ -29,13 +29,6 @@ export async function registerUser(
   await updateProfile(user, { displayName })
 
   try {
-    // Validate join code while signed in, before committing the profile.
-    // Invalid code → throw here so the auth account is cleaned up and user can retry.
-    if (role === 'student' && classroomJoinCode?.trim()) {
-      const found = await resolveJoinCode(classroomJoinCode.trim())
-      if (!found) throw new Error('Invalid class join code. Please check the code with your teacher.')
-    }
-
     const trialEndsAt = (role === 'teacher' || role === 'individual')
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
       : null
@@ -65,9 +58,19 @@ export async function registerUser(
 
   // Non-critical: join the classroom after the profile exists.
   // Any failure here is recoverable — the student can join later via the onboarding checklist.
+  //
+  // The join code used to be validated up here BEFORE the profile was written,
+  // so a typo threw, deleted the half-made auth account and let the user retry.
+  // That check was a client query over classrooms by joinCode, which the read
+  // rule no longer permits — and the callable that replaced it needs the
+  // profile to already exist, because it authorises on role. So the order is
+  // now fixed: profile first, join second, and a wrong code leaves a registered
+  // student who simply is not in a class yet. That is the state the onboarding
+  // checklist on StudentHome is built for — it shows a working join box — and
+  // it is a gentler outcome than deleting the account over a mistyped letter.
   if (role === 'student' && classroomJoinCode?.trim()) {
     try {
-      await joinClassroomByCode(user.uid, classroomJoinCode.trim())
+      await joinClassroomByCode(classroomJoinCode.trim())
     } catch (err) {
       console.warn('Classroom join during registration failed; user can join later:', err)
     }
@@ -208,11 +211,4 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     createdAt: data.createdAt?.toDate() ?? new Date(),
     trialEndsAt: data.trialEndsAt?.toDate() ?? undefined,
   } as UserProfile
-}
-
-async function resolveJoinCode(joinCode: string): Promise<string | null> {
-  const q = query(collection(db, 'classrooms'), where('joinCode', '==', joinCode.toUpperCase()))
-  const snap = await getDocs(q)
-  if (snap.empty) return null
-  return snap.docs[0].id
 }

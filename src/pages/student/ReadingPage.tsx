@@ -10,7 +10,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { useAuth } from '@/context/auth-context'
-import { getBook } from '@/firebase/books'
+import { getBook, getBookPdfBlob } from '@/firebase/books'
 import { getAnnotationsByStudentAndBook, saveAnnotation, updateAnnotation, deleteAnnotation } from '@/firebase/annotations'
 import { getReadingProgress, recordReadingProgress } from '@/firebase/readingProgress'
 import type { Book, Annotation, ReadingProgress, ReactionType } from '@/types'
@@ -51,6 +51,12 @@ export default function ReadingPage() {
   const { profile } = useAuth()
 
   const [book, setBook] = useState<Book | null>(null)
+  // The PDF itself, downloaded as the signed-in user rather than let pdf.js
+  // fetch the stored URL. See the effect below. Stored with the URL it came
+  // from so switching books cannot momentarily show the previous book's file,
+  // which is otherwise what clearing it in the effect body would be for — and
+  // a synchronous setState in an effect trips react-hooks/set-state-in-effect.
+  const [pdf, setPdf] = useState<{ url: string; blob: Blob } | null>(null)
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
@@ -218,6 +224,36 @@ export default function ReadingPage() {
       setLoadingBook(false)
     })
   }, [bookId, profile, shouldOpenWritingTask, setSearchParams])
+
+  // Download the PDF ourselves and hand <Document> the bytes.
+  //
+  // `file={book.storageUrl}` let pdf.js fetch the stored download URL directly.
+  // That URL carries its own access token and authenticates as nobody, so
+  // storage.rules was never consulted on the one path that actually opens a
+  // book — every rule in that file was decorative for the reader. getBookPdfBlob
+  // goes through getBlob(), which sends the user's ID token.
+  //
+  // Keyed on the URL string, never on `book`: the book object is a fresh
+  // identity on every load and re-running this would re-download the PDF. The
+  // Blob then sits in state with a stable identity, so toggling full screen
+  // re-renders <Document> with the very same `file` and nothing refetches —
+  // which is the whole point of the "nothing unmounts on toggle" rule.
+  useEffect(() => {
+    const url = book?.storageUrl
+    if (!url) return
+    let cancelled = false
+    getBookPdfBlob(url)
+      .then((blob) => { if (!cancelled) setPdf({ url, blob }) })
+      .catch((err: unknown) => {
+        console.error('Failed to download book PDF:', err)
+        if (!cancelled) setReaderError('This book\'s file could not be downloaded. You may no longer have access to it.')
+      })
+    return () => { cancelled = true }
+  }, [book?.storageUrl])
+
+  // Identity is stable while the same blob is in state, so re-rendering
+  // <Document> on a full-screen toggle hands it the very same `file`.
+  const pdfSource = pdf && pdf.url === book?.storageUrl ? pdf.blob : null
 
   const pageAnnotations = useMemo(
     () => annotations.filter((a) => a.pageNumber === currentPage),
@@ -884,9 +920,10 @@ export default function ReadingPage() {
             >
               <div className={immersive ? 'w-full h-full overflow-auto flex justify-center items-start p-2' : 'contents'}>
               <Document
-                  file={book.storageUrl}
+                  file={pdfSource}
                   onLoadSuccess={onDocumentLoaded}
                   onLoadError={onDocumentLoadError}
+                  noData={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#4A90D9] border-t-transparent rounded-full animate-spin" /></div>}
                   error={
                     <div className="bg-white rounded-2xl border border-red-100 p-6 text-center text-red-700">
                       This PDF could not be rendered. Try re-uploading it or using a different PDF.

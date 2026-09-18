@@ -2,18 +2,54 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Any authenticated user can read a book PDF — the reader has to render it,
-    // and Firestore rules decide which books a user can see in the first place.
-    // Legacy teacher uploads live flat under books/, so this match stays broad.
-    match /books/{allPaths=**} {
+    // ── helpers ──────────────────────────────────────────────────────────
+    // Storage rules cannot see a book document — nothing in the object path
+    // carries a bookId — so entitlement is proved through the enrolment that
+    // granted it instead: the reader's own classroom, and who teaches it.
+    // Both helpers cost a Firestore read per request, which is why they are
+    // only ever reached after the cheap owner check below has failed.
+    function classroomOf(uid) {
+      return firestore.get(/databases/(default)/documents/users/$(uid)).data.classroomId;
+    }
+    function teacherOfClassroom(classroomId) {
+      return firestore.get(/databases/(default)/documents/classrooms/$(classroomId)).data.teacherId;
+    }
+    // The reader is enrolled in a classroom taught by ownerId.
+    function isStudentOf(ownerId) {
+      return request.auth != null
+        && classroomOf(request.auth.uid) is string
+        && teacherOfClassroom(classroomOf(request.auth.uid)) == ownerId;
+    }
+
+    // ── legacy flat teacher uploads ──────────────────────────────────────
+    // MIGRATION SHIM — books uploaded before uploads moved to books/{ownerId}/
+    // sit flat under books/ with nothing in the path naming their owner, so no
+    // rule can scope them to anyone. One path segment only, so it cannot match
+    // the owner-scoped books/{ownerId}/... files below.
+    //
+    // Kept readable deliberately rather than broken: these are teacher-uploaded
+    // classroom texts, never student work (student uploads have always gone to
+    // student-books/), so what stays exposed is a book excerpt, not a student's
+    // record. Dropping this match would make every legacy book fail to open in
+    // the reader with no way for the teacher to fix it but re-uploading.
+    // Re-upload them and delete this block — until then it is the one place an
+    // unrelated signed-in account can still read something it was not given.
+    // No write rules: nothing can be added to the flat path any more.
+    match /books/{fileName} {
       allow read: if request.auth != null;
     }
 
-    // Teacher-uploaded books, filed under the uploading teacher's uid so that
-    // deletion can be scoped to its owner. Writes restricted to PDFs under 50 MB.
-    // `request.resource` is null on a delete, so the content checks have to live
-    // on create/update only — a combined `allow write` rule denies every delete.
+    // ── teacher-uploaded books ───────────────────────────────────────────
+    // Filed under the uploading teacher's uid, which is what lets both reads
+    // and deletes be scoped to an owner. Read: the teacher who owns it, or a
+    // student currently enrolled in that teacher's classroom. It used to be
+    // any authenticated account at all.
+    // `request.resource` is null on a delete, so the content checks have to
+    // live on create/update only — a combined `allow write` denies every
+    // delete. Writes restricted to PDFs under 50 MB.
     match /books/{ownerId}/{allPaths=**} {
+      allow read: if request.auth != null
+        && (request.auth.uid == ownerId || isStudentOf(ownerId));
       allow create, update: if request.auth != null
         && request.auth.uid == ownerId
         && request.resource.contentType == 'application/pdf'
@@ -21,10 +57,17 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == ownerId;
     }
 
-    // Student-uploaded books: stored under their uid folder.
-    // Only the owning student can write or delete; any authenticated user can read.
+    // ── student-uploaded books ───────────────────────────────────────────
+    // A student's own upload is their document — it is not classroom material
+    // and it is the most private thing in the bucket. The owner and no one
+    // else, which is exactly what Firestore already says: canReadBook grants a
+    // book to its uploader and to assignedStudentIds, and a student upload
+    // carries uploadedBy = assignedStudentIds = [that student], so not even
+    // their teacher can read the record. A broader grant here would hand out a
+    // file whose storageUrl the teacher has no way to obtain anyway.
+    // This was readable by every authenticated account in the product.
     match /student-books/{studentId}/{allPaths=**} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && request.auth.uid == studentId;
       allow create, update: if request.auth != null
         && request.auth.uid == studentId
         && request.resource.contentType == 'application/pdf'

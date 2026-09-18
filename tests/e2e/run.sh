@@ -3,11 +3,17 @@ set -euo pipefail
 SHOTS="${1:-e2e-shots}"
 # Flows run in order against one emulator/vite lifecycle. The writing flow runs
 # first so it sees the pristine seed; register adds students to the classroom.
-FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs tests/e2e/pdftext.e2e.mjs tests/e2e/annotations.e2e.mjs tests/e2e/reader.e2e.mjs tests/e2e/navigation.e2e.mjs tests/e2e/readaloud.e2e.mjs tests/e2e/removal.e2e.mjs}"
+FLOWS="${2:-tests/e2e/writing.e2e.mjs tests/e2e/register.e2e.mjs tests/e2e/pdftext.e2e.mjs tests/e2e/annotations.e2e.mjs tests/e2e/reader.e2e.mjs tests/e2e/navigation.e2e.mjs tests/e2e/readaloud.e2e.mjs tests/e2e/storage-scope.e2e.mjs tests/e2e/removal.e2e.mjs}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-# Everything runs inside the emulator lifecycle so Auth+Firestore are up.
+# The Functions emulator serves compiled JS, so build it before booting.
+# Classroom creation and enrolment are callables now — without this, the
+# registration flow's class join has nothing to call.
+echo '--- building functions ---'
+(cd functions && npm install --silent && npm run build)
+
+# Everything runs inside the emulator lifecycle so Auth+Firestore+Functions are up.
 ./node_modules/.bin/firebase emulators:exec \
   --config firebase.emulator.json --project demo-ascend "
 set -e

@@ -25,7 +25,7 @@ export default function PrivacyPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold text-[#1A1D23] mb-2">Privacy Policy</h1>
-        <p className="text-sm text-[#9CA3AF] mb-8">Last updated: May 29, 2026</p>
+        <p className="text-sm text-[#9CA3AF] mb-8">Last updated: September 18, 2026</p>
 
         <div className="prose prose-sm max-w-none space-y-8 text-[#1A1D23]">
 
@@ -102,8 +102,19 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-bold mb-3">Third-party services</h2>
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              We use Google Firebase for authentication, database, and file storage. Firebase's privacy policy is available at firebase.google.com. Firebase is the only third-party service that student data ever reaches.
+            </p>
+            <p className="text-[#4B5563] leading-relaxed mb-3">
+              Three other services process <strong>teacher and individual account</strong> data only:
+            </p>
+            <ul className="list-disc pl-6 text-[#4B5563] space-y-1 mb-3">
+              <li><strong>Stripe</strong> — payment processing for paid subscriptions. Receives the billing details of the account holder. We never see or store full card numbers.</li>
+              <li><strong>ActiveCampaign</strong> — email and customer-relationship management. Receives a teacher's or individual's name and email address when they sign up.</li>
+              <li><strong>Mailgun</strong> — delivery of transactional and marketing email to teachers and individuals.</li>
+            </ul>
             <p className="text-[#4B5563] leading-relaxed">
-              We use Google Firebase for authentication, database, and file storage. Firebase's privacy policy is available at firebase.google.com. We do not use any other third-party services that process personal data.
+              No student record — no name, annotation, writing, reading progress or uploaded file — is sent to any of these three. Student accounts are not added to any mailing list and are not part of any billing relationship.
             </p>
           </section>
 

@@ -56,7 +56,7 @@ export default function ClassroomPage() {
     setCreating(true)
     setCreateError('')
     try {
-      const c = await createClassroom(newClassName.trim(), profile.uid)
+      const c = await createClassroom(newClassName.trim())
       setClassroom(c)
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Could not create classroom. Please try again.')

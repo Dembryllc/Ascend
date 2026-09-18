@@ -8,6 +8,7 @@ admin.initializeApp()
 export { syncTeacherSignupToActiveCampaign } from './activecampaign'
 export { subscribeLeadMagnet } from './leadMagnet'
 export { createPortalSession } from './billingPortal'
+export { createClassroom, joinClassroom } from './classroom'
 
 export const stripeWebhook = onRequest(
   {
